@@ -1,0 +1,5 @@
+.cardContainer {
+  position: relative;
+  display: inline-block;
+  overflow: visible; /* Allow shader to extend beyond card boundaries */
+}

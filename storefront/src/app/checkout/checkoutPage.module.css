@@ -1,0 +1,391 @@
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  width: 100%;
+}
+
+.breadcrumb {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: #6B7280;
+  flex-wrap: wrap;
+}
+
+.breadcrumb a {
+  color: #6B7280;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #000;
+}
+
+.section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background-color: #fff;
+}
+
+.sectionTitle {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #000;
+}
+
+.progressBarContainer {
+  position: fixed;
+  top: calc(65px + 1rem); /* Header height + top margin */
+  left: 0;
+  right: 0;
+  z-index: 900;
+  padding: 0 5%;
+  background-color: white;
+}
+
+/* Rename to sticky container */
+.stickyProgressBarContainer {
+  position: fixed;
+  top: calc(65px + 1rem); /* Header height + top margin */
+  left: 0;
+  right: 0;
+  z-index: 900;
+  padding: 0 5%;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease;
+}
+
+.formDivider {
+  position: relative;
+  height: 4px;
+  background-color: #E5E7EB;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.formDividerProgress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: #000;
+  transition: width 0.3s ease;
+}
+
+.formGroup {
+  margin-bottom: 1.25rem;
+  width: 100%;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 400;
+  margin-bottom: 0.5rem;
+  color: #000;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #000;
+}
+
+.input::placeholder {
+  color: #9CA3AF;
+  opacity: 0.7;
+}
+
+/* Shipping Options */
+.shippingOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.shippingOption {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.radioInput {
+  margin: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid #000;
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.radioInput:checked::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.625rem;
+  height: 0.625rem;
+  background: #000;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.radioLabel {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #000;
+  font-weight: 400;
+  width: 100%;
+}
+
+.shippingOptionDetails {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.shippingOptionName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #000;
+}
+
+.shippingOptionPrice {
+  font-size: 0.875rem;
+  color: #6B7280;
+}
+
+/* Payment Options */
+.paymentOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.paymentOption {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.paymentDetails {
+  margin-top: 1rem;
+}
+
+/* Order Summary */
+.orderItems {
+  margin-bottom: 1.5rem;
+}
+
+.orderItem {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.orderItemDetails {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.orderItemImage {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.25rem;
+  object-fit: cover;
+  background-color: #f3f3f3;
+}
+
+.orderItemName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #000;
+  margin-bottom: 0.25rem;
+}
+
+.orderItemQuantity {
+  font-size: 0.75rem;
+  color: #6B7280;
+}
+
+.priceSummary {
+  margin-bottom: 1.5rem;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.summaryLabel {
+  font-size: 0.875rem;
+  color: #737373;
+}
+
+.summaryValue {
+  font-size: 0.875rem;
+  color: #000;
+  text-align: right;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #E5E7EB;
+}
+
+.totalLabel {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #000;
+}
+
+.totalValue {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #000;
+}
+
+.placeOrderButton {
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  margin-bottom: 3rem;
+  background-color: #000;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  float: right;
+  width: auto;
+  min-width: 120px;
+  transition: all 0.2s ease;
+}
+
+.placeOrderButton:hover {
+  background-color: #333;
+}
+
+/* Responsive styles */
+@media (max-width: 1024px) {
+  .container {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+  
+  .title {
+    font-size: 2rem;
+  }
+  
+  .sectionTitle {
+    font-size: 1.2rem;
+  }
+  
+  .formRow {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .shippingOptionDetails {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0 0.75rem;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .section {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  
+  .sectionTitle {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .formRow {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  
+  .formGroup {
+    margin-bottom: 1rem;
+  }
+  
+  .input {
+    padding: 0.625rem 0.875rem;
+  }
+  
+  .shippingOption, 
+  .paymentOption {
+    padding: 0.625rem;
+  }
+  
+  .orderItemImage {
+    width: 3rem;
+    height: 3rem;
+  }
+  
+  .placeOrderButton {
+    width: 100%;
+    float: none;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+} 

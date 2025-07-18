@@ -1,0 +1,251 @@
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  width: 100%;
+}
+
+.title {
+  font-size: 3rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: #000;
+}
+
+.itemsBox {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  overflow-x: auto; /* Enable horizontal scrolling for small screens */
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
+.cartTable {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+/* Adjust column widths */
+.cartTable th:first-child,
+.cartTable td:first-child {
+  width: 60%;
+}
+
+.cartTable th:nth-child(2),
+.cartTable td:nth-child(2),
+.cartTable th:nth-child(3),
+.cartTable td:nth-child(3) {
+  width: 20%;
+}
+
+.cartTableHeader {
+  text-align: left;
+}
+
+.cartTableHeader th {
+  padding: 1rem;
+  font-weight: 500;
+  color: #000;
+  font-size: 0.875rem;
+}
+
+/* White background for each row */
+.cartTable tbody tr {
+  background: #fff;
+}
+
+/* Divider between rows */
+.cartTable tbody tr:not(:last-child) {
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.itemCell {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.itemImage {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  object-fit: cover;
+  background-color: #f3f3f3;
+  flex-shrink: 0;
+}
+
+.itemName {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #000;
+  word-break: break-word;
+}
+
+.priceCell, .quantityCell, .totalCell {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #000;
+  text-align: center;
+}
+
+.orderSummary {
+  margin-bottom: 2.5rem;
+  padding: 1rem;
+  background-color: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+}
+
+.orderSummaryTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: #000;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.summaryLabel {
+  font-size: 0.875rem;
+  color: #737373;
+}
+
+.summaryValue {
+  font-size: 0.875rem;
+  color: #000;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #E5E7EB;
+}
+
+.totalLabel {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #000;
+}
+
+.totalValue {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #000;
+}
+
+.buttonsContainer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.continueShoppingButton {
+  padding: 0.75rem 1rem;
+  margin-bottom: 3rem;
+  background-color: #f3f3f3;
+  color: #000;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.continueShoppingButton:hover {
+  background-color: #e5e5e5;
+}
+
+.checkoutButton {
+  padding: 0.75rem 1rem;
+  background-color: #000;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checkoutButton:hover {
+  background-color: #333;
+}
+
+/* Mobile layout for cart items */
+.mobileCartItem {
+  display: none;
+}
+
+/* Responsive styles */
+@media (max-width: 1024px) {
+  .container {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 2rem;
+  }
+  
+  .cartTable th:first-child,
+  .cartTable td:first-child {
+    width: 50%;
+  }
+  
+  .itemImage {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  
+  .buttonsContainer {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+  
+  .continueShoppingButton, .checkoutButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0 1rem;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+  }
+  
+  .buttonsContainer {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+  
+  .continueShoppingButton, .checkoutButton {
+    width: 100%;
+    padding: 0.75rem;
+  }
+  
+  .orderSummary {
+    padding: 0.75rem;
+  }
+  
+  .orderSummaryTitle {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+} 

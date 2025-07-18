@@ -1,0 +1,9 @@
+.shaderCanvas {
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  width: calc(100% + 40px);
+  height: calc(100% + 40px);
+  pointer-events: none; /* Ensure the canvas doesn't block mouse events */
+  z-index: 1; /* Position it above the product card content */
+}
