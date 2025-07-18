@@ -1,0 +1,149 @@
+/* Header styles */
+.header {
+  padding: 1rem 2rem;
+  width: 90%;
+  border: 1.5px solid rgba(229, 232, 235, 0.5);
+  margin-left: 5%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 65px;
+  position: fixed;
+  top: 1rem;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: transparent;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  margin-left: auto;
+  margin-right: auto;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.05);
+  border-radius: 18px;
+}
+
+.brandContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  z-index: 30;
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #000000;
+  letter-spacing: -0.01em;
+  transition: all 0.3s ease;
+}
+
+.dropdown {
+  display: flex;
+  align-items: center;
+  margin-left: 0.25rem;
+}
+
+.navContainer {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  margin-right: 2.5rem;
+  position: relative;
+  z-index: 30;
+}
+
+.navLink {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #000000;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.navLink:hover {
+  color: #333333;
+  transform: translateY(-1px);
+}
+
+.navLink:after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: -4px;
+  left: 0;
+  background-color: #000000;
+  transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.navLink:hover:after {
+  width: 100%;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: #000000;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  z-index: 30;
+}
+
+.iconButton:hover {
+  transform: scale(1.15);
+}
+
+.iconContainer {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 30;
+}
+
+/* Responsive styles */
+@media (max-width: 1024px) {
+  .header {
+    width: 95%;
+  }
+  
+  .navContainer {
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .navContainer {
+    gap: 1.5rem;
+    margin-right: 1.5rem;
+  }
+  
+  .header {
+    padding: 0.75rem 1.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .navContainer {
+    display: none; /* Hide normal nav on mobile */
+  }
+  
+  .brand {
+    font-size: 1.1rem;
+  }
+  
+  .header {
+    padding: 0.5rem 1rem;
+    height: 55px;
+  }
+  
+  .iconContainer {
+    gap: 1rem;
+  }
+} 

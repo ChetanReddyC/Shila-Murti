@@ -1,0 +1,345 @@
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  width: 100%;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #141414;
+  font-family: 'Public Sans', sans-serif;
+}
+
+.accountContainer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 16px;
+}
+
+.navigationMenu {
+  display: flex;
+  gap: 32px;
+  padding: 0 16px;
+  border-bottom: 1px solid #E0E0E0;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.navItem {
+  padding: 16px 0 13px;
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.5em;
+  color: #757575;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.navItemActive {
+  color: #141414;
+  border-bottom: 3px solid #E5E8EB;
+}
+
+.sectionTitle {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.28em;
+  color: #141414;
+  margin: 16px 16px 8px;
+}
+
+.formRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldLabel {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.5em;
+  color: #141414;
+  margin-bottom: 8px;
+}
+
+.inputField {
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 12px;
+  padding: 15px;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 14px;
+  width: 100%;
+  min-width: 300px;
+}
+
+.actionButton {
+  padding: 0.75rem 1rem;
+  background-color: #f3f3f3;
+  color: #000;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 16px;
+  align-self: flex-start;
+}
+
+.actionButton:hover {
+  background-color: #e5e5e5;
+}
+
+.orderHistoryTable {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin: 0 16px 16px;
+  background-color: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.tableHeader {
+  background-color: #F9FAFB;
+  text-align: left;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.tableHeader th {
+  padding: 1rem;
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.5em;
+  color: #000;
+}
+
+.tableHeader th:last-child {
+  color: #757575;
+}
+
+.tableRow {
+  background-color: #fff;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableCell {
+  padding: 1rem;
+  vertical-align: middle;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.5em;
+}
+
+.orderNumber {
+  font-weight: 400;
+  color: #141414;
+}
+
+.orderDate, .orderItem {
+  color: #757575;
+}
+
+.statusBadge {
+  background: #F2F2F2;
+  border-radius: 10px;
+  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.5em;
+  color: #000000;
+  width: fit-content;
+  border: 1px solid #E5E7EB;
+}
+
+.viewDetails {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.5em;
+  color: #757575;
+  cursor: pointer;
+}
+
+.emptyWishlist {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 16px;
+  width: 100%;
+}
+
+.emptyWishlistIcon {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3/2;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 12px;
+}
+
+.emptyWishlistContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.emptyWishlistTitle {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.28em;
+  color: #141414;
+  text-align: center;
+}
+
+.emptyWishlistText {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.5em;
+  color: #141414;
+  text-align: center;
+}
+
+.addressContainer, .paymentContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #FFFFFF;
+  width: 100%;
+}
+
+.addressDetails, .paymentDetails {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.addressLabel, .paymentLabel {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.5em;
+  color: #141414;
+}
+
+.addressValue, .paymentExpiry {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.5em;
+  color: #757575;
+}
+
+.editButton {
+  padding: 0 1rem;
+  background-color: #f3f3f3;
+  color: #000;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editButton:hover {
+  background-color: #e5e5e5;
+}
+
+.creditCardIcon {
+  display: flex;
+  gap: 4px;
+  margin-right: 16px;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .formRow {
+    flex-direction: column;
+  }
+  
+  .navigationMenu {
+    gap: 16px;
+  }
+  
+  .orderHistoryTable {
+    margin: 0 0 16px;
+    width: calc(100% - 32px);
+  }
+  
+  .tableCell {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0 1rem;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+  }
+  
+  .navigationMenu {
+    overflow-x: auto;
+    padding: 0 8px;
+  }
+  
+  .tableHeader th {
+    padding: 0.75rem;
+  }
+  
+  .tableCell {
+    padding: 0.5rem 0.75rem;
+    font-size: 12px;
+  }
+  
+  .statusBadge {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  
+  .viewDetails {
+    font-size: 12px;
+  }
+} 
