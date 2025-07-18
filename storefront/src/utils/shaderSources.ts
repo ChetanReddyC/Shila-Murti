@@ -56,7 +56,7 @@ export const fragmentShaderSource = `
 
     // Define outer and inner rectangle dimensions for a hollow shape
     vec2 outer_dims = vec2(0.5 * aspect, 0.5);
-    vec2 inner_dims = vec2(outer_dims.x - 0.15, outer_dims.y - 0.15);
+    vec2 inner_dims = vec2(outer_dims.x - 0.05, outer_dims.y - 0.05);
   
     // Calculate SDF for outer and inner boxes
     float dist_outer = sdBox(uv, outer_dims);
