@@ -30,9 +30,10 @@ export const fragmentShaderSource = `
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
-    for(int i = 0; i < 5; i++) {
+    for(int i = 0; i < 6; i++) {
       v += a * noise(p);
-      p = 2.0 * p + vec2(cos(u_time * 0.2), sin(u_time * 0.3));
+      // More random time offsets for continuous variation
+      p = 2.0 * p + vec2(cos(u_time * 0.3 + float(i) * 1.7), sin(u_time * 0.4 + float(i) * 2.3));
       a *= 0.5;
     }
     return v;
@@ -47,7 +48,7 @@ export const fragmentShaderSource = `
   void main() {
     // Center coordinates
     vec2 uv = v_uv - 0.5;
-    float t = u_time * 0.4;
+    float t = u_time * 0.35; // Slower, more elegant animation speed
 
     // Correct for aspect ratio
     float aspect = u_res.x / u_res.y;
@@ -67,22 +68,32 @@ export const fragmentShaderSource = `
     // Create a soft mask from the distance field with a wider gradient
     float mask = smoothstep(0.55, 0.0, dist);
 
-    // Swirl field guided by the rectangular distance field
-    float angleNoise = fbm(uv * 1.5 + vec2(0.0, -t));
-    float swirlAngle = mix(0.0, 3.0, mask) * (angleNoise - 0.5) * 3.1415;
+    // Multiple swirl layers for more complex, continuous motion
+    float angleNoise1 = fbm(uv * 1.8 + vec2(0.0, -t));
+    float angleNoise2 = fbm(uv * 2.3 + vec2(t * 0.7, 0.0));
+    float combinedNoise = (angleNoise1 + angleNoise2 * 0.6) / 1.6;
+    
+    float swirlAngle = mix(0.0, 4.0, mask) * (combinedNoise - 0.5) * 3.1415;
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * uv;
 
-    // Layered sinusoidal distortion for structure, contained by the mask
+    // Enhanced layered distortion with multiple frequencies for continuous motion
     p += vec2(
-      sin((uv.y + t) * 3.0) * 0.1,
-      cos((uv.x - t) * 3.0) * 0.1
+      sin((uv.y + t) * 3.5) * 0.12 + sin((uv.y + t * 1.3) * 7.0) * 0.04,
+      cos((uv.x - t) * 3.2) * 0.12 + cos((uv.x - t * 1.1) * 6.5) * 0.04
     ) * mask;
 
-    // Compute density based on the distorted coordinates and mask
-    float density = fbm(p * 1.3 - vec2(0.0, t * 0.6));
-    density *= 0.8 * mask;
-    float alpha = smoothstep(0.35, 0.65, density);
+    // Multiple density layers for richer, more continuous smoke
+    float density1 = fbm(p * 1.3 - vec2(0.0, t * 0.6));
+    float density2 = fbm(p * 1.8 + vec2(t * 0.1, -t * 0.3));
+    float density3 = fbm(p * 2.4 - vec2(t * 0.2, t * 0.3));
+    
+    // Combine densities with different weights for layered effect
+    float density = (density1 * 0.6 + density2 * 0.3 + density3 * 0.2);
+    density *= 0.9 * mask; // Increased from 0.8 to 1.0 for more occurrence
+    
+    // Lower threshold for more visible smoke, smoother transition
+    float alpha = smoothstep(0.35, 0.65, density); // Lowered from 0.35, 0.65
 
     // Symmetric smooth edge fading for all sides
     vec2 edge_uv = abs(v_uv - 0.5) * 2.0;
