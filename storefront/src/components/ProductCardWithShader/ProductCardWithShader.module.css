@@ -1,5 +1,7 @@
 .cardContainer {
   position: relative;
   display: inline-block;
+  width: 100%;
+  height: 300px; /* Match the fixed height of the product card */
   overflow: visible; /* Allow shader to extend beyond card boundaries */
 }

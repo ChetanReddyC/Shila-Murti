@@ -6,4 +6,5 @@
   height: calc(100% + 40px);
   pointer-events: none; /* Ensure the canvas doesn't block mouse events */
   z-index: 1; /* Position it above the product card content */
+  border-radius: 8px; /* Match the card's border radius for a cleaner look */
 }
