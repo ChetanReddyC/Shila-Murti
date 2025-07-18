@@ -15,7 +15,7 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({ isHovering }) => {
     setHover(isHovering);
   }, [isHovering, setHover]);
 
-  return <canvas ref={canvasRef} className={styles.shaderCanvas} />;
+  return <canvas ref={canvasRef} className={styles.shaderCanvas} style={{ backgroundColor: 'transparent' }} />;
 };
 
 export default ShaderCanvas;

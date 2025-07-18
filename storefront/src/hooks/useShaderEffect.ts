@@ -14,12 +14,16 @@ export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, v
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl');
+    const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
     if (!gl) {
       console.error('WebGL not supported');
       return;
     }
     glRef.current = gl;
+
+    // Enable blending for proper alpha compositing
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
@@ -72,10 +76,11 @@ export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, v
       gl.uniform1f(timeUniformLocation, currentTime);
       gl.uniform1f(intensityUniformLocation, intensity);
       
+      // Always clear the canvas first to prevent accumulation
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      
       if (intensity > 0.001) {
         gl.drawArrays(gl.TRIANGLES, 0, 6);
-      } else {
-        gl.clear(gl.COLOR_BUFFER_BIT);
       }
 
       animationFrameId.current = requestAnimationFrame(render);
