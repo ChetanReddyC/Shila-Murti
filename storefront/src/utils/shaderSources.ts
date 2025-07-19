@@ -30,7 +30,7 @@ export const fragmentShaderSource = `
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
-    for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < 8; i++) {
       v += a * noise(p);
       // More random time offsets for continuous variation
       p = 2.0 * p + vec2(cos(u_time * 0.3 + float(i) * 1.7), sin(u_time * 0.4 + float(i) * 2.3));
@@ -55,7 +55,7 @@ export const fragmentShaderSource = `
     uv.x *= aspect;
 
     // Define outer and inner rectangle dimensions for a hollow shape
-    vec2 outer_dims = vec2(0.5 * aspect, 0.5);
+    vec2 outer_dims = vec2(0.6 * aspect, 0.6);
     vec2 inner_dims = vec2(outer_dims.x - 0.05, outer_dims.y - 0.05);
   
     // Calculate SDF for outer and inner boxes
@@ -84,16 +84,16 @@ export const fragmentShaderSource = `
     ) * mask;
 
     // Multiple density layers for richer, more continuous smoke
-    float density1 = fbm(p * 1.3 - vec2(0.0, t * 0.6));
-    float density2 = fbm(p * 1.8 + vec2(t * 0.1, -t * 0.3));
-    float density3 = fbm(p * 2.4 - vec2(t * 0.2, t * 0.3));
+    float density1 = fbm(p * 1.9 - vec2(0.0, t * 0.6));
+    float density2 = fbm(p * 2.8 + vec2(t * 0.1, -t * 0.3));
+    float density3 = fbm(p * 9.4 - vec2(t * 0.2, t * 0.3));
     
     // Combine densities with different weights for layered effect
     float density = (density1 * 0.6 + density2 * 0.3 + density3 * 0.2);
-    density *= 0.9 * mask; // Increased from 0.8 to 1.0 for more occurrence
+    density *= 1.7 * mask; // Increased from 0.8 to 1.0 for more occurrence
     
     // Lower threshold for more visible smoke, smoother transition
-    float alpha = smoothstep(0.35, 0.65, density); // Lowered from 0.35, 0.65
+    float alpha = smoothstep(0.25, 0.65, density); // Lowered from 0.35, 0.65
 
     // Symmetric smooth edge fading for all sides
     vec2 edge_uv = abs(v_uv - 0.5) * 2.0;
