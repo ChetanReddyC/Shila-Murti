@@ -5,5 +5,12 @@
   max-width: 240px;
   height: 350px; /* Match the fixed height of the product card */
   overflow: visible; /* Allow shader and elevated image to extend beyond card boundaries */
-  perspective: 1000px; /* Enable 3D perspective for the elevation effect */
+  perspective: 1200px; /* Enhanced 3D perspective for the elevation effect */
+  transform-style: preserve-3d; /* Preserve 3D transformations */
+  z-index: 1; /* Base z-index for non-hovered state */
+}
+
+/* Add hover state for the container to increase its stacking context */
+.cardContainerHovered {
+  z-index: 999 !important; /* Very high z-index to ensure it's above everything */
 }

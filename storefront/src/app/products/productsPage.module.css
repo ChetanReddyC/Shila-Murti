@@ -1,9 +1,16 @@
 .productsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 24px;
-  padding: 16px;
+  gap: 40px;
+  /* Increased gap to allow more space for the hover effect */
+  padding: 30px 16px;
   justify-items: center;
+  position: relative;
+  /* Create a stacking context for child elements */
+  transform-style: preserve-3d;
+  /* Preserve 3D transformations */
+  perspective: 1000px;
+  /* Add perspective to the grid */
 }
 
 @media (min-width: 768px) {
