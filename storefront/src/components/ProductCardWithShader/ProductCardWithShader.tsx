@@ -16,7 +16,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product }
 
   return (
     <div
-      className={styles.cardContainer}
+      className={`${styles.cardContainer} ${isHovering ? styles.cardContainerHovered : ''}`}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onTouchStart={() => setIsHovering(true)}
