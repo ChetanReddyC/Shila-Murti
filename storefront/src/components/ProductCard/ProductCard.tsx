@@ -17,7 +17,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
         <img 
           src={product.backgroundImage} 
           alt={`${product.title} background`} 
-          className={styles.backgroundImage} 
+          className={`${styles.backgroundImage} ${isHovering ? styles.backgroundImageHovered : ''}`}
         />
         <h3 className={styles.productTitle}>{product.title}</h3>
       </div>

@@ -27,7 +27,7 @@
   object-fit: cover;
   object-position: center;
   z-index: 1;
-}
+ }
 
 .foregroundWrapper {
   position: absolute;
@@ -54,8 +54,7 @@
 
 .foregroundImageHovered {
   transform: translateY(-35px) scale(1.15);
-  filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.5));
-  z-index: 1000; /* Extremely high z-index to ensure it appears above all other elements */
+  z-index: 100; /* Extremely high z-index to ensure it appears above all other elements */
 }
 
 .productTitle {

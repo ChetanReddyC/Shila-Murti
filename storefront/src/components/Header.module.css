@@ -112,7 +112,7 @@
   .header {
     width: 95%;
   }
-  
+
   .navContainer {
     gap: 2rem;
   }
@@ -123,7 +123,7 @@
     gap: 1.5rem;
     margin-right: 1.5rem;
   }
-  
+
   .header {
     padding: 0.75rem 1.5rem;
   }
@@ -131,19 +131,20 @@
 
 @media (max-width: 640px) {
   .navContainer {
-    display: none; /* Hide normal nav on mobile */
+    display: none;
+    /* Hide normal nav on mobile */
   }
-  
+
   .brand {
     font-size: 1.1rem;
   }
-  
+
   .header {
     padding: 0.5rem 1rem;
     height: 55px;
   }
-  
+
   .iconContainer {
     gap: 1rem;
   }
-} 
+}
