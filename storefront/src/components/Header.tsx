@@ -56,7 +56,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
             />
           </filter>
         </svg>
-        
+
         {/* Glass layers */}
         <div
           className="absolute inset-0 z-0 overflow-hidden rounded-inherit"
@@ -84,15 +84,15 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
               "inset 2px 2px 1px 0 rgba(255, 255, 255, 0), inset -1px -1px 1px 1px rgba(255, 255, 255, 0)",
           }}
         />
-        
-        
+
+
         {/* Header Content */}
         <div className="relative z-30 flex w-full justify-between items-center">
           {/* Logo/brand */}
           <div className={styles.brandContainer}>
             <h2 className={styles.brand}>Shila Murthi</h2>
           </div>
-          
+
           <div className="flex items-center">
             {/* Navigation links - hidden on mobile via CSS */}
             <nav className={styles.navContainer}>
@@ -111,7 +111,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                 </a>
               ))}
             </nav>
-            
+
             {/* Icons */}
             <div className={styles.iconContainer}>
               {/* Search button */}
@@ -126,7 +126,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                   <path d="M229.66 218.34l-50.07-50.06a88.11 88.11 0 10-11.31 11.31l50.06 50.07a8 8 0 0011.32-11.32zM40 112a72 72 0 1172 72 72.08 72.08 0 01-72-72z" />
                 </svg>
               </button>
-              
+
               {/* Cart button */}
               <a href="/cart" className={styles.iconButton} aria-label="Cart">
                 <svg

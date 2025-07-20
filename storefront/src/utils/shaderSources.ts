@@ -77,19 +77,11 @@ export const fragmentShaderSource = `
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * uv;
 
-    // Noise-based baseline distortion (never stops)
-    vec2 noiseDistortion = vec2(
-      fbm(uv * 2.0 + t * 0.3) * 0.04,
-      fbm(uv * 2.2 - t * 0.25) * 0.04
-    );
-
-    // Wave-based distortion with phase offsets
-    vec2 waveDistortion = vec2(
-      sin((uv.y + t * 0.8) * 3.5 + 1.57) * 0.12 + sin((uv.y + t * 1.4) * 7.0 + 3.14) * 0.04,
-      cos((uv.x - t * 0.9) * 3.2 + 0.78) * 0.12 + cos((uv.x - t * 1.2) * 6.5 + 2.35) * 0.04
-    );
-
-    p += (noiseDistortion + waveDistortion) * mask;
+    // Enhanced layered distortion with multiple frequencies for continuous motion
+    p += vec2(
+      sin((uv.y + t) * 3.5) * 0.12 + sin((uv.y + t * 1.3) * 7.0) * 0.04,
+      cos((uv.x - t) * 3.2) * 0.12 + cos((uv.x - t * 1.1) * 6.5) * 0.04
+    ) * mask;
 
     // Multiple density layers for richer, more continuous smoke
     float density1 = fbm(p * 4.9 - vec2(0.0, t * 0.6));
