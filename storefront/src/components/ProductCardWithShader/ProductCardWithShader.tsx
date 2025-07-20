@@ -6,7 +6,8 @@ import styles from './ProductCardWithShader.module.css';
 interface ProductCardWithShaderProps {
   product: {
     title: string;
-    thumbnail: string;
+    backgroundImage: string;
+    foregroundImage: string;
   };
 }
 
@@ -21,7 +22,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product }
       onTouchStart={() => setIsHovering(true)}
       onTouchEnd={() => setIsHovering(false)}
     >
-      <ProductCard product={product} />
+      <ProductCard product={product} isHovering={isHovering} />
       <ShaderCanvas isHovering={isHovering} />
     </div>
   );
