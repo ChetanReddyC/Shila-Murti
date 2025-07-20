@@ -5,7 +5,7 @@
   width: calc(100% + 40px);
   height: calc(100% + 40px);
   pointer-events: none; /* Ensure the canvas doesn't block mouse events */
-  z-index: 5; /* Position it above the product card content but below the foreground image */
+  z-index: 5; /* Position it above the product card content but below the edge gradient and foreground image */
   border-radius: 8px; /* Match the card's border radius for a cleaner look */
   transform: translateZ(0); /* Ensure proper stacking in 3D space */
 }
