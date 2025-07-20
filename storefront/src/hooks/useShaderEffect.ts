@@ -9,6 +9,10 @@ export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, v
   const [isHovering, setIsHovering] = useState(false);
   const hoverRef = useRef(isHovering);
   hoverRef.current = isHovering;
+  
+  // Mouse position tracking
+  const mousePos = useRef({ x: 0, y: 0 });
+  const mousePosUniformLocation = useRef<WebGLUniformLocation | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -42,6 +46,9 @@ export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, v
     const resolutionUniformLocation = gl.getUniformLocation(program, "u_res");
     const timeUniformLocation = gl.getUniformLocation(program, "u_time");
     const intensityUniformLocation = gl.getUniformLocation(program, "u_intensity");
+    
+    // Get mouse position uniform location if it exists in the shader
+    mousePosUniformLocation.current = gl.getUniformLocation(program, "u_mouse");
 
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -76,6 +83,11 @@ export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, v
       gl.uniform1f(timeUniformLocation, currentTime);
       gl.uniform1f(intensityUniformLocation, intensity);
       
+      // Pass mouse position to shader if the uniform exists
+      if (mousePosUniformLocation.current !== null) {
+        gl.uniform2f(mousePosUniformLocation.current, mousePos.current.x, mousePos.current.y);
+      }
+      
       // Always clear the canvas first to prevent accumulation
       gl.clear(gl.COLOR_BUFFER_BIT);
       
@@ -101,11 +113,24 @@ export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, v
         }
     };
 
+    // Track mouse movement
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!canvas) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      mousePos.current = {
+        x: e.clientX - rect.left,
+        y: rect.height - (e.clientY - rect.top) // Flip Y for WebGL coordinate system
+      };
+    };
+
     window.addEventListener('resize', handleResize);
+    window.addEventListener('mousemove', handleMouseMove);
     handleResize();
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
       }

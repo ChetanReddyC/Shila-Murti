@@ -34,7 +34,7 @@ const products = [
 export default function ProductsPage() {
   return (
     <div
-      className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-x-hidden"
+      className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
       style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
     >
       <div className="layout-container flex h-full grow flex-col">

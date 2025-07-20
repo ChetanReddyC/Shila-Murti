@@ -8,6 +8,9 @@
   perspective: 1200px; /* Enhanced 3D perspective for the elevation effect */
   transform-style: preserve-3d; /* Preserve 3D transformations */
   z-index: 1; /* Base z-index for non-hovered state */
+  border-radius: 8px; /* Explicitly set border radius for shader canvas inheritance */
+  transition: transform 0.25s ease-out; /* Smooth 3D bending transitions */
+  will-change: transform; /* Hint browser for better performance */
 }
 
 /* Add hover state for the container to increase its stacking context */
