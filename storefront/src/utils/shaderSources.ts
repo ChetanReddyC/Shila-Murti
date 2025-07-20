@@ -56,7 +56,7 @@ export const fragmentShaderSource = `
 
     // Define outer and inner rectangle dimensions for a hollow shape
     vec2 outer_dims = vec2(0.6 * aspect, 0.6);
-    vec2 inner_dims = vec2(outer_dims.x - 0.05, outer_dims.y - 0.05);
+    vec2 inner_dims = vec2(outer_dims.x - 0.55, outer_dims.y - 0.55);
   
     // Calculate SDF for outer and inner boxes
     float dist_outer = sdBox(uv, outer_dims);
@@ -73,27 +73,35 @@ export const fragmentShaderSource = `
     float angleNoise2 = fbm(uv * 2.3 + vec2(t * 0.7, 0.0));
     float combinedNoise = (angleNoise1 + angleNoise2 * 0.6) / 1.6;
     
-    float swirlAngle = mix(0.0, 4.0, mask) * (combinedNoise - 0.5) * 3.1415;
+    float swirlAngle = mix(0.0, 4.0, mask) * (combinedNoise - 0.5) * 6.1415;
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * uv;
 
-    // Enhanced layered distortion with multiple frequencies for continuous motion
-    p += vec2(
-      sin((uv.y + t) * 3.5) * 0.12 + sin((uv.y + t * 1.3) * 7.0) * 0.04,
-      cos((uv.x - t) * 3.2) * 0.12 + cos((uv.x - t * 1.1) * 6.5) * 0.04
-    ) * mask;
+    // Noise-based baseline distortion (never stops)
+    vec2 noiseDistortion = vec2(
+      fbm(uv * 2.0 + t * 0.3) * 0.04,
+      fbm(uv * 2.2 - t * 0.25) * 0.04
+    );
+
+    // Wave-based distortion with phase offsets
+    vec2 waveDistortion = vec2(
+      sin((uv.y + t * 0.8) * 3.5 + 1.57) * 0.12 + sin((uv.y + t * 1.4) * 7.0 + 3.14) * 0.04,
+      cos((uv.x - t * 0.9) * 3.2 + 0.78) * 0.12 + cos((uv.x - t * 1.2) * 6.5 + 2.35) * 0.04
+    );
+
+    p += (noiseDistortion + waveDistortion) * mask;
 
     // Multiple density layers for richer, more continuous smoke
-    float density1 = fbm(p * 1.9 - vec2(0.0, t * 0.6));
-    float density2 = fbm(p * 2.8 + vec2(t * 0.1, -t * 0.3));
-    float density3 = fbm(p * 9.4 - vec2(t * 0.2, t * 0.3));
+    float density1 = fbm(p * 4.9 - vec2(0.0, t * 0.6));
+    float density2 = fbm(p * 9.8 + vec2(t * 0.1, -t * 0.3));
+    float density3 = fbm(p * 19.4 - vec2(t * 0.2, t * 0.3));
     
     // Combine densities with different weights for layered effect
     float density = (density1 * 0.6 + density2 * 0.3 + density3 * 0.2);
     density *= 1.7 * mask; // Increased from 0.8 to 1.0 for more occurrence
     
     // Lower threshold for more visible smoke, smoother transition
-    float alpha = smoothstep(0.25, 0.65, density); // Lowered from 0.35, 0.65
+    float alpha = smoothstep(0.35, 0.75, density); // Lowered from 0.35, 0.65
 
     // Symmetric smooth edge fading for all sides
     vec2 edge_uv = abs(v_uv - 0.5) * 2.0;
