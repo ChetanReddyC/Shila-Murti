@@ -1,8 +1,10 @@
 .productCard {
   position: relative;
   width: 250px;
-  height: 350px; /* Set a fixed height for consistent card sizes */
+  height: 500px; /* Increased to accommodate all product details */
   transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: flex;
+  flex-direction: column;
 }
 
 .cardContent {
@@ -10,7 +12,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: 350px; /* Fixed height for the card content */
   border: 1px solid #ccc;
   border-radius: 8px;
   overflow: hidden;
@@ -34,7 +36,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: 350px; /* Match the card content height */
   z-index: 20; /* Increased from 10 to 20 to stay above all shader effects */
   pointer-events: none; /* Allow clicks to pass through to the card */
 }
@@ -57,16 +59,147 @@
   z-index: 100; /* Extremely high z-index to ensure it appears above all other elements */
 }
 
-.productTitle {
+/* Product details section */
+.productDetails {
   position: absolute;
-  bottom: 0;
+  top: 350px; /* Position below the card content */
   left: 0;
-  right: 0;
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: white;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  padding: 20px 16px 16px;
-  margin: 0;
+  width: 100%;
+  padding: 16px;
+  background-color: white;
+  border-radius: 0 0 8px 8px;
+  z-index: 30;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #eee;
+  border-top: none;
+}
+
+.productTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #141414;
+  margin: 0 0 12px 0;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+/* Price styling */
+.priceContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.price {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #141414;
+}
+
+.originalPrice {
+  font-size: 0.9rem;
+  color: #888;
+  text-decoration: line-through;
+}
+
+/* Rating styling */
+.ratingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.stars {
+  display: flex;
+}
+
+.fullStar, .halfStar {
+  color: #FFD700; /* Gold color for stars */
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.emptyStar {
+  color: #D3D3D3; /* Light gray for empty stars */
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.reviewCount {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Specifications styling */
+.specifications {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  background-color: #f9f9f9;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.specItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.specLabel {
+  color: #666;
+}
+
+.specValue {
+  color: #141414;
+  font-weight: 500;
+}
+
+/* Availability styling */
+.availability {
+  text-align: center;
+  margin-top: 10px;
+  padding: 6px 0;
+  border-top: 1px solid #eee;
+}
+
+.inStock {
+  color: #2E7D32; /* Green */
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.inStock::before {
+  content: "•";
+  font-size: 1.2rem;
+}
+
+.outOfStock {
+  color: #C62828; /* Red */
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.outOfStock::before {
+  content: "•";
+  font-size: 1.2rem;
 }

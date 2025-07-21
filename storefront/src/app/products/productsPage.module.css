@@ -1,9 +1,8 @@
 .productsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 40px;
-  /* Increased gap to allow more space for the hover effect */
-  padding: 30px 16px;
+  gap: 60px; /* Increased gap to allow more space for the product details */
+  padding: 30px 16px 60px; /* Increased bottom padding */
   justify-items: center;
   position: relative;
   /* Create a stacking context for child elements */
@@ -11,6 +10,15 @@
   /* Preserve 3D transformations */
   perspective: 1000px;
   /* Add perspective to the grid */
+  margin-bottom: 60px; /* Increased bottom margin to ensure cards don't get cut off */
+}
+
+.productCardWrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  min-height: 580px; /* Increased to ensure enough space for the card with details */
+  padding-bottom: 20px; /* Add padding at the bottom */
 }
 
 @media (min-width: 768px) {

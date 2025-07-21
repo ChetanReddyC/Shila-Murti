@@ -18,16 +18,37 @@ const products = [
     title: 'Abstract Stone Art 1',
     backgroundImage: Product1BgImage.src,
     foregroundImage: Product1Image.src,
+    price: 499.99,
+    originalPrice: 599.99,
+    rating: 4.5,
+    reviewCount: 12,
+    material: 'Marble',
+    dimensions: '12" × 8" × 4"',
+    inStock: true,
   },
   {
     title: 'Abstract Stone Art 2',
     backgroundImage: Product2BgImage.src,
     foregroundImage: Product2Image.src,
+    price: 649.99,
+    originalPrice: 749.99,
+    rating: 4.8,
+    reviewCount: 24,
+    material: 'Granite',
+    dimensions: '14" × 10" × 5"',
+    inStock: true,
   },
   {
     title: 'Abstract Stone Art 3',
     backgroundImage: Product3BgImage.src,
     foregroundImage: Product3Image.src,
+    price: 799.99,
+    originalPrice: 899.99,
+    rating: 4.7,
+    reviewCount: 18,
+    material: 'Marble',
+    dimensions: '16" × 12" × 6"',
+    inStock: false,
   },
 ];
 
@@ -124,7 +145,9 @@ export default function ProductsPage() {
             </div>
             <div className={styles.productsGrid}>
               {products.map((product) => (
-                <ProductCardWithShader key={product.title} product={product} />
+                <div key={product.title} className={styles.productCardWrapper}>
+                  <ProductCardWithShader product={product} />
+                </div>
               ))}
             </div>
           </div>
