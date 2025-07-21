@@ -35,10 +35,9 @@ const EdgeGradientShaderCanvas: React.FC<EdgeGradientShaderCanvasProps> = ({ isH
         const parentWidth = parentElement.clientWidth;
         const parentHeight = parentElement.clientHeight;
         
-        // Update canvas dimensions to match parent but slightly wider
-        // Adding extra width to ensure it covers the right edge completely
-        if (canvas.width !== Math.ceil(parentWidth * 1.02) || canvas.height !== parentHeight) {
-          canvas.width = Math.ceil(parentWidth * 1.02);
+        // Update canvas dimensions to exactly match parent
+        if (canvas.width !== parentWidth || canvas.height !== parentHeight) {
+          canvas.width = parentWidth;
           canvas.height = parentHeight;
         }
       }

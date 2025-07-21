@@ -13,7 +13,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 104.5%; /* Slightly wider to cover any gap on the right */
+  width: 100%; /* Match exactly the width of the container */
   height: 100%;
   pointer-events: none; /* Ensure the canvas doesn't block mouse events */
   z-index: 15; /* Position it above other elements but below foreground image (z-index 20) */

@@ -1,9 +1,9 @@
 .shaderCanvas {
   position: absolute;
-  top: -20px;
-  left: -20px;
-  width: calc(100% + 40px);
-  height: calc(100% + 40px);
+  top: 0;
+  left: 0;
+  width: 100%; /* Match exactly the width of the container */
+  height: 100%; /* Match exactly the height of the container */
   pointer-events: none; /* Ensure the canvas doesn't block mouse events */
   z-index: 5; /* Position it above the product card content but below the edge gradient and foreground image */
   border-radius: 8px; /* Match the card's border radius for a cleaner look */
