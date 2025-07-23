@@ -4,6 +4,7 @@ import styles from './page.module.css';
 import Header from '../components/Header';
 import GLSLCanvas from '../components/GLSLCanvas';
 import { useState, useEffect, useRef } from 'react';
+// Remove the SVG import since we'll use a direct path in an img tag
 
 export default function Home() {
   const heroes = [
@@ -81,8 +82,13 @@ export default function Home() {
   return (
     <div
       className="relative min-h-screen w-full bg-white overflow-x-hidden"
-      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
+      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif', position: 'relative' }}
     >
+      {/* Decorative SVG Background */}
+      <div className={styles.decorativeBg}>
+        <img src="/illustration1.svg" alt="" />
+      </div>
+
       {/* Header component */}
       <Header />
 

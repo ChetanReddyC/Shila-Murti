@@ -179,6 +179,7 @@ a.secondary {
 
 .heroCarousel {
   position: relative;
+  z-index: 10;
   height: 500px;
   border-radius: 35px;
   overflow: hidden;
@@ -197,6 +198,7 @@ a.secondary {
   display: flex;
   height: 100%;
   width: 100%;
+  will-change: transform;
 }
 
 .hero {
@@ -473,6 +475,89 @@ a.secondary {
   color: #4b5563;
   font-size: 0.875rem;
   text-align: center;
+}
+
+/* Decorative Background SVG Styling */
+.decorativeBg {
+  position: absolute;
+  top: 0;
+  left: 0;   /* Move to left side */
+  right: auto;
+  z-index: 0; /* Place above background but below main content */
+  opacity: 0.7;
+  pointer-events: none;
+  overflow: hidden;
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* Align content to the left */
+}
+
+.decorativeBg img {
+  height: 70vh;            /* base size */
+  max-width: 480px;
+  width: auto;
+  transform: translateY(-3vh); /* pull up slightly */
+  filter: drop-shadow(0 0 30px rgba(251, 250, 246, 0.65));
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
+}
+
+/* Larger screens */
+@media (min-width: 1024px) {
+  .decorativeBg img {
+    height: 85vh;
+    max-width: 550px;
+    transform: translateY(-5vh);
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 75%, rgba(0, 0, 0, 0));
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 75%, rgba(0, 0, 0, 0));
+  }
+}
+
+/* Tablets / small laptops */
+@media (max-width: 1023px) {
+  .decorativeBg img {
+    height: 70vh;
+    max-width: 420px;
+    transform: translateY(-4vh);
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 65%, rgba(0, 0, 0, 0));
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 65%, rgba(0, 0, 0, 0));
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .decorativeBg img {
+    height: 60vh;
+    max-width: 300px;
+    margin-left: -30px;
+    transform: translateY(-2vh);
+    opacity: 0.5;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
+  }
+}
+
+@media (max-width: 1280px) {
+  .decorativeBg img {
+    height: 80vh;
+    margin-right: -100px;
+    max-width: 380px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
+  }
+}
+
+@media (max-width: 480px) {
+  .decorativeBg img {
+    height: 60vh;
+    margin-right: -150px;
+    opacity: 0.3;
+    max-width: 250px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0));
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0));
+  }
 }
 
 /* Enhanced responsive styles */
