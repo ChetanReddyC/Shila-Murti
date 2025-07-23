@@ -4,7 +4,9 @@
   left: 10px;
   width: 250px;
   height: 150px;
-  z-index: 5;
+  z-index: 15; /* Set to be higher than the hero section */
   border-radius: 12px;
   overflow: hidden;
+  will-change: transform;
+  pointer-events: none;
 } 
