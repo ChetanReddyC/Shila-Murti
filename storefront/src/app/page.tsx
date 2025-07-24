@@ -3,8 +3,8 @@
 import styles from './page.module.css';
 import Header from '../components/Header';
 import GLSLCanvas from '../components/GLSLCanvas';
+import SVGShaderCanvas from '../components/SVGShaderCanvas';
 import { useState, useEffect, useRef } from 'react';
-// Remove the SVG import since we'll use a direct path in an img tag
 
 export default function Home() {
   const heroes = [
@@ -37,6 +37,8 @@ export default function Home() {
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [direction, setDirection] = useState(1);
+  // Shader is always active now; removed debug toggle logic that caused flicker
+  const shaderActive = true;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -59,11 +61,11 @@ export default function Home() {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
 
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const handleTouchMove = (e) => {
+  const handleTouchMove = (e: React.TouchEvent) => {
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
@@ -84,9 +86,19 @@ export default function Home() {
       className="relative min-h-screen w-full bg-white overflow-x-hidden"
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif', position: 'relative' }}
     >
-      {/* Decorative SVG Background */}
+      {/* Removed debug indicator */}
+
+      {/* SVG Background shader overlay only */}
       <div className={styles.decorativeBg}>
-        <img src="/illustration1.svg" alt="" />
+        {/* Shader canvas overlay using simplified wrapper */}
+        <div className={styles.shaderWrapper}>
+          <SVGShaderCanvas
+            svgUrl="/svg-art1.svg"
+            width={501}
+            height={1115}
+            alwaysOn
+          />
+        </div>
       </div>
 
       {/* Header component */}
