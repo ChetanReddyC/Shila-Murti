@@ -481,32 +481,90 @@ a.secondary {
 .decorativeBg {
   position: absolute;
   top: 0;
-  left: 0;   /* Move to left side */
-  right: auto;
-  z-index: 0; /* Place above background but below main content */
-  opacity: 0.7;
+  left: 0;
+  z-index: 0;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
   height: 100vh;
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: flex-start; /* Align content to the left */
+  justify-content: flex-start;
 }
 
-.decorativeBg img {
-  height: 70vh;            /* base size */
+/* Shader wrapper for SVGShaderCanvas overlay */
+.shaderWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* match SVG aspect ratio to size accordingly */
+  height: 70vh;
+  aspect-ratio: 501/1115;
+  max-width: 480px;
+  transform: translateY(-3vh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+@media (min-width: 1024px) {
+  .shaderWrapper {
+    height: 85vh;
+    max-width: 550px;
+    transform: translateY(-5vh);
+  }
+}
+
+/* Original background SVG image */
+.svgBackgroundImage {
+  height: 70vh;
   max-width: 480px;
   width: auto;
-  transform: translateY(-3vh); /* pull up slightly */
-  filter: drop-shadow(0 0 30px rgba(251, 250, 246, 0.65));
+  transform: translateY(-3vh);
+  /* Tone down white to light gray */
+  filter: brightness(80%) drop-shadow(0 0 30px rgba(251, 250, 246, 0.65));
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
   -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
+  opacity: 0.3; /* Reduced opacity to make shader more visible */
+}
+
+/* Container for the SVG shader overlay */
+.svgShaderContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 30; /* Bring canvas above image but below main content */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  opacity: 1; /* Ensure full opacity */
+}
+
+/* The SVG shader should exactly match the dimensions of the original SVG */
+.svgShaderContainer > div {
+  position: relative;
+  height: 70vh;
+  max-width: 480px;
+  width: auto;
+  transform: translateY(-3vh);
+  /* Use the SVG itself as a mask so shader is revealed only inside shape */
+  mask-image: url('/svg-art1.svg');
+  -webkit-mask-image: url('/svg-art1.svg');
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-position: top left;
+  -webkit-mask-position: top left;
+  opacity: 1;
 }
 
 /* Larger screens */
 @media (min-width: 1024px) {
-  .decorativeBg img {
+  .svgBackgroundImage, .svgShaderContainer > div {
     height: 85vh;
     max-width: 550px;
     transform: translateY(-5vh);
@@ -517,7 +575,7 @@ a.secondary {
 
 /* Tablets / small laptops */
 @media (max-width: 1023px) {
-  .decorativeBg img {
+  .svgBackgroundImage, .svgShaderContainer > div {
     height: 70vh;
     max-width: 420px;
     transform: translateY(-4vh);
@@ -528,19 +586,18 @@ a.secondary {
 
 /* Mobile */
 @media (max-width: 768px) {
-  .decorativeBg img {
+  .svgBackgroundImage, .svgShaderContainer > div {
     height: 60vh;
     max-width: 300px;
     margin-left: -30px;
     transform: translateY(-2vh);
-    opacity: 0.5;
     mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
     -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
   }
 }
 
 @media (max-width: 1280px) {
-  .decorativeBg img {
+  .svgBackgroundImage, .svgShaderContainer > div {
     height: 80vh;
     margin-right: -100px;
     max-width: 380px;
@@ -550,10 +607,9 @@ a.secondary {
 }
 
 @media (max-width: 480px) {
-  .decorativeBg img {
+  .svgBackgroundImage, .svgShaderContainer > div {
     height: 60vh;
     margin-right: -150px;
-    opacity: 0.3;
     max-width: 250px;
     mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0));
     -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0));
