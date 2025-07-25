@@ -15,21 +15,33 @@ export const svgLineFragmentShaderSource = `
   uniform float u_intensity;
   uniform sampler2D u_texture;
 
-  // Hash function for noise
-  float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  // Enhanced noise functions
+  vec2 random2(vec2 st) {
+    st = vec2(dot(st, vec2(127.1, 311.7)), dot(st, vec2(269.5, 183.3)));
+    return -1.0 + 2.0 * fract(sin(st) * 43758.5453123);
   }
 
-  // 2D noise (value noise)
-  float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
+  float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
     vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-      u.y
-    );
+    return mix(mix(dot(random2(i + vec2(0.0, 0.0)), f - vec2(0.0, 0.0)),
+                   dot(random2(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
+               mix(dot(random2(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)),
+                   dot(random2(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x), u.y);
+  }
+
+  float fbm(vec2 st) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 0.0;
+    
+    for (int i = 0; i < 5; i++) {
+      value += amplitude * noise(st);
+      st *= 2.0;
+      amplitude *= 0.5;
+    }
+    return value;
   }
 
   void main() {
@@ -39,28 +51,39 @@ export const svgLineFragmentShaderSource = `
       discard;
     }
 
-    // Per-pixel offset so each fragment animates at a different time
-    float offset = noise(v_uv * 20.0);
-
-    // Animation cycle (0 – 1). Slower speed for subtle feel
-    float speed = 0.15; // cycles per second
-    float cyclePos = fract(u_time * speed + offset);
-
-    // Length of the "visible" window within one cycle (draw then erase)
-    float window = 0.45;
-    float fade = 0.08;  // soft edge for drawing / erasing
-
-    // Visibility: fade-in when entering window, fade-out when leaving
-    float visIn  = smoothstep(offset, offset + fade, cyclePos);
-    float visOut = 1.0 - smoothstep(offset + window - fade, offset + window, cyclePos);
-    float visibility = clamp(visIn * visOut, 0.0, 1.0);
-
-    // Apply intensity control
+    vec2 st = v_uv;
+    float time = u_time * 2.0; // Faster for visibility
+    
+    // Create very obvious cosmic disturbances
+    float cosmicNoise = fbm(st * 4.0 + vec2(time * 0.3, -time * 0.2));
+    
+    // Add some simple movement
+    float movement = sin(st.x * 3.0 + time) * cos(st.y * 2.0 + time * 0.8);
+    
+    // Combine for dramatic effect
+    float disturbance = cosmicNoise + movement * 0.3;
+    
+    // Normalize
+    disturbance = (disturbance + 1.0) * 0.5;
+    
+    // Create dramatic visibility changes - parts disappear completely
+    float visibility;
+    if (disturbance < 0.4) {
+      visibility = 0.1; // Almost invisible
+    } else if (disturbance > 0.6) {
+      visibility = 1.0; // Fully visible
+    } else {
+      visibility = mix(0.1, 1.0, (disturbance - 0.4) / 0.2); // Smooth transition
+    }
+    
+    // Add pulsing for extra visibility
+    float pulse = sin(time * 1.5) * 0.2 + 0.8;
+    visibility *= pulse;
+    
+    // Apply intensity
     visibility *= u_intensity;
-
-    // Light grey stroke base colour
-    vec3 base = vec3(0.8);
-
-    gl_FragColor = vec4(base, svgCol.a * visibility);
+    
+    // Keep original SVG colors unchanged - only affect alpha/visibility
+    gl_FragColor = vec4(svgCol.rgb, svgCol.a * visibility);
   }
 `; 
