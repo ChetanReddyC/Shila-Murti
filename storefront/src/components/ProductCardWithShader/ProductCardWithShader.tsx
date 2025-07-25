@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import ShaderCanvas from '../ShaderCanvas/ShaderCanvas';
+import CosmicShaderCanvas from '../CosmicShaderCanvas/CosmicShaderCanvas';
 import EdgeGradientShaderCanvas from '../EdgeGradientShaderCanvas';
 import styles from './ProductCardWithShader.module.css';
 
@@ -16,9 +16,10 @@ interface ProductCardWithShaderProps {
     dimensions?: string;
     inStock?: boolean;
   };
+  cosmicVariation?: number;
 }
 
-const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product }) => {
+const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product, cosmicVariation = 1 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isHoveringImageSection, setIsHoveringImageSection] = useState(false);
 
@@ -115,7 +116,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product }
           </div>
           
           <div className={styles.effectsWrapper}>
-            <ShaderCanvas isHovering={isHovering} />
+            <CosmicShaderCanvas isHovering={isHovering} variation={cosmicVariation} />
             <EdgeGradientShaderCanvas isHovering={isHovering} />
           </div>
         </div>

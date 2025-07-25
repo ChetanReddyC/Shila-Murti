@@ -286,7 +286,7 @@ a.secondary {
   .collectionGrid {
     grid-template-columns: 1fr;
   }
-  
+
   .heroTitle {
     font-size: 2.25rem;
   }
@@ -451,7 +451,7 @@ a.secondary {
   border-top: 1px solid #4b5563;
   margin-top: 3rem;
   width: 100%;
-  
+
 }
 
 .footerLinks {
@@ -506,6 +506,7 @@ a.secondary {
   align-items: center;
   justify-content: center;
   z-index: 30;
+  opacity: 40%;
 }
 
 @media (min-width: 1024px) {
@@ -526,7 +527,8 @@ a.secondary {
   filter: brightness(80%) drop-shadow(0 0 30px rgba(251, 250, 246, 0.65));
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
   -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0));
-  opacity: 0.3; /* Reduced opacity to make shader more visible */
+  opacity: 0.3;
+  /* Reduced opacity to make shader more visible */
 }
 
 /* Container for the SVG shader overlay */
@@ -536,15 +538,17 @@ a.secondary {
   left: 0;
   height: 100%;
   width: 100%;
-  z-index: 30; /* Bring canvas above image but below main content */
+  z-index: 30;
+  /* Bring canvas above image but below main content */
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  opacity: 1; /* Ensure full opacity */
+  opacity: 1;
+  /* Ensure full opacity */
 }
 
 /* The SVG shader should exactly match the dimensions of the original SVG */
-.svgShaderContainer > div {
+.svgShaderContainer>div {
   position: relative;
   height: 70vh;
   max-width: 480px;
@@ -564,7 +568,9 @@ a.secondary {
 
 /* Larger screens */
 @media (min-width: 1024px) {
-  .svgBackgroundImage, .svgShaderContainer > div {
+
+  .svgBackgroundImage,
+  .svgShaderContainer>div {
     height: 85vh;
     max-width: 550px;
     transform: translateY(-5vh);
@@ -575,7 +581,9 @@ a.secondary {
 
 /* Tablets / small laptops */
 @media (max-width: 1023px) {
-  .svgBackgroundImage, .svgShaderContainer > div {
+
+  .svgBackgroundImage,
+  .svgShaderContainer>div {
     height: 70vh;
     max-width: 420px;
     transform: translateY(-4vh);
@@ -586,7 +594,9 @@ a.secondary {
 
 /* Mobile */
 @media (max-width: 768px) {
-  .svgBackgroundImage, .svgShaderContainer > div {
+
+  .svgBackgroundImage,
+  .svgShaderContainer>div {
     height: 60vh;
     max-width: 300px;
     margin-left: -30px;
@@ -597,7 +607,9 @@ a.secondary {
 }
 
 @media (max-width: 1280px) {
-  .svgBackgroundImage, .svgShaderContainer > div {
+
+  .svgBackgroundImage,
+  .svgShaderContainer>div {
     height: 80vh;
     margin-right: -100px;
     max-width: 380px;
@@ -607,7 +619,9 @@ a.secondary {
 }
 
 @media (max-width: 480px) {
-  .svgBackgroundImage, .svgShaderContainer > div {
+
+  .svgBackgroundImage,
+  .svgShaderContainer>div {
     height: 60vh;
     margin-right: -150px;
     max-width: 250px;
@@ -622,7 +636,7 @@ a.secondary {
     grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
   }
-  
+
   .footerLinks {
     gap: 10rem;
   }
@@ -633,33 +647,33 @@ a.secondary {
     height: 450px;
     max-width: 95%;
   }
-  
+
   .heroTitle {
     font-size: 2.25rem;
   }
-  
+
   .collectionGrid {
     grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
     max-width: 95%;
   }
-  
+
   .header {
     width: 95%;
   }
-  
+
   .navContainer {
     gap: 2rem;
   }
-  
+
   .footerLinks {
     gap: 8rem;
   }
-  
+
   .sectionTitle {
     max-width: 95%;
   }
-  
+
   .main {
     max-width: 95%;
   }
@@ -669,32 +683,32 @@ a.secondary {
   .hero {
     height: 400px;
   }
-  
+
   .heroTitle {
     font-size: 2rem;
     max-width: 90%;
   }
-  
+
   .heroSubtitle {
     font-size: 0.9rem;
     max-width: 90%;
   }
-  
+
   .collectionGrid {
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
     max-width: 95%;
   }
-  
+
   .navContainer {
     gap: 1.5rem;
     margin-right: 1.5rem;
   }
-  
+
   .header {
     padding: 0.75rem 1.5rem;
   }
-  
+
   .footerLinks {
     gap: 5rem;
   }
@@ -704,49 +718,50 @@ a.secondary {
   .hero {
     height: 350px;
   }
-  
+
   .heroTitle {
     font-size: 1.75rem;
   }
-  
+
   .heroSubtitle {
     font-size: 0.85rem;
     margin-bottom: 1.25rem;
   }
-  
+
   .collectionGrid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
-  
+
   .collectionImage {
     aspect-ratio: 16/9;
   }
-  
+
   .navContainer {
-    display: none; /* Hide normal nav on mobile */
+    display: none;
+    /* Hide normal nav on mobile */
   }
-  
+
   .brand {
     font-size: 1.1rem;
   }
-  
+
   .header {
     padding: 0.5rem 1rem;
     height: 55px;
   }
-  
+
   .iconContainer {
     gap: 1rem;
   }
-  
+
   .footerLinks {
     flex-direction: column;
     gap: 1.5rem;
     align-items: center;
     margin-bottom: 2rem;
   }
-  
+
   .sectionTitle {
     font-size: 1.5rem;
     margin-bottom: 1.5rem;
@@ -757,24 +772,24 @@ a.secondary {
   .hero {
     height: 300px;
   }
-  
+
   .heroTitle {
     font-size: 1.5rem;
   }
-  
+
   .collectionImage {
     aspect-ratio: 4/3;
   }
-  
+
   .shopButton {
     padding: 0.5rem 1.25rem;
     font-size: 0.85rem;
   }
-  
+
   .sectionTitle {
     font-size: 1.35rem;
   }
-  
+
   .footer {
     padding-top: 2rem;
     padding-bottom: 2rem;
