@@ -85,7 +85,8 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
     const gl = canvas.getContext('webgl', { 
       premultipliedAlpha: false,
       alpha: true,
-      antialias: true // Enable antialiasing for smoother lines
+      antialias: true, // Enable antialiasing for smoother lines
+      preserveDrawingBuffer: true // Helps with consistent rendering
     });
     
     if (!gl) {
@@ -128,6 +129,7 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
     const timeUniformLocation = gl.getUniformLocation(program, 'u_time');
     const intensityUniformLocation = gl.getUniformLocation(program, 'u_intensity');
     const textureUniformLocation = gl.getUniformLocation(program, 'u_texture');
+    const fadeBottomUniformLocation = gl.getUniformLocation(program, 'u_fadeBottom');
     
     // Create position buffer
     const positionBuffer = gl.createBuffer();
@@ -191,6 +193,7 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
       gl.uniform1f(timeUniformLocation, currentTime);
       gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
       gl.uniform1f(intensityUniformLocation, alwaysOn ? 2.0 : 0.0); // INCREASED INTENSITY
+      gl.uniform1f(fadeBottomUniformLocation, 0.15); // Add bottom fade value - higher value = more fade
       
       // Set texture
       gl.activeTexture(gl.TEXTURE0);
@@ -238,8 +241,9 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
         height={dimensions.height}
       />
       
-      {/* Debug info */}
+      {/* Debug info - hidden in production */}
       <div className={styles.debugInfo} style={{
+        display: 'none', /* Hide debug info in production */
         position: 'absolute',
         bottom: '5px',
         left: '5px',

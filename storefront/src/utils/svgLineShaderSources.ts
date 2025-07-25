@@ -14,6 +14,7 @@ export const svgLineFragmentShaderSource = `
   uniform vec2 u_res;
   uniform float u_intensity;
   uniform sampler2D u_texture;
+  // uniform float u_fadeBottom; // This is no longer used
 
   // Enhanced noise functions
   vec2 random2(vec2 st) {
@@ -82,6 +83,9 @@ export const svgLineFragmentShaderSource = `
     
     // Apply intensity
     visibility *= u_intensity;
+    
+    // The top fade has been removed to show the start of the SVG.
+    // The bottom fade is handled by a CSS mask on the canvas.
     
     // Keep original SVG colors unchanged - only affect alpha/visibility
     gl_FragColor = vec4(svgCol.rgb, svgCol.a * visibility);
