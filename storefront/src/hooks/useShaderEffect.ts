@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createShader, createProgram } from '../utils/shaderUtils';
 

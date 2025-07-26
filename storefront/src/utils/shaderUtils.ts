@@ -1,4 +1,3 @@
-
 export function createShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
   const shader = gl.createShader(type);
   if (!shader) {
