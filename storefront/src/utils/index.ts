@@ -7,3 +7,8 @@
 export * from './shaderUtils';
 export * from './shaderSources';
 export * from './webglErrorHandling';
+
+// Export API and data transformation utilities
+export * from './httpClient';
+export * from './medusaApiClient';
+export * from './productDataMapper';
