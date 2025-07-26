@@ -29,6 +29,16 @@ export interface ProductOption {
   metadata: Record<string, any> | null;
 }
 
+export interface MoneyAmount {
+  id: string;
+  currency_code: string;
+  amount: number;
+  region_id?: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
 export interface ProductVariant {
   id: string;
   title: string;
@@ -49,6 +59,7 @@ export interface ProductVariant {
   height: number | null;
   width: number | null;
   options: ProductOptionValue[];
+  prices: MoneyAmount[];
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
