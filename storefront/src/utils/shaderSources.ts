@@ -14,11 +14,10 @@ export const fragmentShaderSource = `
   uniform vec2 u_res;
   uniform float u_intensity;
 
-  // Cosmic noise functions
+  // 2D noise functions (hash, noise, fbm)
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123);
   }
-  
   float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
@@ -28,93 +27,97 @@ export const fragmentShaderSource = `
       mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
     u.y);
   }
-  
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
-    for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < 8; i++) {
       v += a * noise(p);
-      p = 2.0 * p + vec2(cos(u_time * 0.2 + float(i) * 2.1), sin(u_time * 0.15 + float(i) * 1.8));
+      // More random time offsets for continuous variation
+      p = 2.0 * p + vec2(cos(u_time * 0.3 + float(i) * 1.7), sin(u_time * 0.4 + float(i) * 2.3));
       a *= 0.5;
     }
     return v;
   }
 
-  // Cosmic nebula function
-  float nebula(vec2 p, float t) {
-    float n1 = fbm(p * 2.0 + vec2(t * 0.1, -t * 0.05));
-    float n2 = fbm(p * 4.0 + vec2(-t * 0.08, t * 0.12));
-    float n3 = fbm(p * 8.0 + vec2(t * 0.15, t * 0.1));
-    return (n1 * 0.5 + n2 * 0.3 + n3 * 0.2);
-  }
-
-  // Star field function
-  float stars(vec2 p) {
-    float n = hash(floor(p * 50.0));
-    return smoothstep(0.98, 1.0, n);
+  // SDF for a 2D box
+  float sdBox(vec2 p, vec2 b) {
+    vec2 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
   }
 
   void main() {
+    // Center coordinates
     vec2 uv = v_uv - 0.5;
-    float t = u_time * 0.3;
-    
+    float t = u_time * 0.35; // Slower, more elegant animation speed
+
     // Correct for aspect ratio
     float aspect = u_res.x / u_res.y;
     uv.x *= aspect;
 
-    // Distance from center for radial effects
-    float dist = length(uv);
+    // Define outer and inner rectangle dimensions for a hollow shape
+    vec2 outer_dims = vec2(0.6 * aspect, 0.6);
+    vec2 inner_dims = vec2(outer_dims.x - 0.55, outer_dims.y - 0.55);
+  
+    // Calculate SDF for outer and inner boxes
+    float dist_outer = sdBox(uv, outer_dims);
+    float dist_inner = sdBox(uv, inner_dims);
+
+    // Combine distances to create a hollow rectangle SDF
+    float dist = max(dist_outer, -dist_inner);
+
+    // Create a soft mask from the distance field with a wider gradient
+    float mask = smoothstep(0.55, 0.0, dist);
+
+    // Multiple swirl layers for more complex, continuous motion
+    float angleNoise1 = fbm(uv * 1.8 + vec2(0.0, -t));
+    float angleNoise2 = fbm(uv * 2.3 + vec2(t * 0.7, 0.0));
+    float combinedNoise = (angleNoise1 + angleNoise2 * 0.6) / 1.6;
     
-    // Create cosmic nebula layers
-    vec2 nebula_uv = uv * 1.5;
-    float nebula1 = nebula(nebula_uv, t);
-    float nebula2 = nebula(nebula_uv * 1.3 + vec2(100.0), t * 1.2);
-    float nebula3 = nebula(nebula_uv * 0.8 + vec2(200.0), t * 0.8);
+    float swirlAngle = mix(0.0, 4.0, mask) * (combinedNoise - 0.5) * 6.1415;
+    mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
+    vec2 p = rot * uv;
+
+    // Enhanced layered distortion with multiple frequencies for continuous motion
+    p += vec2(
+      sin((uv.y + t) * 3.5) * 0.12 + sin((uv.y + t * 1.3) * 7.0) * 0.04,
+      cos((uv.x - t) * 3.2) * 0.12 + cos((uv.x - t * 1.1) * 6.5) * 0.04
+    ) * mask;
+
+    // Multiple density layers for richer, more continuous smoke
+    float density1 = fbm(p * 4.9 - vec2(0.0, t * 0.6));
+    float density2 = fbm(p * 9.8 + vec2(t * 0.1, -t * 0.3));
+    float density3 = fbm(p * 19.4 - vec2(t * 0.2, t * 0.3));
     
-    // Combine nebula layers
-    float combined_nebula = (nebula1 * 0.4 + nebula2 * 0.35 + nebula3 * 0.25);
+    // Combine densities with different weights for layered effect
+    float density = (density1 * 0.6 + density2 * 0.3 + density3 * 0.2);
+    density *= 1.7 * mask; // Increased from 0.8 to 1.0 for more occurrence
     
-    // Add swirling motion
-    float angle = atan(uv.y, uv.x) + t * 0.2 + combined_nebula * 2.0;
-    vec2 spiral_uv = vec2(cos(angle), sin(angle)) * dist;
+    // Lower threshold for more visible smoke, smoother transition
+    float alpha = smoothstep(0.35, 0.75, density); // Lowered from 0.35, 0.65
+
+    // Symmetric smooth edge fading for all sides
+    vec2 edge_uv = abs(v_uv - 0.5) * 2.0;
     
-    // Create spiral arms
-    float spiral = sin(angle * 3.0 + dist * 8.0 - t * 2.0) * 0.5 + 0.5;
-    spiral = pow(spiral, 2.0);
+    // Separate X and Y edge fades for better control
+    float edge_fade_x = 1.0 - smoothstep(0.4, 1.2, edge_uv.x);
+    float edge_fade_y = 1.0 - smoothstep(0.4, 1.2, edge_uv.y);
     
-    // Add stars
-    float star_field = stars(uv + vec2(t * 0.01, t * 0.005));
-    star_field += stars(uv * 2.0 + vec2(-t * 0.008, t * 0.012)) * 0.5;
+    // Combine with multiplication for smooth corners
+    float edge_fade = edge_fade_x * edge_fade_y;
     
-    // Create cosmic dust
-    float dust = fbm(uv * 6.0 + vec2(t * 0.05, -t * 0.03)) * 0.3;
+    // Additional radial fade for ultra-smooth edges
+    float center_dist = length(v_uv - 0.5);
+    float radial_fade = 1.0 - smoothstep(0.3, 0.9, center_dist);
     
-    // Combine all elements
-    float cosmic_density = combined_nebula * spiral + dust;
-    cosmic_density = clamp(cosmic_density, 0.0, 1.0);
+    // Soft vignette for natural falloff
+    float vignette = 1.0 - pow(center_dist * 1.8, 2.5);
+    vignette = clamp(vignette, 0.0, 1.0);
     
-    // Create alpha mask
-    float alpha = smoothstep(0.2, 0.8, cosmic_density);
-    alpha += star_field * 0.8;
-    
-    // Edge fading
-    float edge_fade = 1.0 - smoothstep(0.3, 0.8, dist);
-    
-    // Cosmic color palette - deep space purples and blues with hints of pink
-    vec3 deep_space = vec3(0.05, 0.02, 0.15);
-    vec3 nebula_color = vec3(0.3, 0.1, 0.6);
-    vec3 star_color = vec3(0.9, 0.8, 1.0);
-    vec3 dust_color = vec3(0.4, 0.2, 0.8);
-    
-    // Mix colors based on density and effects
-    vec3 final_color = mix(deep_space, nebula_color, combined_nebula);
-    final_color = mix(final_color, dust_color, dust * 0.5);
-    final_color = mix(final_color, star_color, star_field);
-    
-    // Add some cosmic glow
-    final_color += vec3(0.1, 0.05, 0.2) * spiral * 0.3;
-    
-    gl_FragColor = vec4(final_color, alpha * u_intensity * edge_fade);
+    // Combine all fades
+    float combined_fade = edge_fade * radial_fade * vignette;
+
+    // Final color blending with symmetric smooth edges
+    vec3 fluid_color = vec3(0.2, 0.25, 0.3);
+    gl_FragColor = vec4(fluid_color, alpha * u_intensity * combined_fade);
   }
 `;
-

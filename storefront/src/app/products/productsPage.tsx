@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Header from '../../components/Header';
 import ProductCardWithShader from '../../components/ProductCardWithShader/ProductCardWithShader';
-import CosmicVariationSwitcher from '../../components/CosmicVariationSwitcher';
 import styles from './productsPage.module.css';
 
 // Abstract Stone Art images
@@ -54,8 +53,6 @@ const products = [
 ];
 
 export default function ProductsPage() {
-  const [cosmicVariation, setCosmicVariation] = useState(1);
-
   return (
     <div
       className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
@@ -149,16 +146,10 @@ export default function ProductsPage() {
             <div className={styles.productsGrid}>
               {products.map((product) => (
                 <div key={product.title} className={styles.productCardWrapper}>
-                  <ProductCardWithShader product={product} cosmicVariation={cosmicVariation} />
+                  <ProductCardWithShader product={product} />
                 </div>
               ))}
             </div>
-
-            {/* Cosmic Variation Switcher */}
-            <CosmicVariationSwitcher
-              currentVariation={cosmicVariation}
-              onVariationChange={setCosmicVariation}
-            />
           </div>
         </div>
       </div>
