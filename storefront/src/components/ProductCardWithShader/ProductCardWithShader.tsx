@@ -1,6 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
-import CosmicShaderCanvas from '../CosmicShaderCanvas/CosmicShaderCanvas';
-import EdgeGradientShaderCanvas from '../EdgeGradientShaderCanvas';
+import React from 'react';
 import styles from './ProductCardWithShader.module.css';
 
 interface ProductCardWithShaderProps {
@@ -20,104 +18,30 @@ interface ProductCardWithShaderProps {
 }
 
 const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product, cosmicVariation = 1 }) => {
-  const [isHovering, setIsHovering] = useState(false);
-  const [isHoveringImageSection, setIsHoveringImageSection] = useState(false);
-
-  // --- 3D tilt state & refs -------------------------------------------------
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageSectionRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef<number | null>(null);
-
-  const resetTilt = useCallback(() => {
-    if (imageSectionRef.current) {
-      imageSectionRef.current.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
-    }
-  }, []);
-
-  const handleImageSectionMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    if (!imageSectionRef.current || !isHoveringImageSection) return;
-
-    // Cancel any previous frame to avoid accumulation
-    if (requestRef.current) cancelAnimationFrame(requestRef.current);
-
-    requestRef.current = requestAnimationFrame(() => {
-      const rect = imageSectionRef.current!.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      // Normalize between -1 and 1
-      const midX = rect.width / 2;
-      const midY = rect.height / 2;
-      const normX = (x - midX) / midX; // -1 (left) to 1 (right)
-      const normY = (midY - y) / midY; // -1 (bottom) to 1 (top)
-
-      const maxRotation = 8; // degrees, subtle tilt
-      const rotY = normX * maxRotation;
-      const rotX = normY * maxRotation;
-
-      imageSectionRef.current!.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
-    });
-  }, [isHoveringImageSection]);
-
-  const handleContainerMouseLeave = useCallback(() => {
-    resetTilt();
-    setIsHovering(false);
-    setIsHoveringImageSection(false);
-  }, [resetTilt]);
-
-  const handleContainerMouseEnter = useCallback(() => {
-    setIsHovering(true);
-  }, []);
-
-  const handleImageSectionMouseEnter = useCallback(() => {
-    setIsHoveringImageSection(true);
-  }, []);
-
-  const handleImageSectionMouseLeave = useCallback(() => {
-    setIsHoveringImageSection(false);
-    resetTilt();
-  }, [resetTilt]);
+  // Removed all hover state and 3D tilt functionality for plain hover effect
 
   return (
-    <div
-      ref={containerRef}
-      className={`${styles.cardContainer} ${isHovering ? styles.cardContainerHovered : ''}`}
-      onMouseEnter={handleContainerMouseEnter}
-      onMouseLeave={handleContainerMouseLeave}
-      onTouchStart={() => setIsHovering(true)}
-      onTouchEnd={() => setIsHovering(false)}
-    >
+    <div className={styles.cardContainer}>
       <div className={styles.cardWrapper}>
-        {/* Image section with 3D rotation effect */}
-        <div 
-          ref={imageSectionRef}
-          className={styles.imageSection}
-          onMouseEnter={handleImageSectionMouseEnter}
-          onMouseLeave={handleImageSectionMouseLeave}
-          onMouseMove={handleImageSectionMouseMove}
-        >
+        {/* Simple image section without effects */}
+        <div className={styles.imageSection}>
           <div className={styles.cardContentWrapper}>
             <div className={styles.cardContent}>
               <img 
                 src={product.backgroundImage} 
                 alt={`${product.title} background`} 
-                className={`${styles.backgroundImage} ${isHovering ? styles.backgroundImageHovered : ''}`}
+                className={styles.backgroundImage}
               />
             </div>
             
-            {/* Foreground image outside the card content to allow it to break free */}
+            {/* Foreground image - no hover effects */}
             <div className={styles.foregroundWrapper}>
               <img 
                 src={product.foregroundImage} 
                 alt={product.title} 
-                className={`${styles.foregroundImage} ${isHovering ? styles.foregroundImageHovered : ''}`}
+                className={styles.foregroundImage}
               />
             </div>
-          </div>
-          
-          <div className={styles.effectsWrapper}>
-            <CosmicShaderCanvas isHovering={isHovering} variation={cosmicVariation} />
-            <EdgeGradientShaderCanvas isHovering={isHovering} />
           </div>
         </div>
         
