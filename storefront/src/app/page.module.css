@@ -185,7 +185,9 @@ a.secondary {
 .heroCarousel {
   position: relative;
   z-index: 10;
-  height: 500px;
+  height: 60vh;
+  min-height: 400px;
+  max-height: 600px;
   border-radius: 35px;
   overflow: hidden;
   display: flex;
@@ -204,6 +206,7 @@ a.secondary {
   height: 100%;
   width: 100%;
   will-change: transform;
+  touch-action: pan-x;
 }
 
 .hero {
@@ -220,12 +223,13 @@ a.secondary {
   position: relative;
   z-index: 2;
   text-align: center;
-  max-width: 700px;
-  padding: 0 20px;
+  max-width: 90%;
+  padding: 0 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
 }
 
 .heroImage {
@@ -237,37 +241,46 @@ a.secondary {
   object-fit: cover;
   /* Align slightly higher to ensure the statue’s face is centered in the visible area */
   object-position: center 45%;
+  z-index: 1;
 }
 
 .heroTitle {
   color: white;
-  font-size: 2.5rem;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
   font-weight: 800;
   margin-bottom: 0.5rem;
   line-height: 1.1;
   text-align: center;
   letter-spacing: -0.5px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+  max-width: 100%;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
 .heroSubtitle {
   color: white;
-  font-size: 1rem;
+  font-size: clamp(0.875rem, 2.5vw, 1rem);
   margin-bottom: 1.5rem;
   font-weight: normal;
   text-align: center;
-  max-width: 500px;
+  max-width: 100%;
   line-height: 1.4;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  word-wrap: break-word;
 }
 
 .shopButton {
   background-color: black;
   color: white;
-  padding: 0.6rem 1.5rem;
+  padding: clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 4vw, 1.5rem);
   border-radius: 0.25rem;
   font-weight: 600;
   transition: all 0.2s;
-  font-size: 0.9rem;
+  font-size: clamp(0.8rem, 2.5vw, 0.9rem);
   border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .shopButton:hover {
@@ -674,13 +687,15 @@ a.secondary {
 }
 
 @media (max-width: 1024px) {
-  .hero {
-    height: 450px;
-    max-width: 95%;
+  .heroCarousel {
+    height: 55vh;
+    min-height: 350px;
+    max-height: 500px;
+    border-radius: 25px;
   }
 
-  .heroTitle {
-    font-size: 2.25rem;
+  .heroContent {
+    padding: 0 1.5rem;
   }
 
   .collectionGrid {
@@ -711,18 +726,31 @@ a.secondary {
 }
 
 @media (max-width: 768px) {
-  .hero {
-    height: 400px;
+  .heroCarousel {
+    height: 40vh;
+    min-height: 250px;
+    max-height: 320px;
+    border-radius: 20px;
+    width: 98%;
+  }
+
+  .heroContent {
+    padding: 0 1rem;
+    max-width: 95%;
   }
 
   .heroTitle {
-    font-size: 2rem;
-    max-width: 90%;
+    font-size: clamp(1.25rem, 3.5vw, 1.8rem);
   }
 
   .heroSubtitle {
-    font-size: 0.9rem;
-    max-width: 90%;
+    font-size: clamp(0.75rem, 2vw, 0.9rem);
+    margin-bottom: 1rem;
+  }
+
+  .shopButton {
+    font-size: clamp(0.7rem, 2vw, 0.8rem);
+    padding: clamp(0.4rem, 1.5vw, 0.6rem) clamp(0.8rem, 3vw, 1.2rem);
   }
 
   .collectionGrid {
@@ -746,17 +774,32 @@ a.secondary {
 }
 
 @media (max-width: 640px) {
-  .hero {
-    height: 350px;
+  .heroCarousel {
+    height: 35vh;
+    min-height: 220px;
+    max-height: 280px;
+    border-radius: 15px;
+    width: 98%;
+    margin-bottom: 2rem;
+  }
+
+  .heroContent {
+    padding: 0 0.75rem;
+    max-width: 98%;
   }
 
   .heroTitle {
-    font-size: 1.75rem;
+    font-size: clamp(1.1rem, 3vw, 1.5rem);
   }
 
   .heroSubtitle {
-    font-size: 0.85rem;
-    margin-bottom: 1.25rem;
+    font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+    margin-bottom: 0.8rem;
+  }
+
+  .shopButton {
+    font-size: clamp(0.65rem, 1.8vw, 0.75rem);
+    padding: clamp(0.35rem, 1.2vw, 0.5rem) clamp(0.7rem, 2.5vw, 1rem);
   }
 
   .collectionGrid {
@@ -800,21 +843,36 @@ a.secondary {
 }
 
 @media (max-width: 480px) {
-  .hero {
-    height: 300px;
+  .heroCarousel {
+    height: 30vh;
+    min-height: 200px;
+    max-height: 250px;
+    border-radius: 12px;
+    width: 98%;
+    margin-bottom: 1.5rem;
+  }
+
+  .heroContent {
+    padding: 0 0.5rem;
+    max-width: 100%;
   }
 
   .heroTitle {
-    font-size: 1.5rem;
+    font-size: clamp(1rem, 2.8vw, 1.3rem);
+  }
+
+  .heroSubtitle {
+    font-size: clamp(0.65rem, 1.6vw, 0.8rem);
+    margin-bottom: 0.6rem;
+  }
+
+  .shopButton {
+    font-size: clamp(0.6rem, 1.6vw, 0.7rem);
+    padding: clamp(0.3rem, 1vw, 0.4rem) clamp(0.6rem, 2vw, 0.8rem);
   }
 
   .collectionImage {
     aspect-ratio: 4/3;
-  }
-
-  .shopButton {
-    padding: 0.5rem 1.25rem;
-    font-size: 0.85rem;
   }
 
   .sectionTitle {
@@ -825,6 +883,240 @@ a.secondary {
     padding-top: 2rem;
     padding-bottom: 2rem;
   }
+
+  .heroDots {
+    display: none;
+  }
+
+  .heroDot {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+  .heroCarousel {
+    height: 25vh;
+    min-height: 180px;
+    max-height: 220px;
+    border-radius: 10px;
+    width: 100%;
+  }
+
+  .heroContent {
+    padding: 0 0.25rem;
+  }
+
+  .heroTitle {
+    font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+  }
+
+  .heroSubtitle {
+    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+    margin-bottom: 0.5rem;
+  }
+
+  .shopButton {
+    font-size: clamp(0.55rem, 1.4vw, 0.65rem);
+    padding: clamp(0.25rem, 0.8vw, 0.35rem) clamp(0.5rem, 1.8vw, 0.7rem);
+  }
+
+  .heroDots {
+    display: none;
+  }
+
+  .heroDot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .shaderWrapper {
+    height: clamp(45vh, 55vh, 65vh);
+    max-width: clamp(200px, 35vw, 280px);
+    transform: translateY(clamp(8vh, 12vh, 16vh));
+    opacity: 35%;
+  }
+
+  .shaderWrapperSecond {
+    height: clamp(80vh, 100vh, 120vh);
+    max-width: clamp(250px, 50vw, 350px);
+    right: clamp(-50vw, -40vw, -30vw);
+    opacity: clamp(25%, 35%, 45%);
+    transform: translateY(clamp(-20vh, -15vh, -10vh));
+  }
+}
+
+/* Ensure hero section is accessible */
+.heroCarousel:focus-within {
+  outline: 2px solid #007acc;
+  outline-offset: 2px;
+}
+
+/* Hide hero dots on mobile and tablets */
+@media (max-width: 768px) {
+  .heroDots {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  .heroDot {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .heroDot::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background-color: inherit;
+    border-radius: 50%;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .heroCarousel {
+    height: 70vh;
+    min-height: 200px;
+    max-height: 300px;
+  }
+
+  .heroContent {
+    padding: 0 1rem;
+  }
+
+  .shaderWrapper {
+    height: clamp(60vh, 80vh, 100vh);
+    max-width: clamp(200px, 30vw, 350px);
+    transform: translateY(clamp(2vh, 5vh, 8vh));
+  }
+
+  .shaderWrapperSecond {
+    height: clamp(100vh, 120vh, 140vh);
+    max-width: clamp(300px, 50vw, 500px);
+    right: clamp(-40vw, -30vw, -20vw);
+    transform: translateY(clamp(-15vh, -10vh, -5vh));
+  }
+}
+
+/* Portrait orientation on mobile */
+@media (max-width: 768px) and (orientation: portrait) {
+  .shaderWrapper {
+    height: clamp(50vh, 65vh, 80vh);
+    max-width: clamp(250px, 38vw, 350px);
+    transform: translateY(clamp(6vh, 10vh, 14vh));
+  }
+
+  .shaderWrapperSecond {
+    height: clamp(100vh, 120vh, 140vh);
+    max-width: clamp(350px, 65vw, 500px);
+    right: clamp(-45vw, -35vw, -25vw);
+    transform: translateY(clamp(-18vh, -12vh, -6vh));
+  }
+}
+
+/* Media queries for second SVG wrapper */
+@media (min-width: 1024px) {
+  .shaderWrapperSecond {
+    height: clamp(160vh, 180vh, 200vh);
+    max-width: clamp(900px, 90vw, 1200px);
+    right: clamp(-20vw, -15vw, -10vw);
+    transform: translateY(clamp(-40vh, -30vh, -20vh));
+    /* Enhanced fade for larger screens with stronger top fade */
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.7) 25%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0) 100%),
+      linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 15%, rgba(0, 0, 0, 1) 100%),
+      linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 35%, rgba(0, 0, 0, 1) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.7) 25%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0) 100%),
+      linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 15%, rgba(0, 0, 0, 1) 100%),
+      linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 35%, rgba(0, 0, 0, 1) 100%);
+  }
+}
+
+@media (max-width: 768px) {
+  .shaderWrapperSecond {
+    height: clamp(90vh, 110vh, 130vh);
+    max-width: clamp(350px, 60vw, 500px);
+    right: clamp(-40vw, -30vw, -20vw);
+    opacity: clamp(30%, 40%, 50%);
+    transform: translateY(clamp(-15vh, -10vh, -5vh));
+    /* Simplified fade for mobile with stronger top fade */
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.6) 35%, rgba(0, 0, 0, 0) 100%),
+      linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 25%, rgba(0, 0, 0, 1) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.6) 35%, rgba(0, 0, 0, 0) 100%),
+      linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 25%, rgba(0, 0, 0, 1) 100%);
+  }
+}
+
+/* Very wide screens */
+@media (min-width: 1440px) {
+  .heroCarousel {
+    height: 65vh;
+    min-height: 500px;
+    max-height: 700px;
+  }
+
+  .shaderWrapper {
+    height: clamp(80vh, 90vh, 100vh);
+    max-width: clamp(500px, 35vw, 600px);
+    transform: translateY(clamp(2vh, 4vh, 6vh));
+  }
+
+  .shaderWrapperSecond {
+    height: clamp(180vh, 200vh, 220vh);
+    max-width: clamp(1000px, 70vw, 1400px);
+    right: clamp(-15vw, -10vw, -5vw);
+    transform: translateY(clamp(-50vh, -40vh, -30vh));
+  }
+}
+
+/* Ultra-wide screens */
+@media (min-width: 1920px) {
+  .shaderWrapper {
+    height: clamp(85vh, 95vh, 105vh);
+    max-width: clamp(550px, 30vw, 700px);
+    transform: translateY(clamp(1vh, 3vh, 5vh));
+  }
+
+  .shaderWrapperSecond {
+    height: clamp(200vh, 220vh, 240vh);
+    max-width: clamp(1200px, 60vw, 1600px);
+    right: clamp(-12vw, -8vw, -4vw);
+    transform: translateY(clamp(-60vh, -50vh, -40vh));
+  }
+}
+
+/* Medium tablet screens */
+@media (min-width: 769px) and (max-width: 1023px) {
+  .shaderWrapper {
+    height: clamp(65vh, 75vh, 85vh);
+    max-width: clamp(350px, 42vw, 450px);
+    transform: translateY(clamp(4vh, 7vh, 10vh));
+  }
+
+  .shaderWrapperSecond {
+    height: clamp(130vh, 150vh, 170vh);
+    max-width: clamp(500px, 75vw, 700px);
+    right: clamp(-25vw, -20vw, -15vw);
+    transform: translateY(clamp(-25vh, -20vh, -15vh));
+  }
+}
+
+/* Hero image responsive positioning */
+@media (max-width: 768px) {
+  .heroImage {
+    object-position: center 40% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .heroImage {
+    object-position: center 35% !important;
+  }
 }
 
 .heroDots {
@@ -834,6 +1126,7 @@ a.secondary {
   transform: translateX(-50%);
   display: flex;
   gap: 10px;
+  z-index: 3;
 }
 
 .heroDot {
@@ -854,6 +1147,80 @@ a.secondary {
 }
 
 /* Second SVG shader wrapper for bottom right positioning */
+.shaderWrapperSecond {
+  position: absolute;
+  right: clamp(-35vw, -22vw, -15vw);
+  bottom: clamp(-80vh, -70vh, -60vh);
+  height: clamp(120vh, 150vh, 180vh);
+  aspect-ratio: 501/1115;
+  max-width: clamp(600px, 80vw, 1000px);
+  min-width: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 0;
+  opacity: clamp(35%, 45%, 55%);
+  /* Apply smooth fade with stronger top fade */
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.8) 30%, rgba(0, 0, 0, 0.4) 60%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 1) 100%),
+    linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.8) 30%, rgba(0, 0, 0, 0.4) 60%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 20%, rgba(0, 0, 0, 1) 100%),
+    linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 1) 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+  filter: blur(0.5px);
+  pointer-events: none;
+  transform: translateY(clamp(-30vh, -20vh, -10vh));
+}
+
+
+
+/* Make sure collection grid items have a z-index and position to layer correctly */
+.collectionGrid {
+  position: relative;
+  z-index: 1;
+}
+
+.collectionImage {
+  position: relative;
+  z-index: 2;
+  /* Keep existing styles */
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.collectionTitle {
+  position: relative;
+  z-index: 2;
+  /* Keep existing styles */
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #000000;
+}
+
+@media screen and (max-width: 768px) {
+  .heroCarousel .heroDots {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .heroCarousel .heroDots {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}/* S
+econd SVG shader wrapper for bottom right positioning */
 .shaderWrapperSecond {
   position: absolute;
   right: -22vw;
@@ -912,31 +1279,4 @@ a.secondary {
     -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.6) 35%, rgba(0, 0, 0, 0) 100%),
       linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 25%, rgba(0, 0, 0, 1) 100%);
   }
-}
-
-/* Make sure collection grid items have a z-index and position to layer correctly */
-.collectionGrid {
-  position: relative;
-  z-index: 1;
-}
-
-.collectionImage {
-  position: relative;
-  z-index: 2;
-  /* Keep existing styles */
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  transition: transform 0.3s ease;
-}
-
-.collectionTitle {
-  position: relative;
-  z-index: 2;
-  /* Keep existing styles */
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #000000;
 }
