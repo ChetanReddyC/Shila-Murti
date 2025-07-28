@@ -20,8 +20,8 @@ export interface PriceCalculationResult {
 
 export class ProductDataMapper {
   private static readonly DEFAULT_CURRENCY = 'usd';
-  private static readonly FALLBACK_IMAGE = '/images/placeholder-product.jpg';
-  private static readonly FALLBACK_BACKGROUND = '/images/placeholder-background.jpg';
+  private static readonly FALLBACK_IMAGE = '/images/placeholder-product.svg';
+  private static readonly FALLBACK_BACKGROUND = '/images/placeholder-background.svg';
 
   /**
    * Maps a Medusa product to ProductCardData format
