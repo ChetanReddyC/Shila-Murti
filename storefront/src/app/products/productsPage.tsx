@@ -1,58 +1,126 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Header from '../../components/Header';
-import ProductCardWithShader from '../../components/ProductCardWithShader/ProductCardWithShader';
+import ProductsGrid from '../../components/ProductsGrid';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import { productsService, ProductsServiceError } from '../../services/productsService';
+import { ProductCardData } from '../../utils/productDataMapper';
+import { useRetry } from '../../hooks/useRetry';
 import styles from './productsPage.module.css';
 
-// Abstract Stone Art images
-import Product1BgImage from '../../images/products_images/abstract-stone-art-products/product1-bg-img.jpg';
-import Product1Image from '../../images/products_images/abstract-stone-art-products/product1-img.png';
-import Product2BgImage from '../../images/products_images/abstract-stone-art-products/product2-bg-img.jpg';
-import Product2Image from '../../images/products_images/abstract-stone-art-products/product2-img.png';
-import Product3BgImage from '../../images/products_images/abstract-stone-art-products/product3-bg-img.jpg';
-import Product3Image from '../../images/products_images/abstract-stone-art-products/product3-img.png';
-
-const products = [
-  {
-    title: 'Abstract Stone Art 1',
-    backgroundImage: Product1BgImage.src,
-    foregroundImage: Product1Image.src,
-    price: 499.99,
-    originalPrice: 599.99,
-    rating: 4.5,
-    reviewCount: 12,
-    material: 'Marble',
-    dimensions: '12" × 8" × 4"',
-    inStock: true,
-  },
-  {
-    title: 'Abstract Stone Art 2',
-    backgroundImage: Product2BgImage.src,
-    foregroundImage: Product2Image.src,
-    price: 649.99,
-    originalPrice: 749.99,
-    rating: 4.8,
-    reviewCount: 24,
-    material: 'Granite',
-    dimensions: '14" × 10" × 5"',
-    inStock: true,
-  },
-  {
-    title: 'Abstract Stone Art 3',
-    backgroundImage: Product3BgImage.src,
-    foregroundImage: Product3Image.src,
-    price: 799.99,
-    originalPrice: 899.99,
-    rating: 4.7,
-    reviewCount: 18,
-    material: 'Marble',
-    dimensions: '16" × 12" × 6"',
-    inStock: false,
-  },
-];
+// Memoized state interface to prevent unnecessary re-renders
+interface ProductsState {
+  products: ProductCardData[];
+  loading: boolean;
+  error: ProductsServiceError | null;
+}
 
 export default function ProductsPage() {
+  // Use a single state object to minimize state updates
+  const [state, setState] = useState<ProductsState>({
+    products: [],
+    loading: true,
+    error: null
+  });
+
+  // Use ref to track if component is mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+
+  // Use the retry hook with exponential backoff
+  const { retryCount, isRetrying, canRetry, retry, reset } = useRetry({
+    maxRetries: 3,
+    initialDelay: 1000,
+    backoffMultiplier: 2,
+    maxDelay: 10000
+  });
+
+  // Optimized state update function to minimize re-renders
+  const updateState = useCallback((updates: Partial<ProductsState>) => {
+    if (!isMountedRef.current) return;
+    
+    setState(prevState => {
+      // Only update if there are actual changes
+      const newState = { ...prevState, ...updates };
+      
+      // Shallow comparison to prevent unnecessary updates
+      if (
+        newState.loading === prevState.loading &&
+        newState.error === prevState.error &&
+        newState.products === prevState.products
+      ) {
+        return prevState;
+      }
+      
+      return newState;
+    });
+  }, []);
+
+  // Fetch products with enhanced error handling and optimized state management
+  const fetchProducts = useCallback(async () => {
+    try {
+      updateState({ loading: true, error: null });
+      
+      const fetchedProducts = await productsService.fetchProducts();
+      
+      if (isMountedRef.current) {
+        updateState({ products: fetchedProducts, loading: false });
+        // Reset retry state on successful fetch
+        reset();
+      }
+    } catch (err) {
+      if (isMountedRef.current) {
+        const serviceError = err as ProductsServiceError;
+        updateState({ error: serviceError, loading: false });
+        console.error('Failed to fetch products:', serviceError);
+      }
+    }
+  }, [updateState, reset]);
+
+  // Effect to fetch products on component mount and cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    fetchProducts();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [fetchProducts]);
+
+  // Retry handler using the retry hook
+  const handleRetry = useCallback(async () => {
+    if (!canRetry || !isMountedRef.current) return;
+    
+    try {
+      await retry(fetchProducts);
+    } catch (err) {
+      // Error is already handled in fetchProducts
+      console.error('Retry failed:', err);
+    }
+  }, [retry, fetchProducts, canRetry]);
+
+  // Error boundary error handler - memoized to prevent re-renders
+  const handleErrorBoundaryError = useCallback((error: Error, errorInfo: any) => {
+    console.error('ErrorBoundary caught an error in ProductsPage:', error, errorInfo);
+    
+    // You could send this to an error reporting service
+    // errorReportingService.captureException(error, { extra: errorInfo });
+  }, []);
+
+  // Memoize computed values to prevent unnecessary re-renders
+  const isLoading = useMemo(() => state.loading || isRetrying, [state.loading, isRetrying]);
+  
+  // Memoize grid props to prevent unnecessary re-renders of ProductsGrid
+  const gridProps = useMemo(() => ({
+    products: state.products,
+    loading: isLoading,
+    error: state.error,
+    onRetry: handleRetry,
+    retryCount,
+    maxRetries: 3,
+    skeletonCount: 6
+  }), [state.products, isLoading, state.error, handleRetry, retryCount]);
+
   return (
     <div
       className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
@@ -101,7 +169,7 @@ export default function ProductsPage() {
                     </svg>
                   </div>
                 </button>
-                .                <button className="flex h-8 w-25 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-8 pr-8">
+                <button className="flex h-8 w-25 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-8 pr-8">
                   <p className="text-[#141414] text-sm font-medium leading-normal">Granite</p>
                   <div className="text-[#141414]" data-icon="CaretDown" data-size="20px" data-weight="regular">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
@@ -143,13 +211,11 @@ export default function ProductsPage() {
                 </div>
               </button>
             </div>
-            <div className={styles.productsGrid}>
-              {products.map((product) => (
-                <div key={product.title} className={styles.productCardWrapper}>
-                  <ProductCardWithShader product={product} />
-                </div>
-              ))}
-            </div>
+            
+            {/* Products Grid with Enhanced Loading and Error States */}
+            <ErrorBoundary onError={handleErrorBoundaryError}>
+              <ProductsGrid {...gridProps} />
+            </ErrorBoundary>
           </div>
         </div>
       </div>

@@ -27,6 +27,20 @@ export interface ApiClientConfig {
   retryOptions?: RetryOptions;
   corsMode?: RequestMode;
   credentials?: RequestCredentials;
+  enablePerformanceLogging?: boolean;
+  publishableApiKey?: string;
+}
+
+export interface PerformanceMetrics {
+  endpoint: string;
+  method: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  success: boolean;
+  cacheHit?: boolean;
+  retryCount?: number;
+  error?: string;
 }
 
 export class ApiError extends Error {
@@ -47,6 +61,10 @@ export class MedusaApiClient {
   private retryOptions: RetryOptions;
   private corsMode: RequestMode;
   private credentials: RequestCredentials;
+  private pendingRequests: Map<string, Promise<any>>;
+  private enablePerformanceLogging: boolean;
+  private performanceMetrics: PerformanceMetrics[];
+  private publishableApiKey: string;
 
   constructor(config: ApiClientConfig = {}) {
     this.baseUrl = config.baseUrl || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000';
@@ -57,7 +75,16 @@ export class MedusaApiClient {
       maxDelay: 5000
     };
     this.corsMode = config.corsMode || 'cors';
-    this.credentials = config.credentials || 'same-origin';
+    this.credentials = config.credentials || 'omit';
+    this.pendingRequests = new Map();
+    this.enablePerformanceLogging = config.enablePerformanceLogging ?? true;
+    this.performanceMetrics = [];
+    this.publishableApiKey = config.publishableApiKey || process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
+    
+    if (!this.publishableApiKey) {
+      console.error('[MedusaApiClient] No publishable API key provided. Please add NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY to your .env.local file.');
+      console.error('[MedusaApiClient] You can get this key from your Medusa admin dashboard at http://localhost:9000/app → Settings → API Key Management');
+    }
   }
 
   private async fetchWithTimeout(resource: string, options: RequestInit = {}): Promise<Response> {
@@ -68,12 +95,12 @@ export class MedusaApiClient {
       const response = await fetch(resource, {
         ...options,
         signal: controller.signal,
-        mode: this.corsMode,
-        credentials: this.credentials,
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
+          'x-publishable-api-key': this.publishableApiKey,
           ...options.headers,
         },
       });
@@ -85,6 +112,20 @@ export class MedusaApiClient {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new ApiError('Request timeout', undefined, 'timeout');
       }
+      
+      // Handle CORS-specific errors
+      if (error instanceof Error && (
+        error.message.includes('CORS') || 
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('NetworkError')
+      )) {
+        throw new ApiError(
+          'Unable to connect to the API server. This might be due to CORS configuration or the server being unavailable.',
+          undefined,
+          'network'
+        );
+      }
+      
       throw new ApiError(
         error instanceof Error ? error.message : 'Network error occurred',
         undefined,
@@ -102,68 +143,193 @@ export class MedusaApiClient {
     return Math.min(delay, this.retryOptions.maxDelay);
   }
 
+  private generateRequestKey(endpoint: string, options: RequestInit = {}): string {
+    const method = options.method || 'GET';
+    const body = options.body ? JSON.stringify(options.body) : '';
+    return `${method}:${endpoint}:${body}`;
+  }
+
+  private logPerformanceMetrics(metrics: PerformanceMetrics): void {
+    if (!this.enablePerformanceLogging) return;
+
+    this.performanceMetrics.push(metrics);
+
+    // Keep only the last 100 metrics to prevent memory leaks
+    if (this.performanceMetrics.length > 100) {
+      this.performanceMetrics = this.performanceMetrics.slice(-100);
+    }
+
+    const logLevel = metrics.success ? 'info' : 'warn';
+    const logMessage = `API ${metrics.method} ${metrics.endpoint} - ${metrics.duration}ms`;
+    
+    const logData = {
+      endpoint: metrics.endpoint,
+      method: metrics.method,
+      duration: metrics.duration,
+      success: metrics.success,
+      ...(metrics.cacheHit && { cacheHit: true }),
+      ...(metrics.retryCount && { retryCount: metrics.retryCount }),
+      ...(metrics.error && { error: metrics.error })
+    };
+
+    if (logLevel === 'info') {
+      console.log(`[MedusaApiClient] ${logMessage}`, logData);
+    } else {
+      console.warn(`[MedusaApiClient] ${logMessage}`, logData);
+    }
+
+    // Log performance warnings
+    if (metrics.duration > 3000) {
+      console.warn(`[MedusaApiClient] Slow API response detected: ${metrics.endpoint} took ${metrics.duration}ms`);
+    }
+  }
+
+  public getPerformanceMetrics(): PerformanceMetrics[] {
+    return [...this.performanceMetrics];
+  }
+
+  public getAverageResponseTime(endpoint?: string): number {
+    const relevantMetrics = endpoint 
+      ? this.performanceMetrics.filter(m => m.endpoint === endpoint && m.success)
+      : this.performanceMetrics.filter(m => m.success);
+
+    if (relevantMetrics.length === 0) return 0;
+
+    const totalDuration = relevantMetrics.reduce((sum, metric) => sum + metric.duration, 0);
+    return Math.round(totalDuration / relevantMetrics.length);
+  }
+
   private async makeRequestWithRetry<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    const requestKey = this.generateRequestKey(endpoint, options);
+    const method = options.method || 'GET';
+    const startTime = performance.now();
+    let retryCount = 0;
+    
+    // Check if there's already a pending request for this endpoint
+    if (this.pendingRequests.has(requestKey)) {
+      const cachedPromise = this.pendingRequests.get(requestKey) as Promise<T>;
+      
+      // Log cache hit
+      if (this.enablePerformanceLogging) {
+        const endTime = performance.now();
+        this.logPerformanceMetrics({
+          endpoint,
+          method,
+          startTime,
+          endTime,
+          duration: Math.round(endTime - startTime),
+          success: true,
+          cacheHit: true
+        });
+      }
+      
+      return cachedPromise;
+    }
+
     const url = `${this.baseUrl}${endpoint}`;
     let lastError: ApiError;
 
-    for (let attempt = 0; attempt <= this.retryOptions.maxRetries; attempt++) {
+    // Create the request promise
+    const requestPromise = (async (): Promise<T> => {
       try {
-        const response = await this.fetchWithTimeout(url, options);
+        for (let attempt = 0; attempt <= this.retryOptions.maxRetries; attempt++) {
+          retryCount = attempt;
+          
+          try {
+            const response = await this.fetchWithTimeout(url, options);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const apiError = new ApiError(
-            errorData.message || `HTTP error! status: ${response.status}`,
-            response.status,
-            'api'
-          );
-          
-          // Don't retry client errors (4xx), only server errors (5xx) and network errors
-          if (response.status >= 400 && response.status < 500) {
-            throw apiError;
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              const apiError = new ApiError(
+                errorData.message || `HTTP error! status: ${response.status}`,
+                response.status,
+                'api'
+              );
+              
+              // Don't retry client errors (4xx), only server errors (5xx) and network errors
+              if (response.status >= 400 && response.status < 500) {
+                throw apiError;
+              }
+              
+              lastError = apiError;
+              
+              if (attempt === this.retryOptions.maxRetries) {
+                throw apiError;
+              }
+            } else {
+              const data = await response.json();
+              
+              // Log successful request
+              const endTime = performance.now();
+              this.logPerformanceMetrics({
+                endpoint,
+                method,
+                startTime,
+                endTime,
+                duration: Math.round(endTime - startTime),
+                success: true,
+                ...(retryCount > 0 && { retryCount })
+              });
+              
+              return data;
+            }
+          } catch (error) {
+            if (error instanceof ApiError) {
+              lastError = error;
+              
+              // Don't retry timeout errors or client errors (4xx)
+              if (error.type === 'timeout' || (error.status && error.status >= 400 && error.status < 500)) {
+                throw error;
+              }
+            } else {
+              lastError = new ApiError(
+                error instanceof Error ? error.message : 'Unknown error occurred',
+                undefined,
+                'unknown'
+              );
+            }
+            
+            if (attempt === this.retryOptions.maxRetries) {
+              throw lastError;
+            }
           }
-          
-          lastError = apiError;
-          
-          if (attempt === this.retryOptions.maxRetries) {
-            throw apiError;
+
+          // Wait before retrying
+          if (attempt < this.retryOptions.maxRetries) {
+            const delay = this.calculateDelay(attempt);
+            await this.sleep(delay);
           }
-        } else {
-          const data = await response.json();
-          return data;
         }
+
+        throw lastError!;
       } catch (error) {
-        if (error instanceof ApiError) {
-          lastError = error;
-          
-          // Don't retry timeout errors or client errors (4xx)
-          if (error.type === 'timeout' || (error.status && error.status >= 400 && error.status < 500)) {
-            throw error;
-          }
-        } else {
-          lastError = new ApiError(
-            error instanceof Error ? error.message : 'Unknown error occurred',
-            undefined,
-            'unknown'
-          );
-        }
+        // Log failed request
+        const endTime = performance.now();
+        this.logPerformanceMetrics({
+          endpoint,
+          method,
+          startTime,
+          endTime,
+          duration: Math.round(endTime - startTime),
+          success: false,
+          retryCount,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
         
-        if (attempt === this.retryOptions.maxRetries) {
-          throw lastError;
-        }
+        throw error;
+      } finally {
+        // Remove the request from pending requests when it completes
+        this.pendingRequests.delete(requestKey);
       }
+    })();
 
-      // Wait before retrying
-      if (attempt < this.retryOptions.maxRetries) {
-        const delay = this.calculateDelay(attempt);
-        await this.sleep(delay);
-      }
-    }
+    // Store the promise in pending requests
+    this.pendingRequests.set(requestKey, requestPromise);
 
-    throw lastError!;
+    return requestPromise;
   }
 
   async getProducts(params: ProductQueryParams = {}): Promise<MedusaProductsResponse> {

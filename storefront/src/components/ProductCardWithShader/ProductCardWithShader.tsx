@@ -1,6 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, memo, useEffect } from 'react';
 import ShaderCanvas from '../ShaderCanvas/ShaderCanvas';
 import EdgeGradientShaderCanvas from '../EdgeGradientShaderCanvas';
+import OptimizedImage from '../OptimizedImage';
+import { performanceMonitor } from '../../utils/performanceMonitor';
 import styles from './ProductCardWithShader.module.css';
 
 interface ProductCardWithShaderProps {
@@ -18,9 +20,45 @@ interface ProductCardWithShaderProps {
   };
 }
 
-const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product }) => {
+// Custom comparison function for React.memo
+const arePropsEqual = (
+  prevProps: ProductCardWithShaderProps,
+  nextProps: ProductCardWithShaderProps
+): boolean => {
+  const { product: prevProduct } = prevProps;
+  const { product: nextProduct } = nextProps;
+
+  // Deep comparison of product properties
+  return (
+    prevProduct.title === nextProduct.title &&
+    prevProduct.backgroundImage === nextProduct.backgroundImage &&
+    prevProduct.foregroundImage === nextProduct.foregroundImage &&
+    prevProduct.price === nextProduct.price &&
+    prevProduct.originalPrice === nextProduct.originalPrice &&
+    prevProduct.rating === nextProduct.rating &&
+    prevProduct.reviewCount === nextProduct.reviewCount &&
+    prevProduct.material === nextProduct.material &&
+    prevProduct.dimensions === nextProduct.dimensions &&
+    prevProduct.inStock === nextProduct.inStock
+  );
+};
+
+const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ product }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isHoveringImageSection, setIsHoveringImageSection] = useState(false);
+  
+  // Track render performance
+  const renderStartTime = useRef(performance.now());
+  
+  useEffect(() => {
+    const renderTime = Math.round(performance.now() - renderStartTime.current);
+    performanceMonitor.trackComponentRender('ProductCardWithShader', renderTime, {
+      productTitle: product.title,
+      hasPrice: !!product.price,
+      hasRating: !!product.rating,
+      inStock: product.inStock
+    });
+  });
 
   // --- 3D tilt state & refs -------------------------------------------------
   const containerRef = useRef<HTMLDivElement>(null);
@@ -97,19 +135,25 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product }
         >
           <div className={styles.cardContentWrapper}>
             <div className={styles.cardContent}>
-              <img 
-                src={product.backgroundImage} 
-                alt={`${product.title} background`} 
+              <OptimizedImage
+                src={product.backgroundImage}
+                alt={`${product.title} background`}
+                fallbackSrc="/images/placeholder-background.svg"
                 className={`${styles.backgroundImage} ${isHovering ? styles.backgroundImageHovered : ''}`}
+                priority={false}
+                showRetryButton={false}
               />
             </div>
             
             {/* Foreground image outside the card content to allow it to break free */}
             <div className={styles.foregroundWrapper}>
-              <img 
-                src={product.foregroundImage} 
-                alt={product.title} 
+              <OptimizedImage
+                src={product.foregroundImage}
+                alt={product.title}
+                fallbackSrc="/images/placeholder-product.svg"
                 className={`${styles.foregroundImage} ${isHovering ? styles.foregroundImageHovered : ''}`}
+                priority={false}
+                showRetryButton={false}
               />
             </div>
           </div>
@@ -194,6 +238,8 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = ({ product }
       </div>
     </div>
   );
-};
+}, arePropsEqual);
+
+ProductCardWithShader.displayName = 'ProductCardWithShader';
 
 export default ProductCardWithShader;
