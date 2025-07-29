@@ -1,4 +1,5 @@
 import React from 'react';
+import { CurrencyFormatter } from '../../utils/currencyFormatter';
 import styles from './ProductCard.module.css';
 
 interface ProductCardProps {
@@ -8,6 +9,7 @@ interface ProductCardProps {
     foregroundImage: string;
     price?: number;
     originalPrice?: number;
+    currency?: string;
     rating?: number;
     reviewCount?: number;
     material?: string;
@@ -44,12 +46,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
   };
 
   // Format price with currency
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(price);
+  const formatPrice = (price: number, currency: string = 'USD') => {
+    return CurrencyFormatter.formatPrice(price, currency);
   };
 
   return (
@@ -78,10 +76,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
         {/* Price information */}
         <div className={styles.priceContainer}>
           {product.price && (
-            <span className={styles.price}>{formatPrice(product.price)}</span>
+            <span className={styles.price}>{formatPrice(product.price, product.currency)}</span>
           )}
           {product.originalPrice && product.originalPrice > product.price! && (
-            <span className={styles.originalPrice}>{formatPrice(product.originalPrice)}</span>
+            <span className={styles.originalPrice}>{formatPrice(product.originalPrice, product.currency)}</span>
           )}
         </div>
         

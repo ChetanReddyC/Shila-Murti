@@ -38,6 +38,7 @@ const arePropsEqual = (
         product.foregroundImage === nextProduct.foregroundImage &&
         product.price === nextProduct.price &&
         product.originalPrice === nextProduct.originalPrice &&
+        product.currency === nextProduct.currency &&
         product.rating === nextProduct.rating &&
         product.reviewCount === nextProduct.reviewCount &&
         product.material === nextProduct.material &&

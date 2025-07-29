@@ -343,9 +343,20 @@ export class MedusaApiClient {
       params.category_id.forEach(id => queryParams.append('category_id[]', id));
     }
 
+    // For Medusa v2, try using fields parameter to include related data
+    queryParams.append('fields', '*variants,*variants.prices,*images,*variants.inventory_items,*variants.inventory_items.inventory,*variants.inventory_items.inventory.location_levels');
+
     const endpoint = `/store/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
+    console.log('[MedusaApiClient] Fetching products with params:', params);
+    console.log('[MedusaApiClient] Final endpoint:', endpoint);
+    
     return this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
+  }
+
+  async getRegions(): Promise<{ regions: any[] }> {
+    const endpoint = '/store/regions';
+    return this.makeRequestWithRetry<{ regions: any[] }>(endpoint);
   }
 
   async getProduct(id: string): Promise<Product> {

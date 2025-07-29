@@ -39,6 +39,53 @@ export interface MoneyAmount {
   deleted_at: string | null;
 }
 
+export interface InventoryLevel {
+  id: string;
+  location_id: string;
+  inventory_item_id: string;
+  stocked_quantity: number;
+  reserved_quantity: number;
+  incoming_quantity: number;
+  available_quantity: number;
+  metadata: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface InventoryItem {
+  id: string;
+  sku: string | null;
+  origin_country: string | null;
+  hs_code: string | null;
+  mid_code: string | null;
+  material: string | null;
+  weight: number | null;
+  length: number | null;
+  height: number | null;
+  width: number | null;
+  requires_shipping: boolean;
+  description: string | null;
+  title: string | null;
+  thumbnail: string | null;
+  metadata: Record<string, any> | null;
+  location_levels: InventoryLevel[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface ProductVariantInventoryItem {
+  variant_id: string;
+  inventory_item_id: string;
+  id: string;
+  required_quantity: number;
+  inventory: InventoryItem;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
 export interface ProductVariant {
   id: string;
   title: string;
@@ -60,6 +107,7 @@ export interface ProductVariant {
   width: number | null;
   options: ProductOptionValue[];
   prices: MoneyAmount[];
+  inventory_items?: ProductVariantInventoryItem[]; // Medusa v2 inventory structure
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
