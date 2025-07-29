@@ -3,6 +3,7 @@ import ShaderCanvas from '../ShaderCanvas/ShaderCanvas';
 import EdgeGradientShaderCanvas from '../EdgeGradientShaderCanvas';
 import OptimizedImage from '../OptimizedImage';
 import { performanceMonitor } from '../../utils/performanceMonitor';
+import { CurrencyFormatter } from '../../utils/currencyFormatter';
 import styles from './ProductCardWithShader.module.css';
 
 interface ProductCardWithShaderProps {
@@ -12,6 +13,7 @@ interface ProductCardWithShaderProps {
     foregroundImage: string;
     price?: number;
     originalPrice?: number;
+    currency?: string;
     rating?: number;
     reviewCount?: number;
     material?: string;
@@ -35,6 +37,7 @@ const arePropsEqual = (
     prevProduct.foregroundImage === nextProduct.foregroundImage &&
     prevProduct.price === nextProduct.price &&
     prevProduct.originalPrice === nextProduct.originalPrice &&
+    prevProduct.currency === nextProduct.currency &&
     prevProduct.rating === nextProduct.rating &&
     prevProduct.reviewCount === nextProduct.reviewCount &&
     prevProduct.material === nextProduct.material &&
@@ -46,10 +49,58 @@ const arePropsEqual = (
 const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ product }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isHoveringImageSection, setIsHoveringImageSection] = useState(false);
-  
+
+  // Debug: Log the product data received by the component
+  useEffect(() => {
+    console.log('[ProductCardWithShader] Product data received:', {
+      title: product.title,
+      price: product.price,
+      currency: product.currency,
+      originalPrice: product.originalPrice,
+      material: product.material,
+      dimensions: product.dimensions,
+      inStock: product.inStock
+    });
+
+    // If price is 0, let's test the API directly
+    if (!product.price || product.price === 0) {
+      console.log('🔍 Price is 0, testing API directly...');
+      fetch('http://localhost:9000/store/products?region_id=reg_01JYR9W6MVF236JPJ91FFG427S', {
+        headers: {
+          'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+        }
+      })
+        .then(res => res.json())
+        .then(data => {
+          console.log('🔍 Direct API test result:', {
+            productsCount: data.products?.length,
+            firstProduct: data.products?.[0] ? {
+              title: data.products[0].title,
+              variantsCount: data.products[0].variants?.length,
+              firstVariant: data.products[0].variants?.[0] ? {
+                prices: data.products[0].variants[0].prices,
+                material: data.products[0].variants[0].material,
+                dimensions: {
+                  length: data.products[0].variants[0].length,
+                  width: data.products[0].variants[0].width,
+                  height: data.products[0].variants[0].height
+                }
+              } : null
+            } : null
+          });
+        })
+        .catch(err => console.error('🔍 Direct API test failed:', err));
+    }
+  }, [product]);
+
+  // Helper function to format price with proper currency
+  const formatPrice = (price: number, currency: string = 'USD') => {
+    return CurrencyFormatter.formatPrice(price, currency);
+  };
+
   // Track render performance
   const renderStartTime = useRef(performance.now());
-  
+
   useEffect(() => {
     const renderTime = Math.round(performance.now() - renderStartTime.current);
     performanceMonitor.trackComponentRender('ProductCardWithShader', renderTime, {
@@ -126,7 +177,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
     >
       <div className={styles.cardWrapper}>
         {/* Image section with 3D rotation effect */}
-        <div 
+        <div
           ref={imageSectionRef}
           className={styles.imageSection}
           onMouseEnter={handleImageSectionMouseEnter}
@@ -144,7 +195,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
                 showRetryButton={false}
               />
             </div>
-            
+
             {/* Foreground image outside the card content to allow it to break free */}
             <div className={styles.foregroundWrapper}>
               <OptimizedImage
@@ -157,39 +208,37 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
               />
             </div>
           </div>
-          
+
           <div className={styles.effectsWrapper}>
             <ShaderCanvas isHovering={isHovering} />
             <EdgeGradientShaderCanvas isHovering={isHovering} />
           </div>
         </div>
-        
+
         {/* Product details section - no 3D rotation effect */}
         <div className={styles.productDetails}>
           <h3 className={styles.productTitle}>{product.title}</h3>
-          
+
           {/* Price information */}
           <div className={styles.priceContainer}>
-            {product.price && (
+            {(product.price !== undefined && product.price !== null && product.price > 0) && (
               <span className={styles.price}>
-                {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'USD',
-                  minimumFractionDigits: 2
-                }).format(product.price)}
+                {formatPrice(product.price, product.currency)}
               </span>
             )}
-            {product.originalPrice && product.originalPrice > product.price! && (
+            {product.originalPrice && product.originalPrice > (product.price || 0) && (
               <span className={styles.originalPrice}>
-                {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'USD',
-                  minimumFractionDigits: 2
-                }).format(product.originalPrice)}
+                {formatPrice(product.originalPrice, product.currency)}
+              </span>
+            )}
+            {/* Debug: Show when price is missing */}
+            {(!product.price || product.price <= 0) && (
+              <span style={{ color: 'red', fontSize: '12px' }}>
+                [DEBUG: Price missing - {JSON.stringify({ price: product.price, currency: product.currency })}]
               </span>
             )}
           </div>
-          
+
           {/* Rating and reviews */}
           {product.rating && (
             <div className={styles.ratingContainer}>
@@ -209,7 +258,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
               )}
             </div>
           )}
-          
+
           {/* Product specifications */}
           <div className={styles.specifications}>
             {product.material && (
@@ -225,7 +274,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
               </div>
             )}
           </div>
-          
+
           {/* Availability */}
           <div className={styles.availability}>
             {product.inStock ? (

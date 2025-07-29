@@ -65,12 +65,66 @@ export class ProductsService {
 
       this.log('Fetching products from API', { params });
       
+      // If no region_id is specified, try to get the default region
+      let finalParams = { ...params };
+      if (!finalParams.region_id) {
+        try {
+          const regionsResponse = await this.apiClient.getRegions();
+          console.log('[ProductsService] Regions response:', regionsResponse);
+          
+          if (regionsResponse.regions && regionsResponse.regions.length > 0) {
+            // Look for a region with INR currency first
+            const inrRegion = regionsResponse.regions.find((r: any) => r.currency_code === 'inr');
+            const selectedRegion = inrRegion || regionsResponse.regions[0];
+            
+            finalParams.region_id = selectedRegion.id;
+            
+            console.log('[ProductsService] Selected region:', {
+              id: selectedRegion.id,
+              name: selectedRegion.name,
+              currency_code: selectedRegion.currency_code
+            });
+            this.log('Using region', { 
+              region_id: finalParams.region_id, 
+              region_name: selectedRegion.name,
+              currency_code: selectedRegion.currency_code,
+              isInrRegion: !!inrRegion
+            });
+          }
+        } catch (regionError) {
+          this.log('Failed to fetch regions, proceeding without region_id', { error: regionError });
+        }
+      }
+      
       // Fetch from API
-      const response = await this.apiClient.getProducts(params);
+      const response = await this.apiClient.getProducts(finalParams);
       
       this.log('Products fetched from API', { 
         count: response.products.length, 
         total: response.count 
+      });
+
+      // Debug: Log the raw API response
+      console.log('[ProductsService] Raw API Response:', {
+        count: response.products.length,
+        firstProduct: response.products[0] ? {
+          id: response.products[0].id,
+          title: response.products[0].title,
+          hasVariants: !!response.products[0].variants,
+          variantsCount: response.products[0].variants?.length || 0,
+          variants: response.products[0].variants?.map(v => ({
+            id: v.id,
+            title: v.title,
+            hasPrices: !!v.prices,
+            pricesCount: v.prices?.length || 0,
+            prices: v.prices?.map(p => ({
+              id: p.id,
+              amount: p.amount,
+              currency_code: p.currency_code,
+              region_id: p.region_id
+            }))
+          }))
+        } : null
       });
 
       // Transform data
@@ -78,6 +132,18 @@ export class ProductsService {
       const transformedProducts = this.transformProducts(response.products);
       const transformEndTime = performance.now();
       const transformTime = Math.round(transformEndTime - transformStartTime);
+      
+      // Debug: Log the transformed data
+      console.log('[ProductsService] Transformed Products:', {
+        count: transformedProducts.length,
+        firstProduct: transformedProducts[0] ? {
+          title: transformedProducts[0].title,
+          price: transformedProducts[0].price,
+          currency: transformedProducts[0].currency,
+          material: transformedProducts[0].material,
+          dimensions: transformedProducts[0].dimensions
+        } : null
+      });
       
       // Cache the result
       this.setCache(cacheKey, transformedProducts);

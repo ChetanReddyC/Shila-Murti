@@ -7,6 +7,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { productsService, ProductsServiceError } from '../../services/productsService';
 import { ProductCardData } from '../../utils/productDataMapper';
 import { useRetry } from '../../hooks/useRetry';
+import { debugMedusaApiResponse } from '../../utils/debugApiResponse';
 import styles from './productsPage.module.css';
 
 // Memoized state interface to prevent unnecessary re-renders
@@ -81,6 +82,12 @@ export default function ProductsPage() {
   useEffect(() => {
     isMountedRef.current = true;
     fetchProducts();
+    
+    // Make debug function available in browser console
+    if (typeof window !== 'undefined') {
+      (window as any).debugMedusaApi = debugMedusaApiResponse;
+      console.log('🔧 Debug function available: window.debugMedusaApi()');
+    }
     
     return () => {
       isMountedRef.current = false;
