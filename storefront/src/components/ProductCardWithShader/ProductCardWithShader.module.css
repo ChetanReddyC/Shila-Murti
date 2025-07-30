@@ -3,37 +3,50 @@
   display: inline-block;
   width: 100%;
   max-width: 240px;
-  min-height: 550px; /* Increased min-height to accommodate all product details */
-  height: auto; /* Allow height to adjust based on content */
-  overflow: visible; /* Allow shader and elevated image to extend beyond card boundaries */
-  perspective: 1200px; /* Enhanced 3D perspective for the elevation effect */
-  z-index: 1; /* Base z-index for non-hovered state */
-  border-radius: 8px; /* Explicitly set border radius for shader canvas inheritance */
-  margin-bottom: 30px; /* Add margin to ensure cards don't overlap */
+  min-height: 580px;
+  /* Minimum height for consistency */
+  overflow: visible;
+  /* Allow shader and elevated image to extend beyond card boundaries */
+  perspective: 1200px;
+  /* Enhanced 3D perspective for the elevation effect */
+  z-index: 1;
+  /* Base z-index for non-hovered state */
+  border-radius: 8px;
+  /* Explicitly set border radius for shader canvas inheritance */
+  margin-bottom: 30px;
+  /* Add margin to ensure cards don't overlap */
 }
 
 /* Add hover state for the container to increase its stacking context */
 .cardContainerHovered {
-  z-index: 999 !important; /* Very high z-index to ensure it's above everything */
+  z-index: 999 !important;
+  /* Very high z-index to ensure it's above everything */
 }
 
 .cardWrapper {
   position: relative;
   width: 100%;
-  height: auto; /* Allow height to adjust based on content */
+  height: auto;
+  /* Allow natural height */
   display: flex;
   flex-direction: column;
 }
 
 .imageSection {
-  position: absolute; /* Changed to absolute positioning */
+  position: absolute;
+  /* Changed to absolute positioning */
   width: 100%;
-  height: 350px; /* Height of the image portion */
+  height: 350px;
+  /* Height of the image portion */
   overflow: visible;
-  cursor: pointer; /* Indicate interactive area */
-  transform-style: preserve-3d; /* Preserve 3D transformations */
-  transition: transform 0.25s ease-out; /* Smooth 3D bending transitions */
-  will-change: transform; /* Hint browser for better performance */
+  cursor: pointer;
+  /* Indicate interactive area */
+  transform-style: preserve-3d;
+  /* Preserve 3D transformations */
+  transition: transform 0.25s ease-out;
+  /* Smooth 3D bending transitions */
+  will-change: transform;
+  /* Hint browser for better performance */
 }
 
 .cardContentWrapper {
@@ -53,7 +66,8 @@
   overflow: hidden;
   background-color: #fff;
   z-index: 1;
-  box-sizing: border-box; /* Ensure border is included in the width/height calculation */
+  box-sizing: border-box;
+  /* Ensure border is included in the width/height calculation */
 }
 
 .backgroundImage {
@@ -77,8 +91,10 @@
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 20; /* Increased from 10 to 20 to stay above all shader effects */
-  pointer-events: none; /* Allow clicks to pass through to the card */
+  z-index: 20;
+  /* Increased from 10 to 20 to stay above all shader effects */
+  pointer-events: none;
+  /* Allow clicks to pass through to the card */
 }
 
 .foregroundImage {
@@ -91,12 +107,14 @@
   object-position: center;
   transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   transform-origin: center center;
-  z-index: 20; /* Increased from 10 to 20 to stay above all shader effects */
+  z-index: 20;
+  /* Increased from 10 to 20 to stay above all shader effects */
 }
 
 .foregroundImageHovered {
   transform: translateY(-35px) scale(1.15);
-  z-index: 100; /* Extremely high z-index to ensure it appears above all other elements */
+  z-index: 100;
+  /* Extremely high z-index to ensure it appears above all other elements */
 }
 
 .effectsWrapper {
@@ -105,17 +123,24 @@
   left: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden; /* Changed from visible to hidden to prevent overflow */
-  z-index: 5; /* Position between card content and foreground image */
-  border-radius: 8px; /* Match the card's border radius */
+  overflow: hidden;
+  /* Changed from visible to hidden to prevent overflow */
+  z-index: 5;
+  /* Position between card content and foreground image */
+  border-radius: 8px;
+  /* Match the card's border radius */
 }
 
 /* Product details section */
 .productDetails {
-  position: relative; /* Changed from absolute to relative */
+  position: relative;
+  /* Simple relative positioning */
   width: 100%;
+  min-height: 200px;
+  /* Minimum height for consistency */
   padding: 16px;
-  margin-top: 350px; /* Position below the image section */
+  margin-top: 350px;
+  /* Position below the image section */
   background-color: white;
   border-radius: 0 0 8px 8px;
   z-index: 30;
@@ -128,20 +153,35 @@
   font-size: 1.1rem;
   font-weight: 600;
   color: #141414;
-  margin: 0 0 12px 0;
-  text-align: center;
+  margin: 0 0 8px 0;
+  text-align: left;
+  line-height: 1.4;
+  /* Simple ellipsis truncation */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.productSubtitle {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #666;
+  margin: 0 0 12px 0;
+  text-align: left;
+  line-height: 1.4;
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
+  /* Simple ellipsis truncation */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Price styling */
 .priceContainer {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -162,7 +202,7 @@
 .ratingContainer {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
   margin-bottom: 12px;
 }
@@ -171,14 +211,17 @@
   display: flex;
 }
 
-.fullStar, .halfStar {
-  color: #FFD700; /* Gold color for stars */
+.fullStar,
+.halfStar {
+  color: #FFD700;
+  /* Gold color for stars */
   font-size: 1rem;
   line-height: 1;
 }
 
 .emptyStar {
-  color: #D3D3D3; /* Light gray for empty stars */
+  color: #D3D3D3;
+  /* Light gray for empty stars */
   font-size: 1rem;
   line-height: 1;
 }
@@ -225,7 +268,8 @@
 }
 
 .inStock {
-  color: #2E7D32; /* Green */
+  color: #2E7D32;
+  /* Green */
   font-weight: 600;
   font-size: 0.9rem;
   display: flex;
@@ -240,7 +284,8 @@
 }
 
 .outOfStock {
-  color: #C62828; /* Red */
+  color: #C62828;
+  /* Red */
   font-weight: 600;
   font-size: 0.9rem;
   display: flex;
