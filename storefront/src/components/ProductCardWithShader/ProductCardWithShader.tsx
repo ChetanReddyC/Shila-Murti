@@ -9,6 +9,7 @@ import styles from './ProductCardWithShader.module.css';
 interface ProductCardWithShaderProps {
   product: {
     title: string;
+    subtitle?: string | null;
     backgroundImage: string;
     foregroundImage: string;
     price?: number;
@@ -33,6 +34,7 @@ const arePropsEqual = (
   // Deep comparison of product properties
   return (
     prevProduct.title === nextProduct.title &&
+    prevProduct.subtitle === nextProduct.subtitle &&
     prevProduct.backgroundImage === nextProduct.backgroundImage &&
     prevProduct.foregroundImage === nextProduct.foregroundImage &&
     prevProduct.price === nextProduct.price &&
@@ -218,6 +220,9 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
         {/* Product details section - no 3D rotation effect */}
         <div className={styles.productDetails}>
           <h3 className={styles.productTitle}>{product.title}</h3>
+          {product.subtitle && (
+            <p className={styles.productSubtitle}>{product.subtitle}</p>
+          )}
 
           {/* Price information */}
           <div className={styles.priceContainer}>
