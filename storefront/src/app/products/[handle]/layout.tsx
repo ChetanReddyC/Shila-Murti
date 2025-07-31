@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 
 interface ProductLayoutProps {
   children: React.ReactNode;
-  params: { handle: string };
+  params: Promise<{ handle: string }>;
 }
 
-export async function generateMetadata({ params }: { params: { handle: string } }): Promise<Metadata> {
-  const { handle } = params;
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
+  const { handle } = await params;
   
   // Convert handle back to a readable title for SEO
   const title = handle
