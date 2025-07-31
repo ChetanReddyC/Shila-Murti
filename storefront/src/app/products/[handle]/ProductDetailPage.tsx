@@ -9,7 +9,7 @@ import { ProductCardData } from '../../../utils/productDataMapper';
 import { Product } from '../../../types/medusa';
 import { useRetry } from '../../../hooks/useRetry';
 import { isValidHandle, generateProductHandle } from '../../../utils/productHandleGenerator';
-import styles from './productDetailPage.module.css';
+import styles from './ProductDetailPage.module.css'
 
 interface ProductDetailPageProps {
   params: Promise<{ handle: string }>;
