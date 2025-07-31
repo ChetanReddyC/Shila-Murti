@@ -9,6 +9,7 @@ import { ProductCardData } from '../../../utils/productDataMapper';
 import { Product } from '../../../types/medusa';
 import { useRetry } from '../../../hooks/useRetry';
 import { isValidHandle, generateProductHandle } from '../../../utils/productHandleGenerator';
+import styles from './ProductDetailPage.module.css';
 
 interface ProductDetailPageProps {
   params: Promise<{ handle: string }>;
@@ -452,38 +453,40 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     </div>
 
                     {/* Product Details */}
-                    <div className="flex flex-col gap-5 py-6 px-6 bg-[#fafafa] rounded-2xl border border-[#f0f0f0]">
-                      {product.material && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#6b7280] text-base font-medium">Material</span>
-                          <span className="text-[#141414] text-base font-semibold">{product.material}</span>
-                        </div>
-                      )}
-                      
-                      {product.dimensions && (
-                        <div className="flex justify-between items-center border-t border-[#e5e5e5] pt-4">
-                          <span className="text-[#6b7280] text-base font-medium">Dimensions</span>
-                          <span className="text-[#141414] text-base font-semibold">{product.dimensions}</span>
-                        </div>
-                      )}
+                    <div className={styles.productDetails}>
+                      <div className={styles.detailsContainer}>
+                        {product.material && (
+                          <div className={styles.detailRow}>
+                            <span className={styles.detailLabel}>Material</span>
+                            <span className={styles.detailValue}>{product.material}</span>
+                          </div>
+                        )}
+                        
+                        {product.dimensions && (
+                          <div className={styles.detailRow}>
+                            <span className={styles.detailLabel}>Dimensions</span>
+                            <span className={styles.detailValue}>{product.dimensions}</span>
+                          </div>
+                        )}
 
-                      {product.weight && (
-                        <div className="flex justify-between items-center border-t border-[#e5e5e5] pt-4">
-                          <span className="text-[#6b7280] text-base font-medium">Weight</span>
-                          <span className="text-[#141414] text-base font-semibold">
-                            {product.weight} {product.weightUnit || 'g'}
-                          </span>
-                        </div>
-                      )}
+                        {product.weight && (
+                          <div className={styles.detailRow}>
+                            <span className={styles.detailLabel}>Weight</span>
+                            <span className={styles.detailValue}>
+                              {product.weight} {product.weightUnit || 'g'}
+                            </span>
+                          </div>
+                        )}
 
-                      {/* Stock Status */}
-                      <div className="flex justify-between items-center border-t border-[#e5e5e5] pt-4">
-                        <span className="text-[#6b7280] text-base font-medium">Availability</span>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${product.inStock ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                          <span className={`text-base font-semibold ${product.inStock ? 'text-green-600' : 'text-red-600'}`}>
-                            {product.inStock ? 'In Stock' : 'Out of Stock'}
-                          </span>
+                        {/* Stock Status */}
+                        <div className={styles.detailRow}>
+                          <span className={styles.detailLabel}>Availability</span>
+                          <div className={styles.stockContainer}>
+                            <div className={`${styles.stockIndicator} ${product.inStock ? styles.inStock : styles.outOfStock}`}></div>
+                            <span className={`${styles.stockText} ${product.inStock ? styles.inStock : styles.outOfStock}`}>
+                              {product.inStock ? 'In Stock' : 'Out of Stock'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
