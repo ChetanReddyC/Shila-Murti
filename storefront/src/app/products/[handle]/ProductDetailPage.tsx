@@ -532,6 +532,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         </div>
                       </div>
 
+                       {/* Shipping info */}
+                        <span className="font-medium text-[#6b7280]">Free shipping on orders over $50</span>
+
                       <div className="flex gap-4">
                         <button
                           onClick={handleAddToCart}
@@ -569,13 +572,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         </button>
                       </div>
 
-                      {/* Shipping info */}
-                      <div className="flex items-center gap-3 text-base text-[#6b7280] pt-4 px-4 py-3 bg-[#f8f9fa] rounded-xl border border-[#e9ecef]">
-                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                        <span className="font-medium">Free shipping on orders over $50</span>
-                      </div>
                     </div>
                   </div>
                 </div>
