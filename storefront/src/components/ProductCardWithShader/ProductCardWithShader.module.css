@@ -1,3 +1,12 @@
+/* Card link wrapper */
+.cardLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Main card container */
 .cardContainer {
   position: relative;
   display: inline-block;
