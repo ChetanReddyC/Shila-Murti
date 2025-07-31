@@ -9,7 +9,7 @@ import { ProductCardData } from '../../../utils/productDataMapper';
 import { Product } from '../../../types/medusa';
 import { useRetry } from '../../../hooks/useRetry';
 import { isValidHandle, generateProductHandle } from '../../../utils/productHandleGenerator';
-import styles from './ProductDetailPage.module.css';
+import styles from './productDetailPage.module.css';
 
 interface ProductDetailPageProps {
   params: Promise<{ handle: string }>;
@@ -31,7 +31,7 @@ interface ProductDetailState {
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // All hooks must be at the top before any conditional logic
   const [handle, setHandle] = useState<string | null>(null);
-  
+
   // Use a single state object to minimize state updates
   const [state, setState] = useState<ProductDetailState>({
     product: null,
@@ -60,11 +60,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // Optimized state update function to minimize re-renders
   const updateState = useCallback((updates: Partial<ProductDetailState>) => {
     if (!isMountedRef.current) return;
-    
+
     setState(prevState => {
       // Only update if there are actual changes
       const newState = { ...prevState, ...updates };
-      
+
       // Shallow comparison to prevent unnecessary updates
       if (
         newState.loading === prevState.loading &&
@@ -78,7 +78,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       ) {
         return prevState;
       }
-      
+
       return newState;
     });
   }, []);
@@ -86,18 +86,18 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // Fetch product by handle
   const fetchProductByHandle = useCallback(async () => {
     if (!handle) return;
-    
+
     try {
       updateState({ loading: true, error: null });
-      
+
       try {
         // Try to use the new fetchProductByHandle method
         const productData = await productsService.fetchProductByHandle(handle);
 
         if (isMountedRef.current) {
-          updateState({ 
-            productData, 
-            loading: false 
+          updateState({
+            productData,
+            loading: false
           });
           // Reset retry state on successful fetch
           reset();
@@ -107,7 +107,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       } catch (handleError) {
         // If handle-based fetch fails, fall back to searching all products
         console.log('Handle-based fetch failed, falling back to search:', handleError);
-        
+
         const allProducts = await productsService.fetchProducts();
         const matchingProduct = allProducts.find(p => {
           const productHandle = generateProductHandle(p.title);
@@ -121,9 +121,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         }
 
         if (isMountedRef.current) {
-          updateState({ 
-            productData: matchingProduct, 
-            loading: false 
+          updateState({
+            productData: matchingProduct,
+            loading: false
           });
           // Reset retry state on successful fetch
           reset();
@@ -134,14 +134,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     } catch (err) {
       if (isMountedRef.current) {
         const serviceError = err as ProductsServiceError;
-        
+
         // If it's a 404 error, trigger Next.js 404 page
-        if (serviceError.type === 'api' && serviceError.originalError && 
-            'status' in serviceError.originalError && serviceError.originalError.status === 404) {
+        if (serviceError.type === 'api' && serviceError.originalError &&
+          'status' in serviceError.originalError && serviceError.originalError.status === 404) {
           notFound();
           return;
         }
-        
+
         updateState({ error: serviceError, loading: false });
         console.error('Failed to fetch product:', serviceError);
       }
@@ -151,7 +151,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // Retry handler using the retry hook
   const handleRetry = useCallback(async () => {
     if (!canRetry || !isMountedRef.current) return;
-    
+
     try {
       await retry(fetchProductByHandle);
     } catch (err) {
@@ -182,19 +182,19 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // Add to cart handler
   const handleAddToCart = useCallback(async () => {
     if (!state.productData || !state.productData.inStock) return;
-    
+
     updateState({ isAddingToCart: true });
-    
+
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 800));
-      
+
       // Add to cart logic would go here
       console.log(`Added ${state.selectedQuantity} of ${state.productData.title} to cart`);
-      
+
       // Show success feedback
       // You could add a toast notification here
-      
+
     } catch (error) {
       console.error('Failed to add to cart:', error);
     } finally {
@@ -220,13 +220,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   useEffect(() => {
     params.then(resolvedParams => {
       const { handle: resolvedHandle } = resolvedParams;
-      
+
       // Validate handle format
       if (!isValidHandle(resolvedHandle)) {
         notFound();
         return;
       }
-      
+
       setHandle(resolvedHandle);
     });
   }, [params]);
@@ -237,11 +237,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     if (handle) {
       fetchProductByHandle();
     }
-    
+
     // Load recently viewed from localStorage
     const recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
     updateState({ recentlyViewed });
-    
+
     return () => {
       isMountedRef.current = false;
     };
@@ -344,14 +344,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   return (
     <div
-      className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
+      className={`relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden ${styles.pageContainer}`}
       style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
     >
       <div className="layout-container flex h-full grow flex-col">
         <Header />
 
         <div className="px-8 md:px-16 lg:px-24 xl:px-40 flex flex-1 justify-center py-12">
-          <div className="layout-content-container flex flex-col max-w-[1200px] flex-1">
+          <div className={`layout-content-container flex flex-col max-w-[1200px] flex-1 ${styles.contentWrapper}`}>
             {/* Breadcrumb */}
             <nav className="py-8 mb-4">
               <ol className="flex items-center space-x-3 text-sm text-[#6b7280]">
@@ -395,9 +395,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     <img
                       src={product.foregroundImage}
                       alt={product.title}
-                      className={`w-full h-full object-cover transition-all duration-300 ${
-                        state.imageLoaded ? 'opacity-100' : 'opacity-0'
-                      } ${state.showImageZoom ? 'scale-110' : 'scale-100'}`}
+                      className={`w-full h-full object-cover transition-all duration-300 ${state.imageLoaded ? 'opacity-100' : 'opacity-0'
+                        } ${state.showImageZoom ? 'scale-110' : 'scale-100'}`}
                       onLoad={handleImageLoad}
                       onMouseEnter={handleImageMouseEnter}
                       onMouseLeave={handleImageMouseLeave}
@@ -409,7 +408,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     />
                     {/* Image overlay for zoom effect */}
                     <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
-                    
+
                     {/* Zoom indicator */}
                     {state.showImageZoom && (
                       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-lg">
@@ -434,8 +433,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       )}
                       <div className="flex items-center gap-4 mt-2">
                         <span className="text-[#141414] text-3xl lg:text-4xl font-bold leading-tight">
-                          {product.currency && product.price ? 
-                            `${product.currency} ${product.price.toLocaleString()}` : 
+                          {product.currency && product.price ?
+                            `${product.currency} ${product.price.toLocaleString()}` :
                             'Price not available'
                           }
                         </span>
@@ -461,7 +460,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                             <span className={styles.detailValue}>{product.material}</span>
                           </div>
                         )}
-                        
+
                         {product.dimensions && (
                           <div className={styles.detailRow}>
                             <span className={styles.detailLabel}>Dimensions</span>
@@ -535,11 +534,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       <div className="flex gap-4">
                         <button
                           onClick={handleAddToCart}
-                          className={`flex h-16 flex-1 shrink-0 items-center justify-center rounded-2xl font-semibold text-lg transition-all duration-200 ${
-                            product.inStock && !state.isAddingToCart
+                          className={`flex h-16 flex-1 shrink-0 items-center justify-center rounded-2xl font-semibold text-lg transition-all duration-200 ${product.inStock && !state.isAddingToCart
                               ? 'bg-[#141414] text-white hover:bg-[#333333] hover:shadow-xl transform hover:-translate-y-1 shadow-lg'
                               : 'bg-[#e0e0e0] text-[#6b7280] cursor-not-allowed'
-                          }`}
+                            }`}
                           disabled={!product.inStock || state.isAddingToCart}
                         >
                           {state.isAddingToCart ? (
@@ -558,7 +556,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                             </div>
                           )}
                         </button>
-                        
+
                         {/* Wishlist button */}
                         <button
                           className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-[#e0e0e0] hover:bg-[#f2f2f2] hover:border-[#141414] transition-all duration-200 shadow-sm hover:shadow-md"
@@ -612,8 +610,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                               {item.title}
                             </h4>
                             <p className="text-[#141414] text-lg font-bold leading-tight">
-                              {item.currency && item.price ? 
-                                `${item.currency} ${item.price.toLocaleString()}` : 
+                              {item.currency && item.price ?
+                                `${item.currency} ${item.price.toLocaleString()}` :
                                 'Price not available'
                               }
                             </p>
@@ -624,7 +622,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 )}
 
                 {/* Product Features */}
-                <div className="mt-16 pt-12 border-t-2 border-[#e0e0e0]">
+                <div className={`mt-16 pt-12 border-t-2 border-[#e0e0e0] ${styles.lastSection}`}>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className="flex items-center gap-5 p-6 bg-[#fafafa] rounded-2xl border border-[#f0f0f0] hover:shadow-md transition-shadow duration-300">
                       <div className="w-14 h-14 bg-gradient-to-br from-[#141414] to-[#333333] rounded-2xl flex items-center justify-center shadow-lg">
@@ -637,7 +635,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         <p className="text-[#6b7280] text-sm leading-relaxed">30-day return policy</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-5 p-6 bg-[#fafafa] rounded-2xl border border-[#f0f0f0] hover:shadow-md transition-shadow duration-300">
                       <div className="w-14 h-14 bg-gradient-to-br from-[#141414] to-[#333333] rounded-2xl flex items-center justify-center shadow-lg">
                         <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -649,7 +647,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         <p className="text-[#6b7280] text-sm leading-relaxed">2-3 business days</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-5 p-6 bg-[#fafafa] rounded-2xl border border-[#f0f0f0] hover:shadow-md transition-shadow duration-300">
                       <div className="w-14 h-14 bg-gradient-to-br from-[#141414] to-[#333333] rounded-2xl flex items-center justify-center shadow-lg">
                         <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -663,6 +661,28 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* Footer */}
+                <footer className={styles.footer}>
+                  <div className={styles.footerLinks}>
+                    {[
+                      { label: "About Us", href: "/about" },
+                      { label: "Contact", href: "/contact" },
+                      { label: "Terms of Service", href: "/terms" },
+                    ].map((link) => (
+                      <a
+                        key={link.label}
+                        className={styles.footerLink}
+                        href={link.href}
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                  <p className={styles.footerCopyright}>
+                    © 2024 Shila Murthi. All rights reserved.
+                  </p>
+                </footer>
               </div>
             </ErrorBoundary>
           </div>
