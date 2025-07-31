@@ -226,6 +226,43 @@ export class ProductsService {
   }
 
   /**
+   * Fetches a single product by handle and transforms it
+   */
+  async fetchProductByHandle(handle: string): Promise<ProductCardData> {
+    const cacheKey = this.generateCacheKey('product-handle', { handle });
+    
+    try {
+      // Check cache first
+      const cachedData = this.getFromCache<ProductCardData>(cacheKey);
+      if (cachedData) {
+        this.log('Product fetched from cache by handle', { handle, cacheKey });
+        return cachedData;
+      }
+
+      this.log('Fetching product by handle from API', { handle });
+      
+      // Fetch from API
+      const product = await this.apiClient.getProductByHandle(handle);
+      
+      this.log('Product fetched from API by handle', { handle, title: product.title });
+
+      // Transform data
+      const transformedProduct = this.transformProduct(product);
+      
+      // Cache the result
+      this.setCache(cacheKey, transformedProduct);
+      
+      this.log('Product transformed and cached by handle', { handle, cacheKey });
+
+      return transformedProduct;
+    } catch (error) {
+      const serviceError = this.handleError(error, 'fetchProductByHandle');
+      this.logError('Failed to fetch product by handle', serviceError, { handle });
+      throw serviceError;
+    }
+  }
+
+  /**
    * Transforms multiple Medusa products to ProductCardData format
    */
   private transformProducts(products: Product[]): ProductCardData[] {

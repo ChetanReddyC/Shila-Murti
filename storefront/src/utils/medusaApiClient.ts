@@ -364,6 +364,22 @@ export class MedusaApiClient {
     const response = await this.makeRequestWithRetry<{ product: Product }>(endpoint);
     return response.product;
   }
+
+  async getProductByHandle(handle: string): Promise<Product> {
+    // For Medusa v2, we can use the handle parameter directly
+    const queryParams = new URLSearchParams();
+    queryParams.append('handle', handle);
+    queryParams.append('fields', '*variants,*variants.prices,*images,*variants.inventory_items,*variants.inventory_items.inventory,*variants.inventory_items.inventory.location_levels');
+
+    const endpoint = `/store/products?${queryParams.toString()}`;
+    const response = await this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
+    
+    if (!response.products || response.products.length === 0) {
+      throw new ApiError('Product not found', 404, 'api');
+    }
+
+    return response.products[0];
+  }
 }
 
 // Export a default instance

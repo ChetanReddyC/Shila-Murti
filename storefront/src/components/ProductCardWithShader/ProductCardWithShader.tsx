@@ -1,9 +1,11 @@
 import React, { useState, useRef, useCallback, memo, useEffect } from 'react';
+import Link from 'next/link';
 import ShaderCanvas from '../ShaderCanvas/ShaderCanvas';
 import EdgeGradientShaderCanvas from '../EdgeGradientShaderCanvas';
 import OptimizedImage from '../OptimizedImage';
 import { performanceMonitor } from '../../utils/performanceMonitor';
 import { CurrencyFormatter } from '../../utils/currencyFormatter';
+import { generateProductHandle } from '../../utils/productHandleGenerator';
 import styles from './ProductCardWithShader.module.css';
 
 interface ProductCardWithShaderProps {
@@ -51,6 +53,9 @@ const arePropsEqual = (
 const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ product }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isHoveringImageSection, setIsHoveringImageSection] = useState(false);
+
+  // Generate handle from product title
+  const productHandle = generateProductHandle(product.title);
 
   // Debug: Log the product data received by the component
   useEffect(() => {
@@ -169,15 +174,16 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
   }, [resetTilt]);
 
   return (
-    <div
-      ref={containerRef}
-      className={`${styles.cardContainer} ${isHovering ? styles.cardContainerHovered : ''}`}
-      onMouseEnter={handleContainerMouseEnter}
-      onMouseLeave={handleContainerMouseLeave}
-      onTouchStart={() => setIsHovering(true)}
-      onTouchEnd={() => setIsHovering(false)}
-    >
-      <div className={styles.cardWrapper}>
+    <Link href={`/products/${productHandle}`} className={styles.cardLink}>
+      <div
+        ref={containerRef}
+        className={`${styles.cardContainer} ${isHovering ? styles.cardContainerHovered : ''}`}
+        onMouseEnter={handleContainerMouseEnter}
+        onMouseLeave={handleContainerMouseLeave}
+        onTouchStart={() => setIsHovering(true)}
+        onTouchEnd={() => setIsHovering(false)}
+      >
+        <div className={styles.cardWrapper}>
         {/* Image section with 3D rotation effect */}
         <div
           ref={imageSectionRef}
@@ -289,8 +295,9 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
             )}
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }, arePropsEqual);
 
