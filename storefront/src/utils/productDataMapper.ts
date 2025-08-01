@@ -2,6 +2,9 @@ import { Product, ProductVariant, ProductImage, MoneyAmount } from '../types/med
 import { AggregatedInventoryInfo, InventoryInfo } from '../types/inventory';
 
 export interface ProductCardData {
+  // Core identity used across the app
+  id: string;
+
   // Existing fields
   title: string;
   backgroundImage: string;
@@ -57,6 +60,7 @@ export class ProductDataMapper {
     const inventoryInfo = this.extractInventoryInfo(medusaProduct);
     
     return {
+      id: medusaProduct.id,
       title: medusaProduct.title,
       backgroundImage: this.extractBackgroundImage(medusaProduct.images),
       foregroundImage: this.extractPrimaryImage(medusaProduct.images),

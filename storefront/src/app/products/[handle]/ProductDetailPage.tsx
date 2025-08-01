@@ -11,6 +11,7 @@ import { useRetry } from '../../../hooks/useRetry';
 import { isValidHandle, generateProductHandle } from '../../../utils/productHandleGenerator';
 import styles from './ProductDetailPage.module.css'
 import FeaturesSection from './FeaturesSection';
+import ReviewsSection from './ReviewsSection';
 
 interface ProductDetailPageProps {
   params: Promise<{ handle: string }>;
@@ -621,6 +622,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 {/* Product Features */}
                 <div className={`mt-16 pt-12 border-[#e0e0e0] ${styles.lastSection}`}>
                   <FeaturesSection />
+                </div>
+
+                {/* Reviews - increase separation from the ridged section above */}
+                <div className="mt-32 md:mt-48 lg:mt-56 xl:mt-64">
+                  <ReviewsSection />
                 </div>
 
                 {/* Footer */}
