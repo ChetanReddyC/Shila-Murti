@@ -12,6 +12,7 @@ import { isValidHandle, generateProductHandle } from '../../../utils/productHand
 import styles from './ProductDetailPage.module.css'
 import FeaturesSection from './FeaturesSection';
 import ReviewsSection from './ReviewsSection';
+import SimilarProductsSection from './SimilarProductsSection';
 
 interface ProductDetailPageProps {
   params: Promise<{ handle: string }>;
@@ -630,6 +631,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 {/* Reviews - increase separation from the ridged section above */}
                 <div className="mt-32 md:mt-48 lg:mt-56 xl:mt-64">
                   <ReviewsSection />
+                </div>
+
+                {/* Similar Products */}
+                <div className="mt-16">
+                  <SimilarProductsSection current={product} />
                 </div>
 
                 {/* Footer */}

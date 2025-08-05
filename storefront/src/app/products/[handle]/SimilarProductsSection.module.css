@@ -1,0 +1,71 @@
+.section {
+  margin-top: 48px;
+  padding-top: 0; /* remove visual separator line spacing */
+  border-top: none; /* remove top partition line as requested */
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.title {
+  color: #141414;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 32px;
+  }
+}
+
+.cardWrapper {
+  /* Let the inner ProductCardWithShader handle its hover and visuals.
+     Wrapper just controls spacing and can pass-through hover if needed. */
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.viewAll {
+  color: #141414;
+  font-size: 14px;
+  font-weight: 600;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 8px 14px;
+  background: #fff;
+  transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+
+.viewAll:hover {
+  background: #f2f2f2;
+  border-color: #141414;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.emptyState {
+  color: #6b7280;
+  font-size: 14px;
+}
