@@ -388,17 +388,18 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               <div className="flex flex-col">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 py-8">
                   {/* Product Image */}
-                  <div className="aspect-square relative overflow-hidden rounded-lg bg-[#f2f2f2] group">
+                  <div className={`aspect-square relative overflow-hidden rounded-lg bg-[#f2f2f2] group ${styles.imageContainerBorder}`}>
                     {!state.imageLoaded && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#141414]"></div>
                       </div>
                     )}
                     <img
-                      src={product.foregroundImage}
+                      src={product.backgroundImage}
                       alt={product.title}
-                      className={`w-full h-full object-cover transition-all duration-300 ${state.imageLoaded ? 'opacity-100' : 'opacity-0'
-                        } ${state.showImageZoom ? 'scale-110' : 'scale-100'}`}
+                      className={`w-full h-full object-contain transition-all duration-300 ${state.imageLoaded ? 'opacity-100' : 'opacity-0'
+                        } ${state.showImageZoom ? 'scale-165' : 'scale-150'}`}
+                      style={{ imageRendering: 'auto' }}
                       onLoad={handleImageLoad}
                       onMouseEnter={handleImageMouseEnter}
                       onMouseLeave={handleImageMouseLeave}
@@ -410,6 +411,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     />
                     {/* Image overlay for zoom effect */}
                     <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
+                    {/* Add subtle padding around image to prevent edge clipping when contain */}
+                    <div className="pointer-events-none absolute inset-0 p-2 md:p-3 lg:p-4"></div>
 
                     {/* Zoom indicator */}
                     {state.showImageZoom && (
