@@ -11,6 +11,28 @@
     margin-bottom: 1.5rem;
 }
 
+/* Apply the exact same border + subtle gradient/shadow to the image container */
+.imageContainerBorder {
+    background: #f2f2f23f;
+    background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0));
+    border-radius: 1.9rem; /* match productDetails */
+    /* ~30% more intensity than current, still smooth and even */
+    box-shadow:
+        0 3px 6px rgba(0, 0, 0, 0.12),
+        0 9px 25px rgba(0, 0, 0, 0.13),
+        0 18px 48px rgba(0, 0, 0, 0.10);
+    border: 5px solid #ffffff;
+    transition: box-shadow 280ms ease;
+}
+
+.imageContainerBorder:hover {
+    /* hover remains soft but proportionally stronger */
+    box-shadow:
+        0 5px 9px rgba(0, 0, 0, 0.14),
+        0 12px 32px rgba(0, 0, 0, 0.15),
+        0 20px 56px rgba(0, 0, 0, 0.11);
+}
+
 .productDetails:hover {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
