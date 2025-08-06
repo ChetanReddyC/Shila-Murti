@@ -214,6 +214,51 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     updateState({ showImageZoom: false });
   }, [updateState]);
 
+  // Collapsible description subcomponent (scoped to this page)
+  const DescriptionWithExpand: React.FC<{ text: string }> = ({ text }) => {
+    const [expanded, setExpanded] = useState(false);
+
+    return (
+      <div className="flex flex-col gap-4">
+        <h3 className={styles.descriptionHeading}>Description</h3>
+        {null}
+
+        <div className={`${styles.descriptionWrapper} ${expanded ? styles.expanded : styles.collapsed}`}>
+          <p id="product-description" className={`${styles.descriptionText} text-[#6b7280] text-base font-normal leading-relaxed`}>
+            {text}
+          </p>
+          {!expanded && (
+            <div
+              className={styles.fadeMask}
+              aria-hidden="true"
+              style={{
+                // Extremely soft so underlying lines remain clearly readable
+                backdropFilter: 'blur(1px) saturate(100%)',
+                WebkitBackdropFilter: 'blur(1px) saturate(100%)',
+                // Remove SVG distortion to avoid heavy smearing of text
+                filter: 'none',
+                isolation: 'isolate',
+                opacity: 0.85,
+              }}
+            />
+          )}
+        </div>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors bg-[#f2f2f2] hover:bg-[#e8e8e8] text-[#141414] border border-[#e5e7eb]"
+            aria-expanded={expanded}
+            aria-controls="product-description"
+          >
+            {expanded ? 'Read Less' : 'Read More'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // Error boundary error handler
   const handleErrorBoundaryError = useCallback((error: Error, errorInfo: any) => {
     console.error('ErrorBoundary caught an error in ProductDetailPage:', error, errorInfo);
@@ -428,7 +473,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   {/* Product Information */}
                   <div className="flex flex-col gap-10">
                     {/* Title and Price */}
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
                       <h1 className="text-[#141414] tracking-tight text-4xl lg:text-5xl font-bold leading-tight">
                         {product.title}
                       </h1>
@@ -437,7 +482,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                           {product.subtitle}
                         </p>
                       )}
-                      <div className="flex items-center gap-3 mt-1">
+                      
+                    </div>
+                    {/* Price visually separated lower, creating a tighter title/subtitle pair */}
+                      <div className="flex items-center gap-1 mt-5">
                         <span className="text-[#141414] text-3xl lg:text-4xl font-bold leading-tight">
                           {product.currency && product.price ?
                             `${product.currency} ${product.price.toLocaleString()}` :
@@ -450,12 +498,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                               {product.currency} {product.originalPrice.toLocaleString()}
                             </span>
                             <span className="bg-red-100 text-red-800 text-sm font-semibold px-3 py-1 rounded-full">
-                              {Math.round(((product.originalPrice - (product.price || 0)) / product.originalPrice) * 100)}% OFF
                             </span>
                           </>
                         )}
                       </div>
-                    </div>
 
                     {/* Product Details */}
                     <div className={styles.productDetails}>
@@ -498,12 +544,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
                     {/* Description */}
                     {product.description && (
-                      <div className="flex flex-col gap-4">
-                        <h3 className="text-[#141414] text-xl font-semibold leading-tight">Description</h3>
-                        <p className="text-[#6b7280] text-base font-normal leading-relaxed">
-                          {product.description}
-                        </p>
-                      </div>
+                      <DescriptionWithExpand text={product.description} />
                     )}
 
                     {/* Add to Cart Section */}
