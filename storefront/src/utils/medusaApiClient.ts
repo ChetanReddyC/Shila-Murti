@@ -1,4 +1,4 @@
-import { Product } from '../types/medusa';
+import { Product, MedusaCart, Region } from '../types/medusa';
 
 export interface ProductQueryParams {
   limit?: number;
@@ -6,6 +6,33 @@ export interface ProductQueryParams {
   region_id?: string;
   sales_channel_id?: string;
   category_id?: string[];
+}
+
+// Cart-related interfaces
+export interface CreateCartPayload {
+  region_id?: string;
+  sales_channel_id?: string;
+  country_code?: string;
+  currency_code?: string;
+}
+
+export interface AddLineItemPayload {
+  variant_id: string;
+  quantity: number;
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateLineItemPayload {
+  quantity: number;
+  metadata?: Record<string, any>;
+}
+
+export interface MedusaCartResponse {
+  cart: MedusaCart;
+}
+
+export interface MedusaRegionsResponse {
+  regions: Region[];
 }
 
 export interface MedusaProductsResponse {
@@ -243,6 +270,7 @@ export class MedusaApiClient {
 
             if (!response.ok) {
               const errorData = await response.json().catch(() => ({}));
+              console.error('[MedusaApiClient] API Error Response Body:', errorData);
               const apiError = new ApiError(
                 errorData.message || `HTTP error! status: ${response.status}`,
                 response.status,
@@ -354,9 +382,157 @@ export class MedusaApiClient {
     return this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
   }
 
-  async getRegions(): Promise<{ regions: any[] }> {
+  async getRegions(): Promise<MedusaRegionsResponse> {
     const endpoint = '/store/regions';
-    return this.makeRequestWithRetry<{ regions: any[] }>(endpoint);
+    return this.makeRequestWithRetry<MedusaRegionsResponse>(endpoint);
+  }
+
+  // Cart operations
+  async createCart(payload: CreateCartPayload = {}): Promise<MedusaCart> {
+    const endpoint = '/store/carts';
+
+    // If no region_id is provided, try to get the India & International region
+    let finalPayload = { ...payload };
+
+    if (!finalPayload.region_id) {
+      try {
+        const indiaRegion = await this.getIndiaRegion();
+        if (indiaRegion) {
+          finalPayload.region_id = indiaRegion.id;
+        }
+      } catch (e) {
+        console.error('[MedusaApiClient] Failed to getIndiaRegion', e);
+      }
+    }
+
+    // Prepare the final payload
+    const finalPayloadWithContext = {
+      ...finalPayload,
+    };
+
+    try {
+      const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(finalPayloadWithContext),
+      });
+
+      return response.cart;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getCart(cartId: string): Promise<MedusaCart> {
+    const queryParams = new URLSearchParams();
+    // Expand cart items with variant and product information
+    queryParams.append('fields', '*items,*items.variant,*items.variant.product');
+    
+    const endpoint = `/store/carts/${cartId}?${queryParams.toString()}`;
+    
+    console.log('[MedusaApiClient] Fetching cart:', cartId);
+    
+    try {
+      const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint);
+      return response.cart;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        throw new ApiError('Cart not found or has expired. A new cart will be created.', 404, 'api');
+      }
+      throw error;
+    }
+  }
+
+  async addLineItem(cartId: string, payload: AddLineItemPayload): Promise<MedusaCart> {
+    const endpoint = `/store/carts/${cartId}/line-items`;
+    
+    console.log('[MedusaApiClient] Adding line item to cart:', cartId, payload);
+    
+    try {
+      const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      
+      return response.cart;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        // Handle specific cart errors
+        if (error.status === 404) {
+          throw new ApiError('Cart not found. Please refresh and try again.', 404, 'api');
+        } else if (error.status === 400) {
+          throw new ApiError('Invalid product variant or insufficient stock.', 400, 'api');
+        }
+      }
+      throw error;
+    }
+  }
+
+  async updateLineItem(cartId: string, lineItemId: string, payload: UpdateLineItemPayload): Promise<MedusaCart> {
+    const endpoint = `/store/carts/${cartId}/line-items/${lineItemId}`;
+    
+    console.log('[MedusaApiClient] Updating line item:', cartId, lineItemId, payload);
+    
+    try {
+      const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      
+      return response.cart;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        // Handle specific cart errors
+        if (error.status === 404) {
+          throw new ApiError('Cart or item not found. Please refresh and try again.', 404, 'api');
+        } else if (error.status === 400) {
+          throw new ApiError('Invalid quantity or insufficient stock.', 400, 'api');
+        }
+      }
+      throw error;
+    }
+  }
+
+  async removeLineItem(cartId: string, lineItemId: string): Promise<MedusaCart> {
+    const endpoint = `/store/carts/${cartId}/line-items/${lineItemId}`;
+    
+    console.log('[MedusaApiClient] Removing line item:', cartId, lineItemId);
+    
+    try {
+      const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
+        method: 'DELETE'
+      });
+      
+      return response.cart;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        // Handle specific cart errors
+        if (error.status === 404) {
+          throw new ApiError('Cart or item not found. Please refresh and try again.', 404, 'api');
+        }
+      }
+      throw error;
+    }
+  }
+
+  // Helper method to find the India & International region
+  async getIndiaRegion(): Promise<Region | null> {
+    try {
+      const regionsResponse = await this.getRegions();
+      const indiaRegion = regionsResponse.regions.find(
+        region => region.name === 'India & International' || 
+                 region.currency_code === 'inr'
+      );
+      
+      if (!indiaRegion) {
+        console.warn('[MedusaApiClient] India & International region not found, using first available region');
+        return regionsResponse.regions[0] || null;
+      }
+      
+      return indiaRegion;
+    } catch (error) {
+      console.error('[MedusaApiClient] Failed to fetch regions:', error);
+      return null;
+    }
   }
 
   async getProduct(id: string): Promise<Product> {

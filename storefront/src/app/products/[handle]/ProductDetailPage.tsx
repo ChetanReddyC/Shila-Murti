@@ -9,10 +9,15 @@ import { ProductCardData } from '../../../utils/productDataMapper';
 import { Product } from '../../../types/medusa';
 import { useRetry } from '../../../hooks/useRetry';
 import { isValidHandle, generateProductHandle } from '../../../utils/productHandleGenerator';
+import { useCart } from '../../../contexts/CartContext';
+import { medusaApiClient } from '../../../utils/medusaApiClient';
 import styles from './ProductDetailPage.module.css'
 import FeaturesSection from './FeaturesSection';
 import ReviewsSection from './ReviewsSection';
 import SimilarProductsSection from './SimilarProductsSection';
+import CartFeedback from '../../../components/CartFeedback/CartFeedback';
+import NetworkStatus from '../../../components/NetworkStatus/NetworkStatus';
+import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 
 interface ProductDetailPageProps {
   params: Promise<{ handle: string }>;
@@ -29,6 +34,8 @@ interface ProductDetailState {
   isAddingToCart: boolean;
   showImageZoom: boolean;
   recentlyViewed: ProductCardData[];
+  addToCartSuccess: boolean;
+  addToCartError: string | null;
 }
 
 // Collapsible description component - moved outside to prevent re-creation on every render
@@ -92,6 +99,7 @@ const DescriptionWithExpand: React.FC<{ text: string }> = React.memo(({ text }) 
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // All hooks must be at the top before any conditional logic
   const [handle, setHandle] = useState<string | null>(null);
+  const { addToCart, loading: cartLoading, error: cartError, clearError } = useCart();
 
   // Use a single state object to minimize state updates
   const [state, setState] = useState<ProductDetailState>({
@@ -104,7 +112,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     imageLoaded: false,
     isAddingToCart: false,
     showImageZoom: false,
-    recentlyViewed: []
+    recentlyViewed: [],
+    addToCartSuccess: false,
+    addToCartError: null
   });
 
   // Use ref to track if component is mounted to prevent state updates after unmount
@@ -149,15 +159,19 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     if (!handle) return;
 
     try {
-      updateState({ loading: true, error: null });
+      updateState({ loading: true, error: null, addToCartSuccess: false, addToCartError: null });
 
       try {
-        // Try to use the new fetchProductByHandle method
-        const productData = await productsService.fetchProductByHandle(handle);
+        // Fetch both the transformed product data and raw product data with variants
+        const [productData, rawProduct] = await Promise.all([
+          productsService.fetchProductByHandle(handle),
+          medusaApiClient.getProductByHandle(handle)
+        ]);
 
         if (isMountedRef.current) {
           updateState({
             productData,
+            product: rawProduct,
             loading: false
           });
           // Reset retry state on successful fetch
@@ -181,9 +195,18 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           return;
         }
 
+        // Also try to get the raw product data for the matching product
+        let rawProduct: Product | null = null;
+        try {
+          rawProduct = await medusaApiClient.getProduct(matchingProduct.id);
+        } catch (rawError) {
+          console.warn('Failed to fetch raw product data:', rawError);
+        }
+
         if (isMountedRef.current) {
           updateState({
             productData: matchingProduct,
+            product: rawProduct,
             loading: false
           });
           // Reset retry state on successful fetch
@@ -242,26 +265,116 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   // Add to cart handler
   const handleAddToCart = useCallback(async () => {
-    if (!state.productData || !state.productData.inStock) return;
+    if (!state.productData || !state.product) {
+      return;
+    }
 
-    updateState({ isAddingToCart: true });
+    // Check if product is in stock
+    if (!state.productData.inStock) {
+      updateState({ 
+        addToCartError: 'This product is currently out of stock.',
+        addToCartSuccess: false 
+      });
+      return;
+    }
+
+    // Check if product has variants
+    if (!state.product.variants || state.product.variants.length === 0) {
+      updateState({ 
+        addToCartError: 'This product has no available variants.',
+        addToCartSuccess: false 
+      });
+      return;
+    }
+
+    // Find the first available variant with stock
+    let selectedVariant = null;
+    for (const variant of state.product.variants) {
+      // Check variant inventory
+      let hasStock = false;
+      
+      // Check Medusa v1 style inventory
+      if (typeof variant.inventory_quantity === 'number' && variant.inventory_quantity > 0) {
+        hasStock = true;
+      }
+      // Check Medusa v2 style inventory
+      else if (variant.inventory_items && variant.inventory_items.length > 0) {
+        const inventoryItem = variant.inventory_items[0];
+        if (inventoryItem.inventory?.location_levels && inventoryItem.inventory.location_levels.length > 0) {
+          const availableQuantity = inventoryItem.inventory.location_levels[0].available_quantity || 0;
+          hasStock = availableQuantity >= state.selectedQuantity;
+        }
+      }
+      // If inventory is not managed, assume it's available
+      else if (!variant.manage_inventory) {
+        hasStock = true;
+      }
+
+      if (hasStock) {
+        selectedVariant = variant;
+        break;
+      }
+    }
+    
+    if (!selectedVariant) {
+      updateState({ 
+        addToCartError: 'No product variant with sufficient stock is available.',
+        addToCartSuccess: false 
+      });
+      return;
+    }
+
+    updateState({ 
+      isAddingToCart: true, 
+      addToCartError: null, 
+      addToCartSuccess: false 
+    });
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Add to cart logic would go here
-      console.log(`Added ${state.selectedQuantity} of ${state.productData.title} to cart`);
+      await addToCart(selectedVariant.id, state.selectedQuantity);
 
       // Show success feedback
-      // You could add a toast notification here
+      updateState({ 
+        addToCartSuccess: true,
+        addToCartError: null
+      });
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        updateState({ addToCartSuccess: false });
+      }, 3000);
 
     } catch (error) {
       console.error('Failed to add to cart:', error);
+      
+      // Handle specific error types
+      let errorMessage = 'Failed to add item to cart. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('insufficient stock') || error.message.includes('out of stock')) {
+          errorMessage = 'This item is currently out of stock or has insufficient quantity available.';
+        } else if (error.message.includes('variant not found')) {
+          errorMessage = 'This product variant is no longer available.';
+        } else if (error.message.includes('cart not found')) {
+          errorMessage = 'Your cart session has expired. Please refresh the page and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      updateState({ 
+        addToCartError: errorMessage,
+        addToCartSuccess: false
+      });
+
+      // Clear error message after 5 seconds
+      setTimeout(() => {
+        updateState({ addToCartError: null });
+      }, 5000);
     } finally {
       updateState({ isAddingToCart: false });
     }
-  }, [state.productData, state.selectedQuantity, updateState]);
+  }, [state.productData, state.product, state.selectedQuantity, addToCart, updateState]);
 
   // Image zoom handlers
   const handleImageMouseEnter = useCallback(() => {
@@ -416,6 +529,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     >
       <div className="layout-container flex h-full grow flex-col">
         <Header />
+        <NetworkStatus />
 
         <div className="px-8 md:px-16 lg:px-24 xl:px-40 flex flex-1 justify-center py-12">
           <div className={`layout-content-container flex flex-col max-w-[1200px] flex-1 ${styles.contentWrapper}`}>
@@ -615,15 +729,15 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                             e.stopPropagation();
                             handleAddToCart();
                           }}
-                          className={`flex h-16 flex-1 shrink-0 items-center justify-center rounded-2xl font-semibold text-lg transition-all duration-200 ${product.inStock && !state.isAddingToCart
+                          className={`flex h-16 flex-1 shrink-0 items-center justify-center rounded-2xl font-semibold text-lg transition-all duration-200 ${product.inStock && !state.isAddingToCart && !cartLoading
                             ? 'bg-[#141414] text-white hover:bg-[#333333] hover:shadow-xl transform hover:-translate-y-1 shadow-lg'
                             : 'bg-[#e0e0e0] text-[#6b7280] cursor-not-allowed'
                             }`}
-                          disabled={!product.inStock || state.isAddingToCart}
+                          disabled={!product.inStock || state.isAddingToCart || cartLoading}
                         >
-                          {state.isAddingToCart ? (
+                          {(state.isAddingToCart || cartLoading) ? (
                             <div className="flex items-center gap-3">
-                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                              <LoadingSpinner size="small" color="white" />
                               <span className="text-lg font-semibold">Adding...</span>
                             </div>
                           ) : (
@@ -647,6 +761,21 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
                         </button>
+                      </div>
+
+                      {/* Success/Error Feedback */}
+                      <div className="mt-4">
+                        <CartFeedback
+                          loading={state.isAddingToCart || cartLoading}
+                          error={state.addToCartError || cartError}
+                          success={state.addToCartSuccess ? `Successfully added ${state.selectedQuantity} ${state.selectedQuantity === 1 ? 'item' : 'items'} to cart!` : null}
+                          loadingMessage="Adding to cart..."
+                          onDismissError={() => {
+                            updateState({ addToCartError: null });
+                            clearError();
+                          }}
+                          onDismissSuccess={() => updateState({ addToCartSuccess: false })}
+                        />
                       </div>
 
                     </div>

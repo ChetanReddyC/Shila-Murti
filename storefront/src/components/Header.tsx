@@ -1,7 +1,9 @@
 import { FC } from 'react';
+import { useCart } from '../contexts/CartContext';
 import styles from './Header.module.css';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
+  const { getTotalItems, loading: cartLoading } = useCart();
   return (
     <div className="w-full" style={{ height: "100px" }}>
       <header className={styles.header}>
@@ -127,17 +129,24 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                 </svg>
               </button>
 
-              {/* Cart button */}
-              <a href="/cart" className={styles.iconButton} aria-label="Cart">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 256 256"
-                >
-                  <path d="M216 40H40A16 16 0 0024 56v144a16 16 0 0016 16h176a16 16 0 0016-16V56a16 16 0 00-16-16zm0 160H40V56h176zM176 88a48 48 0 01-96 0 8 8 0 0116 0 32 32 0 0064 0 8 8 0 0116 0z" />
-                </svg>
+              {/* Cart button with indicator */}
+              <a href="/cart" className={`${styles.iconButton} ${styles.cartButton}`} aria-label={`Cart (${getTotalItems()} items)`}>
+                <div className={styles.cartIconContainer}>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    fill="currentColor"
+                    viewBox="0 0 256 256"
+                  >
+                    <path d="M216 40H40A16 16 0 0024 56v144a16 16 0 0016 16h176a16 16 0 0016-16V56a16 16 0 00-16-16zm0 160H40V56h176zM176 88a48 48 0 01-96 0 8 8 0 0116 0 32 32 0 0064 0 8 8 0 0116 0z" />
+                  </svg>
+                  {getTotalItems() > 0 && (
+                    <span className={`${styles.cartBadge} ${cartLoading ? styles.cartBadgeLoading : ''}`}>
+                      {getTotalItems()}
+                    </span>
+                  )}
+                </div>
               </a>
             </div>
           </div>

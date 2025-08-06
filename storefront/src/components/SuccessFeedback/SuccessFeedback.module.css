@@ -1,0 +1,72 @@
+.container {
+  @apply relative flex flex-col bg-green-50 border border-green-200 rounded-xl overflow-hidden transition-all duration-200;
+  animation: slideIn 0.3s ease-out;
+}
+
+.content {
+  @apply flex items-start gap-3 p-4;
+}
+
+.iconContainer {
+  @apply flex-shrink-0 mt-0.5 text-green-600;
+}
+
+.messageContainer {
+  @apply flex-1 min-w-0;
+}
+
+.message {
+  @apply font-medium text-sm leading-relaxed text-green-800;
+}
+
+.actions {
+  @apply flex items-center gap-2 flex-shrink-0;
+}
+
+.dismissButton {
+  @apply p-1.5 rounded-lg text-green-600 hover:bg-green-100 transition-colors duration-200;
+}
+
+.progressBar {
+  @apply absolute bottom-0 left-0 right-0 h-1 bg-green-100;
+}
+
+.progressFill {
+  @apply h-full bg-green-500;
+  animation: progressShrink linear forwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progressShrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .content {
+    @apply p-3;
+  }
+  
+  .message {
+    @apply text-xs;
+  }
+  
+  .dismissButton {
+    @apply p-1;
+  }
+}
