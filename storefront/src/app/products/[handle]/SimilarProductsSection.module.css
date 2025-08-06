@@ -1,5 +1,5 @@
 .section {
-  margin-top: 48px;
+  margin-top: 40px;
   padding-top: 0; /* remove visual separator line spacing */
   border-top: none; /* remove top partition line as requested */
 }
@@ -9,12 +9,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
 }
 
 .title {
   color: #141414;
-  font-size: 24px;
+  font-size: 36px;
   line-height: 1.25;
   font-weight: 700;
 }
