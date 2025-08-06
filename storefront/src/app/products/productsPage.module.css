@@ -13,6 +13,43 @@
   margin-bottom: 60px; /* Increased bottom margin to ensure cards don't get cut off */
 }
 
+/* Pill filter button to match the screenshot */
+.pillFilterButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px; /* compact height */
+  background: #f2f2f2; /* light gray */
+  color: #141414;
+  border: none;
+  border-radius: 9999px; /* full pill */
+  cursor: pointer;
+  height: 32px; /* approx h-8 */
+  line-height: 1;
+  transition: background 160ms ease, transform 120ms ease, box-shadow 160ms ease;
+}
+
+.pillFilterButton:hover {
+  background: #ececec;
+}
+
+.pillFilterButton:active {
+  transform: translateY(0.5px);
+}
+
+.pillFilterLabel {
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500; /* medium */
+  color: #141414;
+}
+
+.pillChevron {
+  color: #141414;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 .productCardWrapper {
   width: 100%;
   display: flex;

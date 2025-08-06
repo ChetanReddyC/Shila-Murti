@@ -142,47 +142,37 @@ export default function ProductsPage() {
             <p className="py-8 text-[#141414] tracking-light text-[32px] font-bold leading-tight">Stone Idols</p>
             <div className="flex flex-col gap-6">
               <div className="flex gap-3 flex-wrap">
-                <button className="flex h-8 w-25 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-8 pr-8">
-                  <p className="text-[#141414] text-sm font-medium leading-normal">Deities</p>
-                  <div className="text-[#141414]" data-icon="CaretDown" data-size="20px" data-weight="regular">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
-                      <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                    </svg>
-                  </div>
+                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
+                  <span className={styles.pillFilterLabel}>Deities</span>
+                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
+                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+                  </svg>
                 </button>
-                <button className="flex h-8 w-25 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-8 pr-8">
-                  <p className="text-[#141414] text-sm font-medium leading-normal">Animals</p>
-                  <div className="text-[#141414]" data-icon="CaretDown" data-size="20px" data-weight="regular">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
-                      <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                    </svg>
-                  </div>
+                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
+                  <span className={styles.pillFilterLabel}>Animals</span>
+                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
+                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+                  </svg>
                 </button>
-                <button className="flex h-8 w-25 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-8 pr-8">
-                  <p className="text-[#141414] text-sm font-medium leading-normal">Abstract</p>
-                  <div className="text-[#141414]" data-icon="CaretDown" data-size="20px" data-weight="regular">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
-                      <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                    </svg>
-                  </div>
+                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
+                  <span className={styles.pillFilterLabel}>Abstract</span>
+                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
+                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+                  </svg>
                 </button>
               </div>
               <div className="flex gap-3 flex-wrap">
-                <button className="flex h-8 w-25 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-8 pr-8">
-                  <p className="text-[#141414] text-sm font-medium leading-normal">Marble</p>
-                  <div className="text-[#141414]" data-icon="CaretDown" data-size="20px" data-weight="regular">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
-                      <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                    </svg>
-                  </div>
+                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
+                  <span className={styles.pillFilterLabel}>Marble</span>
+                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
+                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+                  </svg>
                 </button>
-                <button className="flex h-8 w-25 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-8 pr-8">
-                  <p className="text-[#141414] text-sm font-medium leading-normal">Granite</p>
-                  <div className="text-[#141414]" data-icon="CaretDown" data-size="20px" data-weight="regular">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
-                      <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                    </svg>
-                  </div>
+                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
+                  <span className={styles.pillFilterLabel}>Granite</span>
+                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
+                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+                  </svg>
                 </button>
               </div>
             </div>

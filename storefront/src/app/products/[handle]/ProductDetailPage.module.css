@@ -75,6 +75,39 @@
     display: none;
 }
 
+/* Read more / Read less button styling */
+.readMoreButton {
+    display: inline-flex;
+    align-items: center;
+    padding: 0px 6px;
+    height: 33px;
+    background: #f2f2f2;
+    border: 1px solid #e5e7eb;
+    color: #141414;
+    border-radius: 12px;
+    font-size: 0.875rem; /* 14px */
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, transform 120ms ease, box-shadow 160ms ease;
+}
+
+.readMoreButton:hover {
+    background: #ececec;
+    border-color: #dcdfe3;
+}
+
+.readMoreButton:active {
+    transform: translateY(0.5px);
+}
+
+.readMoreChevron {
+    width: 16px;
+    height: 16px;
+    color: #141414;
+    flex: 0 0 auto;
+}
+
 /* Description heading (replaces Tailwind on h3) */
 .descriptionHeading {
     color: #141414;
