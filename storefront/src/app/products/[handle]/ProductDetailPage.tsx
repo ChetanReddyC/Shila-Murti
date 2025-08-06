@@ -428,16 +428,16 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   {/* Product Information */}
                   <div className="flex flex-col gap-10">
                     {/* Title and Price */}
-                    <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-2">
                       <h1 className="text-[#141414] tracking-tight text-4xl lg:text-5xl font-bold leading-tight">
                         {product.title}
                       </h1>
                       {product.subtitle && (
-                        <p className="text-[#6b7280] text-xl font-normal leading-relaxed">
+                        <p className="text-[#6b7280] text-xl font-normal leading-snug">
                           {product.subtitle}
                         </p>
                       )}
-                      <div className="flex items-center gap-4 mt-2">
+                      <div className="flex items-center gap-3 mt-1">
                         <span className="text-[#141414] text-3xl lg:text-4xl font-bold leading-tight">
                           {product.currency && product.price ?
                             `${product.currency} ${product.price.toLocaleString()}` :
