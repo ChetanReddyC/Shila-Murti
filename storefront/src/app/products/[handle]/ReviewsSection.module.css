@@ -1,0 +1,31 @@
+.subtitle {
+  /* Full control over subtitle styling */
+  color: #6b7280; /* same gray */
+  font-size: 0.95rem; /* ~15.2px */
+  line-height: 1.5rem; /* 24px */
+  letter-spacing: -0.01em;
+  margin-top: -10px; /* move VERY close to the heading */
+  margin-bottom: 0; /* remove extra bottom space */
+  max-width: 48rem; /* align with previous max-w-3xl */
+
+  /* Allow precise positioning if ever needed */
+  position: relative;
+  top: 0;
+
+  /* Smooth transitions if needed */
+  transition: margin 200ms ease, font-size 200ms ease, line-height 200ms ease, top 200ms ease;
+}
+
+/* Responsive tweak for md+ screens to keep proportionally smaller than heading */
+@media (min-width: 768px) {
+  .subtitle {
+    font-size: 1rem; /* 16px, keep proportionally small */
+    line-height: 1.625rem; /* 26px */
+    margin-top: -6px; /* even closer on larger heading sizes */
+  }
+}
+
+/* Optional: ensure consistent spacing below subtitle if needed later */
+.subtitle + .summaryRow {
+  margin-top: 0.5rem;
+}

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import styles from './ProductDetailPage.module.css';
+import reviewStyles from './ReviewsSection.module.css';
 import { useScrollAnimation } from '../../../hooks/useScrollAnimation';
 
 interface Review {
@@ -82,7 +83,7 @@ const ReviewsSection: React.FC = () => {
       aria-labelledby="reviews-title"
     >
       {/* Section header aligned left, matching page intro hierarchy */}
-      <div className="flex flex-col items-start text-left mb-16 md:mb-20 max-w-5xl gap-6 md:gap-8">
+      <div className="flex flex-col items-start text-left mb-16 md:mb-20 max-w-5xl gap-3 md:gap-3">
         <h3
           id="reviews-title"
           ref={titleAnim.elementRef as React.RefObject<HTMLHeadingElement>}
@@ -92,9 +93,12 @@ const ReviewsSection: React.FC = () => {
         >
           What Customers Say
         </h3>
-        <p className="text-[#6b7280] text-lg md:text-xl leading-8 md:leading-9 max-w-3xl tracking-[-0.01em]">
-          Real experiences from people who bought this product.
-        </p>
+        {/* Subtitle wrapped to allow absolute/relative fine control */}
+        <div className="relative w-full">
+          <p className={reviewStyles.subtitle}>
+            Real experiences from people who bought this product.
+          </p>
+        </div>
 
         {/* Rating summary emphasizes left alignment like price row */}
         <div
