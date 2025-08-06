@@ -1,14 +1,14 @@
 .productDetails {
     background: #f2f2f23f;
     background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0));
-    padding: 1.5rem;
+    padding: 1rem; /* tighter card padding */
     border-radius: 1.9rem;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
     border: 5px solid #ffffff;
     transition: box-shadow 0.3s ease;
     max-width: 960px;
-    margin-top: 0.75rem;
-    margin-bottom: 1.5rem;
+    margin-top: 0.25rem; /* reduce top margin */
+    margin-bottom: 1rem;  /* reduce bottom margin */
 }
 
 /* Apply the exact same border + subtle gradient/shadow to the image container */
@@ -40,14 +40,14 @@
 .detailsContainer {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.35rem; /* rows closer together */
 }
 
 .detailRow {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 0;
+    padding: 0.35rem 0; /* tighter vertical padding */
     transition: transform 0.2s ease;
 }
 
@@ -72,8 +72,8 @@
 .stockContainer {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.25rem 0;
+    gap: 0.5rem; /* bring dot and text closer */
+    padding: 0.1rem 0;
 }
 
 .stockIndicator {
@@ -156,12 +156,12 @@
 /* Responsive design */
 @media (max-width: 768px) {
     .productDetails {
-        padding: 1.5rem;
+        padding: 0.875rem; /* mobile tighter */
         border-radius: 1rem;
     }
 
     .detailsContainer {
-        gap: 1.5rem;
+        gap: 0.5rem; /* mobile rows closer */
     }
 
     .detailLabel,
@@ -253,23 +253,23 @@
 /* Page layout and spacing */
 .pageContainer {
     min-height: 100vh;
-    padding-bottom: 3rem;
+    padding-bottom: 2rem; /* reduce global bottom spacing */
     /* 128px bottom padding */
 }
 
 .contentWrapper {
-    padding-bottom: 6rem;
+    padding-bottom: 3rem; /* reduce bottom padding inside content */
     /* 96px additional bottom padding */
 }
 
 .lastSection {
-    margin-top: 5rem;
-    padding: 2.5rem 1.25rem;
+    margin-top: 3rem; /* bring sections closer */
+    padding: 2rem 1rem; /* slightly tighter */
     position: relative;
     background: linear-gradient(to bottom, rgb(242, 242, 242), rgba(255, 255, 255, 0.938));
     border-radius: 1.5rem;
     overflow: hidden;
-    margin-bottom: 3rem; /* add breathing room below ridged section */
+    margin-bottom: 2rem; /* tighter gap below ridged section */
 }
 
 .lastSection::before {
@@ -333,17 +333,17 @@
 /* Responsive spacing */
 @media (max-width: 768px) {
     .pageContainer {
-        padding-bottom: 6rem;
+        padding-bottom: 3rem; /* tighter on mobile */
         /* 96px on mobile */
     }
 
     .contentWrapper {
-        padding-bottom: 4rem;
+        padding-bottom: 2rem; /* tighter on mobile */
         /* 64px on mobile */
     }
 
     .lastSection {
-        margin-bottom: 4.5rem; /* increase mobile gap under ridged section */
+        margin-bottom: 2.5rem; /* tighter mobile gap */
         /* 72px on mobile */
     }
 
