@@ -148,3 +148,81 @@
     gap: 1rem;
   }
 }
+
+/* Cart button specific styles */
+.cartButton {
+  position: relative;
+}
+
+.cartIconContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cartBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ff4444;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  min-width: 18px;
+  padding: 0 2px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: cartBadgeAppear 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.cartBadgeLoading {
+  animation: cartBadgePulse 1s ease-in-out infinite;
+}
+
+@keyframes cartBadgeAppear {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cartBadgePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Hover effects for cart button */
+.cartButton:hover .cartBadge {
+  transform: scale(1.1);
+  background: #ff3333;
+}
+
+/* Responsive adjustments for cart badge */
+@media (max-width: 640px) {
+  .cartBadge {
+    width: 16px;
+    height: 16px;
+    font-size: 0.7rem;
+    top: -6px;
+    right: -6px;
+  }
+}

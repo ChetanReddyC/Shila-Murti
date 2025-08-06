@@ -143,3 +143,146 @@ export interface Product {
   variants: ProductVariant[];
   metadata: Record<string, any> | null;
 }
+
+// Cart-related types for Medusa v2
+export interface Address {
+  id: string;
+  customer_id?: string;
+  company?: string;
+  first_name?: string;
+  last_name?: string;
+  address_1?: string;
+  address_2?: string;
+  city?: string;
+  country_code?: string;
+  province?: string;
+  postal_code?: string;
+  phone?: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface ShippingMethod {
+  id: string;
+  cart_id: string;
+  name: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface PaymentSession {
+  id: string;
+  cart_id: string;
+  provider_id: string;
+  is_selected: boolean;
+  status: string;
+  data: Record<string, any>;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface LineItemAdjustment {
+  id: string;
+  line_item_id: string;
+  amount: number;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface MedusaLineItem {
+  id: string;
+  cart_id: string;
+  product_id: string;
+  variant_id: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  subtotal: number;
+  tax_total: number;
+  discount_total: number;
+  title: string;
+  description?: string;
+  thumbnail?: string;
+  variant: {
+    id: string;
+    title: string;
+    sku?: string;
+    product: {
+      id: string;
+      title: string;
+      handle: string;
+      thumbnail?: string;
+    };
+  };
+  adjustments?: LineItemAdjustment[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface MedusaCart {
+  id: string;
+  region_id: string;
+  customer_id?: string;
+  sales_channel_id?: string;
+  items: MedusaLineItem[];
+  shipping_address?: Address;
+  billing_address?: Address;
+  shipping_methods: ShippingMethod[];
+  payment_sessions: PaymentSession[];
+  total: number;
+  subtotal: number;
+  tax_total: number;
+  shipping_total: number;
+  discount_total: number;
+  currency_code: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface Region {
+  id: string;
+  name: string;
+  currency_code: string;
+  tax_rate: number;
+  countries: Country[];
+  payment_providers: PaymentProvider[];
+  fulfillment_providers: FulfillmentProvider[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface Country {
+  id: string;
+  iso_2: string;
+  iso_3: string;
+  num_code: number;
+  name: string;
+  display_name: string;
+  region_id?: string;
+}
+
+export interface PaymentProvider {
+  id: string;
+  is_installed: boolean;
+}
+
+export interface FulfillmentProvider {
+  id: string;
+  is_installed: boolean;
+}
