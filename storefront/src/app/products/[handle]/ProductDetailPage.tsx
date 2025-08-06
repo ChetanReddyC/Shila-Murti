@@ -31,6 +31,64 @@ interface ProductDetailState {
   recentlyViewed: ProductCardData[];
 }
 
+// Collapsible description component - moved outside to prevent re-creation on every render
+const DescriptionWithExpand: React.FC<{ text: string }> = React.memo(({ text }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const handleToggle = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpanded(prev => !prev);
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h3 className={styles.descriptionHeading}>Description</h3>
+
+      <div className={`${styles.descriptionWrapper} ${expanded ? styles.expanded : styles.collapsed}`}>
+        <p id="product-description" className={`${styles.descriptionText} text-[#6b7280] text-base font-normal leading-relaxed`}>
+          {text}
+        </p>
+        {!expanded && (
+          <div
+            className={styles.fadeMask}
+            aria-hidden="true"
+            style={{
+              // Extremely soft so underlying lines remain clearly readable
+              backdropFilter: 'blur(1px) saturate(100%)',
+              WebkitBackdropFilter: 'blur(1px) saturate(100%)',
+              // Remove SVG distortion to avoid heavy smearing of text
+              filter: 'none',
+              isolation: 'isolate',
+              opacity: 0.85,
+            }}
+          />
+        )}
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={handleToggle}
+          className={styles.readMoreButton}
+          aria-expanded={expanded}
+          aria-controls="product-description"
+        >
+          <span>{expanded ? 'Read Less' : 'Read More'}</span>
+          <svg
+            className={styles.readMoreChevron}
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 256 256"
+            aria-hidden="true"
+          >
+            <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // All hooks must be at the top before any conditional logic
   const [handle, setHandle] = useState<string | null>(null);
@@ -214,58 +272,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     updateState({ showImageZoom: false });
   }, [updateState]);
 
-  // Collapsible description subcomponent (scoped to this page)
-  const DescriptionWithExpand: React.FC<{ text: string }> = ({ text }) => {
-    const [expanded, setExpanded] = useState(false);
 
-    return (
-      <div className="flex flex-col gap-4">
-        <h3 className={styles.descriptionHeading}>Description</h3>
-        {null}
-
-        <div className={`${styles.descriptionWrapper} ${expanded ? styles.expanded : styles.collapsed}`}>
-          <p id="product-description" className={`${styles.descriptionText} text-[#6b7280] text-base font-normal leading-relaxed`}>
-            {text}
-          </p>
-          {!expanded && (
-            <div
-              className={styles.fadeMask}
-              aria-hidden="true"
-              style={{
-                // Extremely soft so underlying lines remain clearly readable
-                backdropFilter: 'blur(1px) saturate(100%)',
-                WebkitBackdropFilter: 'blur(1px) saturate(100%)',
-                // Remove SVG distortion to avoid heavy smearing of text
-                filter: 'none',
-                isolation: 'isolate',
-                opacity: 0.85,
-              }}
-            />
-          )}
-        </div>
-
-        <div>
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className={styles.readMoreButton}
-            aria-expanded={expanded}
-            aria-controls="product-description"
-          >
-            <span>{expanded ? 'Read Less' : 'Read More'}</span>
-            <svg
-              className={styles.readMoreChevron}
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 256 256"
-              aria-hidden="true"
-            >
-              <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   // Error boundary error handler
   const handleErrorBoundaryError = useCallback((error: Error, errorInfo: any) => {
@@ -374,7 +381,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 </p>
                 {canRetry && (
                   <button
-                    onClick={handleRetry}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRetry();
+                    }}
                     className="flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#141414] text-white px-8 hover:bg-[#333333] transition-colors"
                   >
                     <span className="text-sm font-medium leading-normal">
@@ -490,26 +501,26 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                           {product.subtitle}
                         </p>
                       )}
-                      
+
                     </div>
                     {/* Price visually separated lower, creating a tighter title/subtitle pair */}
-                      <div className="flex items-center gap-1 mt-5">
-                        <span className="text-[#141414] text-3xl lg:text-4xl font-bold leading-tight">
-                          {product.currency && product.price ?
-                            `${product.currency} ${product.price.toLocaleString()}` :
-                            'Price not available'
-                          }
-                        </span>
-                        {product.originalPrice && product.originalPrice > (product.price || 0) && (
-                          <>
-                            <span className="text-[#6b7280] text-xl font-normal leading-normal line-through">
-                              {product.currency} {product.originalPrice.toLocaleString()}
-                            </span>
-                            <span className="bg-red-100 text-red-800 text-sm font-semibold px-3 py-1 rounded-full">
-                            </span>
-                          </>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-1 mt-5">
+                      <span className="text-[#141414] text-3xl lg:text-4xl font-bold leading-tight">
+                        {product.currency && product.price ?
+                          `${product.currency} ${product.price.toLocaleString()}` :
+                          'Price not available'
+                        }
+                      </span>
+                      {product.originalPrice && product.originalPrice > (product.price || 0) && (
+                        <>
+                          <span className="text-[#6b7280] text-xl font-normal leading-normal line-through">
+                            {product.currency} {product.originalPrice.toLocaleString()}
+                          </span>
+                          <span className="bg-red-100 text-red-800 text-sm font-semibold px-3 py-1 rounded-full">
+                          </span>
+                        </>
+                      )}
+                    </div>
 
                     {/* Product Details */}
                     <div className={styles.productDetails}>
@@ -563,7 +574,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         </label>
                         <div className="flex items-center border-2 border-[#e0e0e0] rounded-2xl overflow-hidden bg-white shadow-sm">
                           <button
-                            onClick={() => handleQuantityChange(Math.max(1, state.selectedQuantity - 1))}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleQuantityChange(Math.max(1, state.selectedQuantity - 1));
+                            }}
                             className="px-4 py-3 hover:bg-[#f2f2f2] transition-colors disabled:opacity-50"
                             disabled={state.selectedQuantity <= 1}
                           >
@@ -575,7 +590,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                             {state.selectedQuantity}
                           </span>
                           <button
-                            onClick={() => handleQuantityChange(Math.min(10, state.selectedQuantity + 1))}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleQuantityChange(Math.min(10, state.selectedQuantity + 1));
+                            }}
                             className="px-4 py-3 hover:bg-[#f2f2f2] transition-colors disabled:opacity-50"
                             disabled={state.selectedQuantity >= 10}
                           >
@@ -586,15 +605,19 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         </div>
                       </div>
 
-                       {/* Shipping info */}
-                        <span className="font-medium text-[#6b7280]">Free shipping on orders over $50</span>
+                      {/* Shipping info */}
+                      <span className="font-medium text-[#6b7280]">Free shipping on orders over $50</span>
 
                       <div className="flex gap-4">
                         <button
-                          onClick={handleAddToCart}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAddToCart();
+                          }}
                           className={`flex h-16 flex-1 shrink-0 items-center justify-center rounded-2xl font-semibold text-lg transition-all duration-200 ${product.inStock && !state.isAddingToCart
-                              ? 'bg-[#141414] text-white hover:bg-[#333333] hover:shadow-xl transform hover:-translate-y-1 shadow-lg'
-                              : 'bg-[#e0e0e0] text-[#6b7280] cursor-not-allowed'
+                            ? 'bg-[#141414] text-white hover:bg-[#333333] hover:shadow-xl transform hover:-translate-y-1 shadow-lg'
+                            : 'bg-[#e0e0e0] text-[#6b7280] cursor-not-allowed'
                             }`}
                           disabled={!product.inStock || state.isAddingToCart}
                         >
