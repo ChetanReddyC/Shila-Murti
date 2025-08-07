@@ -1,9 +1,87 @@
-import { FC } from 'react';
+'use client';
+
+import { FC, useEffect, useState } from 'react';
 import { useCart } from '../contexts/CartContext';
 import styles from './Header.module.css';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading } = useCart();
+
+  // Only show the cart badge after the user has visited the cart page at least once,
+  // and hide it while the user is actively on the /cart route.
+  const [hasVisitedCart, setHasVisitedCart] = useState<boolean>(false);
+  const [isOnCartPage, setIsOnCartPage] = useState<boolean>(false);
+  const [lastSeenCount, setLastSeenCount] = useState<number>(0);
+
+  useEffect(() => {
+    // SSR-safe guards
+    if (typeof window === 'undefined') return;
+
+    // Read persisted flags
+    try {
+      const visited = window.sessionStorage.getItem('hasVisitedCart') === 'true';
+      setHasVisitedCart(visited);
+      const storedLastSeen = Number(window.sessionStorage.getItem('cartLastSeenCount') || '0');
+      setLastSeenCount(Number.isFinite(storedLastSeen) ? storedLastSeen : 0);
+    } catch {
+      // ignore storage errors
+    }
+
+    // Determine current route
+    const updateRouteState = () => {
+      const path = window.location.pathname || '';
+      // Avoid scheduling updates during useInsertionEffect phase by deferring with microtask
+      Promise.resolve().then(() => {
+        setIsOnCartPage(path === '/cart' || path.startsWith('/cart/'));
+      });
+    };
+
+    updateRouteState();
+
+    // Keep route state in sync on client-side navigations (Next.js)
+    const onPopState = () => updateRouteState();
+    window.addEventListener('popstate', onPopState);
+
+    // Instead of monkey-patching history, listen to navigation events Next.js emits
+    // Next 13+ dispatches a 'next-router-navigation' CustomEvent; also rely on popstate above.
+    const onNextNav = () => updateRouteState();
+    window.addEventListener('next-router-navigation', onNextNav as EventListener);
+
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('next-router-navigation', onNextNav as EventListener);
+    };
+  }, []);
+
+  // When a user visits /cart, record that they've seen the current count.
+  // This makes the badge only show for NEW items added since the last cart visit.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isOnCartPage) {
+      try {
+        // Defer storage and state updates to avoid clashing with insertion effects during navigation
+        Promise.resolve().then(() => {
+          window.sessionStorage.setItem('hasVisitedCart', 'true');
+          const currentCount = getTotalItems();
+          window.sessionStorage.setItem('cartLastSeenCount', String(currentCount));
+          setLastSeenCount(currentCount);
+          if (!hasVisitedCart) setHasVisitedCart(true);
+        });
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, [isOnCartPage, hasVisitedCart, getTotalItems]);
+
+  const totalItems = getTotalItems();
+
+  // Show badge if:
+  // - User has visited cart at least once (so they know what the number means)
+  // - User is not currently on the cart page
+  // - There are NEW items since they last visited the cart (totalItems > lastSeenCount)
+  const shouldShowBadge =
+    hasVisitedCart && !isOnCartPage && totalItems > lastSeenCount;
+
   return (
     <div className="w-full" style={{ height: "100px" }}>
       <header className={styles.header}>
@@ -141,9 +219,9 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                   >
                     <path d="M216 40H40A16 16 0 0024 56v144a16 16 0 0016 16h176a16 16 0 0016-16V56a16 16 0 00-16-16zm0 160H40V56h176zM176 88a48 48 0 01-96 0 8 8 0 0116 0 32 32 0 0064 0 8 8 0 0116 0z" />
                   </svg>
-                  {getTotalItems() > 0 && (
+                  {shouldShowBadge && (
                     <span className={`${styles.cartBadge} ${cartLoading ? styles.cartBadgeLoading : ''}`}>
-                      {getTotalItems()}
+                      {totalItems}
                     </span>
                   )}
                 </div>
@@ -156,4 +234,4 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   );
 };
 
-export default Header; 
+export default Header;

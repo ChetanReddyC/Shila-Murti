@@ -62,10 +62,20 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         loading: false,
       };
     case 'SET_CART':
+      // Guard against unexpected undefined/null payloads from API responses.
+      // Do NOT eagerly clear the entire cart if items still exist; prefer preserving items for consistency.
+      if (!action.payload) {
+        console.warn('[CartContext] SET_CART received undefined payload, ignoring to preserve current state');
+        return { ...state, loading: false };
+      }
+      if (!action.payload.id && (action.payload as any)?.items == null) {
+        console.warn('[CartContext] SET_CART payload missing id and items; ignoring to preserve current state');
+        return { ...state, loading: false };
+      }
       return {
         ...state,
         cart: action.payload,
-        cartId: action.payload.id,
+        cartId: action.payload.id ?? state.cartId ?? null,
         loading: false,
         error: null,
       };
@@ -103,10 +113,7 @@ export function CartProvider({ children }: CartProviderProps) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const { errorState, handleApiError, clearError: clearErrorHandler, isRetryableError } = useErrorHandler();
 
-  useEffect(() => {
-    console.log('[CartContext] Initializing cart from session');
-    refreshCart();
-  }, []);
+  
   
   // Track the last failed operation for retry functionality
   const [lastOperation, setLastOperation] = useState<{
@@ -162,7 +169,7 @@ export function CartProvider({ children }: CartProviderProps) {
   };
 
   // Create a new cart
-  const createCart = async (): Promise<void> => {
+  const createCart = React.useCallback(async (): Promise<void> => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     setLastOperation({ type: 'createCart', params: [] });
@@ -182,10 +189,10 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error; // Re-throw so calling components can handle it
     }
-  };
+  }, []);
 
   // Handle cart session expiration and recreation
-  const handleCartExpiration = async (): Promise<void> => {
+  const handleCartExpiration = React.useCallback(async (): Promise<void> => {
     console.log('[CartContext] Handling cart expiration - clearing session and preparing for new cart');
     removeCartIdFromSession();
     dispatch({ type: 'CLEAR_CART' });
@@ -193,10 +200,10 @@ export function CartProvider({ children }: CartProviderProps) {
     // Optionally create a new cart immediately
     // For now, we'll wait for the next add operation to create a new cart
     console.log('[CartContext] Cart session cleared, new cart will be created on next operation');
-  };
+  }, []);
 
   // Refresh cart from API with enhanced error handling
-  const refreshCart = async (): Promise<void> => {
+  const refreshCart = React.useCallback(async (): Promise<void> => {
     const cartId = state.cartId || getCartIdFromSession();
     
     if (!cartId) {
@@ -228,10 +235,10 @@ export function CartProvider({ children }: CartProviderProps) {
         dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
     }
-  };
+  }, [state.cartId, handleCartExpiration, handleApiError]);
 
   // Add item to cart with enhanced session management
-  const addToCart = async (variantId: string, quantity: number): Promise<void> => {
+  const addToCart = React.useCallback(async (variantId: string, quantity: number): Promise<void> => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     setLastOperation({ type: 'addToCart', params: [variantId, quantity] });
@@ -292,12 +299,18 @@ export function CartProvider({ children }: CartProviderProps) {
       
       throw error; // Re-throw so calling components can handle it
     }
-  };
+  }, [state.cart, state.cartId, handleApiError]);
 
   // Remove item from cart
-  const removeFromCart = async (lineItemId: string): Promise<void> => {
+  const removeFromCart = React.useCallback(async (lineItemId: string): Promise<void> => {
     if (!state.cart) {
       throw new Error('No cart available');
+    }
+    // Defensive: verify the line item exists before calling API to avoid undefined states
+    const exists = state.cart.items?.some((it) => it.id === lineItemId);
+    if (!exists) {
+      console.warn('[CartContext] removeFromCart called for non-existent lineItemId, ignoring:', lineItemId);
+      return;
     }
 
     const cartId = state.cart.id;
@@ -309,7 +322,25 @@ export function CartProvider({ children }: CartProviderProps) {
       console.log('[CartContext] Removing item from cart:', { cartId, lineItemId });
       const updatedCart = await medusaApiClient.removeLineItem(cartId, lineItemId);
       
-      dispatch({ type: 'SET_CART', payload: updatedCart });
+      // Normalize: only clear the cart if the backend explicitly indicates the cart no longer exists (missing id AND no items array).
+      // Otherwise, if the response is missing id but has items, keep local cart state filtered as a fallback to avoid nuking other items.
+      if (!updatedCart || (!updatedCart.id && (updatedCart as any)?.items == null)) {
+        console.warn('[CartContext] No valid cart returned after removal; preserving existing cart items except removed one');
+        const remainingItems = state.cart.items?.filter((it) => it.id !== lineItemId) ?? [];
+        // If remaining items exist, update local state minimally to avoid losing the rest
+        if (remainingItems.length > 0) {
+          const localCart: MedusaCart = {
+            ...(state.cart as MedusaCart),
+            items: remainingItems,
+          };
+          dispatch({ type: 'SET_CART', payload: localCart });
+        } else {
+          // No items left, clear cart
+          dispatch({ type: 'CLEAR_CART' });
+        }
+      } else {
+        dispatch({ type: 'SET_CART', payload: updatedCart });
+      }
       setLastOperation(null); // Clear last operation on success
       console.log('[CartContext] Item removed from cart successfully');
     } catch (error) {
@@ -318,17 +349,23 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
     }
-  };
+  }, [state.cart, handleApiError]);
 
   // Update item quantity in cart
-  const updateQuantity = async (lineItemId: string, quantity: number): Promise<void> => {
+  const updateQuantity = React.useCallback(async (lineItemId: string, quantity: number): Promise<void> => {
     if (!state.cart) {
       throw new Error('No cart available');
     }
 
     // If quantity is 0 or negative, remove the item
     if (quantity <= 0) {
-      await removeFromCart(lineItemId);
+      // Ensure the id exists before attempting removal
+      const exists = state.cart.items?.some((it) => it.id === lineItemId);
+      if (exists) {
+        await removeFromCart(lineItemId);
+      } else {
+        console.warn('[CartContext] updateQuantity to 0 for non-existent line item, ignoring:', lineItemId);
+      }
       return;
     }
 
@@ -352,25 +389,25 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
     }
-  };
+  }, [state.cart, removeFromCart, handleApiError]);
 
   // Clear cart (reset state and remove from session)
-  const clearCart = async (): Promise<void> => {
+  const clearCart = React.useCallback(async (): Promise<void> => {
     dispatch({ type: 'CLEAR_CART' });
     removeCartIdFromSession();
     setLastOperation(null);
     clearErrorHandler();
     console.log('[CartContext] Cart cleared');
-  };
+  }, [clearErrorHandler]);
 
   // Clear error state
-  const clearError = (): void => {
+  const clearError = React.useCallback((): void => {
     dispatch({ type: 'SET_ERROR', payload: null });
     clearErrorHandler();
-  };
+  }, [clearErrorHandler]);
 
   // Retry the last failed operation
-  const retryLastOperation = async (): Promise<void> => {
+  const retryLastOperation = React.useCallback(async (): Promise<void> => {
     if (!lastOperation) {
       console.warn('[CartContext] No operation to retry');
       return;
@@ -402,19 +439,19 @@ export function CartProvider({ children }: CartProviderProps) {
       console.error('[CartContext] Retry failed:', error);
       // Error is already handled by the individual operation functions
     }
-  };
+  }, [lastOperation, addToCart, removeFromCart, updateQuantity, refreshCart, createCart]);
 
   // Get total number of items in cart
-  const getTotalItems = (): number => {
+  const getTotalItems = React.useCallback((): number => {
     if (!state.cart || !state.cart.items) {
       return 0;
     }
     
     return state.cart.items.reduce((total, item) => total + item.quantity, 0);
-  };
+  }, [state.cart]);
 
   // Validate cart session integrity
-  const validateCartSession = async (cartId: string): Promise<boolean> => {
+  const validateCartSession = React.useCallback(async (cartId: string): Promise<boolean> => {
     try {
       console.log('[CartContext] Validating cart session:', cartId);
       await medusaApiClient.getCart(cartId);
@@ -424,7 +461,7 @@ export function CartProvider({ children }: CartProviderProps) {
       console.log('[CartContext] Cart session is invalid or expired:', error);
       return false;
     }
-  };
+  }, []);
 
   // Initialize cart on mount and handle session management
   useEffect(() => {
@@ -538,7 +575,7 @@ export function CartProvider({ children }: CartProviderProps) {
   }, [state.cartId, state.cart]);
 
   // Context value
-  const contextValue: CartContextType = {
+  const contextValue: CartContextType = React.useMemo(() => ({
     cart: state.cart,
     loading: state.loading,
     error: state.error || errorState.error,
@@ -552,7 +589,7 @@ export function CartProvider({ children }: CartProviderProps) {
     clearError,
     retryLastOperation,
     isRetryable: errorState.isRetryable || (lastOperation !== null && isRetryableError(errorState.originalError)),
-  };
+  }), [state.cart, state.loading, state.error, errorState.error, addToCart, removeFromCart, updateQuantity, clearCart, getTotalItems, refreshCart, createCart, clearError, retryLastOperation, errorState.isRetryable, lastOperation, isRetryableError, errorState.originalError]);
 
   return (
     <CartContext.Provider value={contextValue}>
