@@ -24,44 +24,40 @@ export default function CartPage() {
   } = useCart();
   
   const [operationLoading, setOperationLoading] = useState<string | null>(null);
-  const [operationSuccess, setOperationSuccess] = useState<string | null>(null);
-  const [operationError, setOperationError] = useState<string | null>(null);
+  // Removed operationSuccess/operationError feedback for quantity changes (no popups)
+  // const [operationSuccess, setOperationSuccess] = useState<string | null>(null);
+  // const [operationError, setOperationError] = useState<string | null>(null);
 
-  // Refresh cart data when component mounts
+  // Refresh cart data on first mount (context also initializes on mount)
   useEffect(() => {
     refreshCart();
-  }, [refreshCart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Format currency to INR
+  // NOTE: Our backend amounts are already stored in rupees (not cents). 
+  // The earlier division by 100 caused ₹8000 to show as ₹80, etc.
+  // Use the raw amount without dividing.
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-    }).format(amount / 100); // Medusa stores amounts in cents
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }).format(amount);
   };
 
   // Clear operation feedback after delay
-  const clearOperationFeedback = () => {
-    setTimeout(() => {
-      setOperationSuccess(null);
-      setOperationError(null);
-    }, 3000);
-  };
+  // Removed popup feedback; keep a no-op to avoid refactoring handlers extensively
+  const clearOperationFeedback = () => {};
 
   // Handle quantity increase
   const handleQuantityIncrease = async (lineItemId: string, currentQuantity: number) => {
     setOperationLoading(`increase-${lineItemId}`);
-    setOperationError(null);
-    setOperationSuccess(null);
-    
     try {
       await updateQuantity(lineItemId, currentQuantity + 1);
-      setOperationSuccess('Quantity updated successfully');
-      clearOperationFeedback();
     } catch (error) {
       console.error('Failed to increase quantity:', error);
-      setOperationError('Failed to increase quantity. Please try again.');
-      clearOperationFeedback();
     } finally {
       setOperationLoading(null);
     }
@@ -70,23 +66,14 @@ export default function CartPage() {
   // Handle quantity decrease
   const handleQuantityDecrease = async (lineItemId: string, currentQuantity: number) => {
     setOperationLoading(`decrease-${lineItemId}`);
-    setOperationError(null);
-    setOperationSuccess(null);
-    
     try {
       if (currentQuantity <= 1) {
-        // Remove item if quantity would become 0
         await removeFromCart(lineItemId);
-        setOperationSuccess('Item removed from cart');
       } else {
         await updateQuantity(lineItemId, currentQuantity - 1);
-        setOperationSuccess('Quantity updated successfully');
       }
-      clearOperationFeedback();
     } catch (error) {
       console.error('Failed to decrease quantity:', error);
-      setOperationError('Failed to update quantity. Please try again.');
-      clearOperationFeedback();
     } finally {
       setOperationLoading(null);
     }
@@ -95,23 +82,14 @@ export default function CartPage() {
   // Handle direct quantity input change
   const handleQuantityChange = async (lineItemId: string, newQuantity: number) => {
     setOperationLoading(`update-${lineItemId}`);
-    setOperationError(null);
-    setOperationSuccess(null);
-    
     try {
       if (newQuantity <= 0) {
-        // Remove item if quantity is 0 or negative
         await removeFromCart(lineItemId);
-        setOperationSuccess('Item removed from cart');
       } else {
         await updateQuantity(lineItemId, newQuantity);
-        setOperationSuccess('Quantity updated successfully');
       }
-      clearOperationFeedback();
     } catch (error) {
       console.error('Failed to update quantity:', error);
-      setOperationError('Failed to update quantity. Please try again.');
-      clearOperationFeedback();
     } finally {
       setOperationLoading(null);
     }
@@ -239,19 +217,17 @@ export default function CartPage() {
             <h1 className={styles.title}>Shopping Cart</h1>
             
             {/* Cart-level feedback */}
-            <div className="mb-6">
-              <CartFeedback
-                error={error || operationError}
-                success={operationSuccess}
-                onRetry={isRetryable ? retryLastOperation : handleRetryRefresh}
-                onDismissError={() => {
-                  clearError();
-                  setOperationError(null);
-                }}
-                onDismissSuccess={() => setOperationSuccess(null)}
-                showRetry={!!error && isRetryable}
-              />
-            </div>
+            {/* Removed success/error popups for quantity updates */}
+            {error && (
+              <div className="mb-6">
+                <CartFeedback
+                  error={error}
+                  onRetry={isRetryable ? retryLastOperation : handleRetryRefresh}
+                  onDismissError={clearError}
+                  showRetry={!!error && isRetryable}
+                />
+              </div>
+            )}
             
             {/* Cart table */}
             <div className={styles.itemsBox}>
@@ -270,19 +246,19 @@ export default function CartPage() {
                       <td>
                         <div className={styles.itemCell}>
                           <img 
-                            src={item.thumbnail || item.variant.product.thumbnail || '/placeholder-image.jpg'} 
-                            alt={item.title} 
+                            src={(item?.thumbnail ?? item?.variant?.product?.thumbnail ?? '/placeholder-image.jpg')} 
+                            alt={(item?.title ?? 'Cart item')} 
                             className={styles.itemImage}
                           />
                           <div className={styles.itemDetails}>
-                            <span className={styles.itemName}>{item.title}</span>
-                            {item.variant.title && (
+                            <span className={styles.itemName}>{item?.title ?? 'Item'}</span>
+                            {!!item?.variant?.title && (
                               <span className={styles.itemVariant}>{item.variant.title}</span>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className={styles.priceCell}>{formatCurrency(item.unit_price)}</td>
+                      <td className={styles.priceCell}>{formatCurrency(Number(item.unit_price))}</td>
                       <td className={styles.quantityCell}>
                         <div className={styles.quantityControls}>
                           <button 
@@ -326,7 +302,13 @@ export default function CartPage() {
                         </div>
                       </td>
                       <td className={styles.priceCell}>
-                        <strong>{formatCurrency(item.subtotal)}</strong>
+                        <strong>
+                          {formatCurrency(
+                            typeof item?.subtotal === 'number' && !Number.isNaN(item.subtotal)
+                              ? Number(item.subtotal)
+                              : (Number(item?.unit_price ?? 0) * Number(item?.quantity ?? 0))
+                          )}
+                        </strong>
                       </td>
                     </tr>
                   ))}
@@ -340,7 +322,7 @@ export default function CartPage() {
               
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel}>Subtotal</span>
-                <span className={styles.summaryValue}>{formatCurrency(cart.subtotal)}</span>
+                <span className={styles.summaryValue}>{formatCurrency(Number(cart.subtotal))}</span>
               </div>
               
               {cart.tax_total > 0 && (
@@ -353,20 +335,20 @@ export default function CartPage() {
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel}>Shipping</span>
                 <span className={styles.summaryValue}>
-                  {cart.shipping_total > 0 ? formatCurrency(cart.shipping_total) : 'Free'}
+                  {cart.shipping_total > 0 ? formatCurrency(Number(cart.shipping_total)) : 'Free'}
                 </span>
               </div>
               
               {cart.discount_total > 0 && (
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Discount</span>
-                  <span className={styles.summaryValue}>-{formatCurrency(cart.discount_total)}</span>
+                  <span className={styles.summaryValue}>-{formatCurrency(Number(cart.discount_total))}</span>
                 </div>
               )}
               
               <div className={styles.totalRow}>
                 <span className={styles.totalLabel}>Total</span>
-                <span className={styles.totalValue}>{formatCurrency(cart.total)}</span>
+                <span className={styles.totalValue}>{formatCurrency(Number(cart.total))}</span>
               </div>
             </div>
             
@@ -390,4 +372,4 @@ export default function CartPage() {
       </div>
     </div>
   );
-} 
+}
