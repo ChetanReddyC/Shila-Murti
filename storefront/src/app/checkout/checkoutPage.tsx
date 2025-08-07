@@ -5,18 +5,18 @@ import Header from '../../components/Header';
 import styles from './checkoutPage.module.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-// Real product data from the products page
-const products = [
-  {
-    id: 1,
-    name: "Stone Idol",
-    price: 50,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDLuyJZ0xxw_l9UUZPYMMLIG5k9I8fiVs6lcmflwE_12DaUsTg9Zz4nHSGXRPCWuHcGg4SgqHcaFm5a2_OlvZj6CgnY-9pNDVRy1WIJbv-LWBQ6lE_k-teSL6Da366eZQ323rHVwrTqos9EKSJ5ucUGKwNhtdwJUbaznsE3Cu0SrlKj-M76eTRkXlyudU1atflukUlrRQe7bxiAY2yA5vrHir7LVQrFeRh1mDe9IrNGiY-uJvCQPWB2_GI_YqTIEF9MvM-HuI1oleSI"
-  }
-];
+import { useCart } from '../../contexts/CartContext';
 
 export default function CheckoutPage() {
+  const router = useRouter();
+  const { cart, loading, refreshCart, clearCart } = useCart();
+
+  // Ensure we have fresh cart data when entering checkout
+  useEffect(() => {
+    refreshCart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -40,25 +40,35 @@ export default function CheckoutPage() {
     cvv: ''
   });
 
-  // Cart items
-  const cartItems = [
-    {
-      ...products[0],
-      quantity: 1
-    }
-  ];
-  
-  // Calculate subtotal
-  const subtotal = 50;
-  
-  // Shipping is free
-  const shipping = 'Free';
-  
-  // Taxes
-  const taxes = 5;
-  
-  // Total amount
-  const total = subtotal + taxes;
+  // Derive cart-based values
+  const cartItems = cart?.items ?? [];
+
+  // Helpers for currency formatting (INR as per cart page)
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }).format(Number(amount || 0));
+  };
+
+  const subtotal = Number(cart?.subtotal ?? 0);
+  const backendShippingAmount = Number(cart?.shipping_total ?? 0);
+
+  // Client-side shipping charges (INR) mapped to selected method
+  const selectedShippingCharge =
+    shippingMethod === 'express' ? 1600 :
+    shippingMethod === 'expedited' ? 800 : 0;
+
+  // Choose the higher of backend shipping and the user's selected tier
+  const effectiveShippingAmount = Math.max(backendShippingAmount, selectedShippingCharge);
+
+  const shipping = effectiveShippingAmount > 0 ? formatCurrency(effectiveShippingAmount) : 'Free';
+  const taxes = Number(cart?.tax_total ?? 0);
+
+  // Always compute total on the client to reflect selected shipping immediately
+  const total = subtotal + effectiveShippingAmount + taxes;
 
   // Progress state for entire checkout form
   const [formProgress, setFormProgress] = useState(0);
@@ -147,19 +157,101 @@ export default function CheckoutPage() {
   };
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Process the order
-    console.log('Order submitted:', {
+
+    // Prevent UI glitch by not mutating CartContext in this page at all.
+    // We only persist a snapshot and navigate; cart clearing will happen on the confirmation page.
+
+    // Build a serializable snapshot of exactly what was submitted
+    const orderSnapshot = {
+      timestamp: Date.now(),
+      cartId: cart?.id ?? null,
       customer: formData,
-      shippingMethod,
+      shippingSelection: {
+        method: shippingMethod,
+        amount: effectiveShippingAmount,
+      },
       paymentMethod,
-      paymentDetails,
-      items: cartItems,
-      total
-    });
+      items: cartItems.map((it) => ({
+        id: it.id,
+        title: it.title,
+        quantity: it.quantity,
+        unit_price: Number(it.unit_price || 0),
+        thumbnail: (it as any)?.thumbnail ?? (it as any)?.variant?.product?.thumbnail ?? null,
+        variant_id: (it as any)?.variant_id ?? (it as any)?.variant?.id ?? null,
+        product_id: (it as any)?.variant?.product_id ?? (it as any)?.variant?.product?.id ?? null,
+      })),
+      totals: {
+        subtotal,
+        shipping: effectiveShippingAmount,
+        taxes,
+        total,
+      },
+    };
+
+    try {
+      // Persist snapshot in sessionStorage with a short TTL
+      const payload = {
+        data: orderSnapshot,
+        // TTL: 30 minutes from now
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      };
+      sessionStorage.setItem('order_checkout_snapshot', JSON.stringify(payload));
+    } catch (err) {
+      console.warn('[Checkout] Failed to persist order snapshot to sessionStorage:', err);
+    }
+
+    // Process the order using real cart items (console log retained for visibility)
+    console.log('Order submitted:', orderSnapshot);
+
+    // Navigate immediately; DO NOT clear the cart here to avoid any flicker.
     router.push('/order-confirmation');
   };
+
+  // Loading or empty cart states - prevent proceeding with no items
+  if (loading) {
+    return (
+      <div 
+        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
+        style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
+      >
+        <div className="layout-container flex h-full grow flex-col">
+          <Header />
+          <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
+            <div className={styles.container}>
+              <h1 className={styles.title}>Checkout</h1>
+              <div className="text-gray-600">Loading your cart...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!cart || !cartItems || cartItems.length === 0) {
+    return (
+      <div 
+        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
+        style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
+      >
+        <div className="layout-container flex h-full grow flex-col">
+          <Header />
+          <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
+            <div className={styles.container}>
+              <h1 className={styles.title}>Checkout</h1>
+              <div className="flex flex-col items-center gap-4">
+                <div className="text-gray-600">Your cart is empty.</div>
+                <Link href="/products">
+                  <button className={styles.placeOrderButton}>Browse Products</button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -316,7 +408,7 @@ export default function CheckoutPage() {
                     <label htmlFor="expedited" className={styles.radioLabel}>
                       <div className={styles.shippingOptionDetails}>
                         <div className={styles.shippingOptionName}>Expedited (2-3 business days)</div>
-                        <div className={styles.shippingOptionPrice}>$10</div>
+                        <div className={styles.shippingOptionPrice}>₹800.00</div>
                       </div>
                     </label>
                   </div>
@@ -334,7 +426,7 @@ export default function CheckoutPage() {
                     <label htmlFor="express" className={styles.radioLabel}>
                       <div className={styles.shippingOptionDetails}>
                         <div className={styles.shippingOptionName}>Express (1-2 business days)</div>
-                        <div className={styles.shippingOptionPrice}>$20</div>
+                        <div className={styles.shippingOptionPrice}>₹1600.00</div>
                       </div>
                     </label>
                   </div>
@@ -449,12 +541,12 @@ export default function CheckoutPage() {
                     <div key={item.id} className={styles.orderItem}>
                       <div className={styles.orderItemDetails}>
                         <img 
-                          src={item.image} 
-                          alt={item.name} 
+                          src={(item?.thumbnail ?? item?.variant?.product?.thumbnail ?? '/placeholder-image.jpg')}
+                          alt={(item?.title ?? 'Cart item')} 
                           className={styles.orderItemImage} 
                         />
                         <div>
-                          <p className={styles.orderItemName}>{item.name}</p>
+                          <p className={styles.orderItemName}>{item?.title ?? 'Item'}</p>
                           <p className={styles.orderItemQuantity}>Quantity: {item.quantity}</p>
                         </div>
                       </div>
@@ -466,7 +558,7 @@ export default function CheckoutPage() {
                 <div className={styles.priceSummary}>
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>Subtotal</span>
-                    <span className={styles.summaryValue}>${subtotal}</span>
+                    <span className={styles.summaryValue}>{formatCurrency(subtotal)}</span>
                   </div>
                   
                   <div className={styles.summaryRow}>
@@ -476,12 +568,12 @@ export default function CheckoutPage() {
                   
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>Taxes</span>
-                    <span className={styles.summaryValue}>${taxes}</span>
+                    <span className={styles.summaryValue}>{formatCurrency(taxes)}</span>
                   </div>
                   
                   <div className={styles.totalRow}>
                     <span className={styles.totalLabel}>Total</span>
-                    <span className={styles.totalValue}>${total}</span>
+                    <span className={styles.totalValue}>{formatCurrency(total)}</span>
                   </div>
                 </div>
                 
@@ -495,4 +587,4 @@ export default function CheckoutPage() {
       </div>
     </div>
   );
-} 
+}
