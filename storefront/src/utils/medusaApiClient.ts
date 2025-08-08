@@ -42,6 +42,94 @@ export interface MedusaProductsResponse {
   limit: number;
 }
 
+// ---- Checkout-specific types ----
+export interface UpdateCartPayload {
+  email?: string;
+  shipping_address?: {
+    first_name?: string;
+    last_name?: string;
+    address_1: string;
+    address_2?: string;
+    city: string;
+    postal_code: string;
+    province?: string;
+    country_code: string;
+    phone?: string;
+  };
+  billing_address?: {
+    first_name?: string;
+    last_name?: string;
+    address_1: string;
+    address_2?: string;
+    city: string;
+    postal_code: string;
+    province?: string;
+    country_code: string;
+    phone?: string;
+  };
+}
+
+export interface ShippingOption {
+  id: string;
+  name: string;
+  amount: number;
+  price_type?: string;
+  provider_id?: string;
+  profile_id?: string;
+  data?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface ShippingOptionsResponse {
+  shipping_options: ShippingOption[];
+}
+
+export interface OrderSummaryItem {
+  id: string;
+  title: string;
+  quantity: number;
+  unit_price: number;
+  subtotal?: number;
+  total?: number;
+  thumbnail?: string | null;
+}
+
+export interface OrderMinimal {
+  id: string;
+  display_id?: number;
+  email?: string;
+  currency_code?: string;
+  total?: number;
+  subtotal?: number;
+  shipping_total?: number;
+  tax_total?: number;
+  items?: OrderSummaryItem[];
+  created_at?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CompleteCartResponse {
+  type?: 'order' | string;
+  order?: OrderMinimal;
+  cart?: MedusaCart;
+}
+
+export interface OrderResponse {
+  order: OrderMinimal;
+}
+
+// Minimal types for Payment Collections (Medusa v2)
+interface PaymentCollection {
+  id: string
+  amount?: number
+  currency_code?: string
+  status?: string
+}
+
+interface PaymentCollectionResponse {
+  payment_collection: PaymentCollection
+}
+
 export interface RetryOptions {
   maxRetries: number;
   baseDelay: number;
@@ -92,6 +180,7 @@ export class MedusaApiClient {
   private enablePerformanceLogging: boolean;
   private performanceMetrics: PerformanceMetrics[];
   private publishableApiKey: string;
+  public static readonly MANUAL_PAYMENT_PROVIDER_ID = 'manual';
 
   constructor(config: ApiClientConfig = {}) {
     this.baseUrl = config.baseUrl || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000';
@@ -111,6 +200,8 @@ export class MedusaApiClient {
     if (!this.publishableApiKey) {
       console.error('[MedusaApiClient] No publishable API key provided. Please add NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY to your .env.local file.');
       console.error('[MedusaApiClient] You can get this key from your Medusa admin dashboard at http://localhost:9000/app → Settings → API Key Management');
+    } else {
+      console.log('[MedusaApiClient] Using publishable key (present). Base URL:', this.baseUrl)
     }
   }
 
@@ -128,6 +219,9 @@ export class MedusaApiClient {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'x-publishable-api-key': this.publishableApiKey,
+          // Explicitly advertise requested headers for preflight clarity
+          // Some proxies/frameworks behave better when this header is present
+          'Access-Control-Request-Headers': 'content-type,accept,x-publishable-api-key',
           ...options.headers,
         },
       });
@@ -269,8 +363,13 @@ export class MedusaApiClient {
             const response = await this.fetchWithTimeout(url, options);
 
             if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              console.error('[MedusaApiClient] API Error Response Body:', errorData);
+              const errorText = await response.text().catch(() => '');
+              let errorData: any = {}
+              try { errorData = errorText ? JSON.parse(errorText) : {} } catch {}
+              console.error('[MedusaApiClient] API Error Response Body:', errorText || errorData);
+              if (response.status === 401 || response.status === 403) {
+                console.warn('[MedusaApiClient] Auth-like failure. Ensure x-publishable-api-key is valid and linked to the sales channel.')
+              }
               const apiError = new ApiError(
                 errorData.message || `HTTP error! status: ${response.status}`,
                 response.status,
@@ -555,6 +654,93 @@ export class MedusaApiClient {
     }
 
     return response.products[0];
+  }
+
+  // ---------------- Checkout operations (Medusa v2 Store routes) ----------------
+
+  /** Update cart details: email, shipping/billing address */
+  async updateCart(cartId: string, payload: UpdateCartPayload): Promise<MedusaCart> {
+    const endpoint = `/store/carts/${cartId}`;
+    console.log('[MedusaApiClient] Updating cart:', cartId, payload);
+    const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.cart;
+  }
+
+  /** List eligible shipping options for a cart */
+  async getShippingOptionsForCart(cartId: string): Promise<ShippingOption[]> {
+    // Request all fields to ensure profile_id is included for grouping per profile
+    const endpoint = `/store/shipping-options?cart_id=${encodeURIComponent(cartId)}&fields=*`;
+    console.log('[MedusaApiClient] Fetching shipping options for cart:', cartId);
+    const response = await this.makeRequestWithRetry<ShippingOptionsResponse>(endpoint);
+    return response.shipping_options || [];
+  }
+
+  /** Add a shipping method to the cart using the selected option id */
+  async addShippingMethod(cartId: string, optionId: string): Promise<MedusaCart> {
+    const endpoint = `/store/carts/${cartId}/shipping-methods`;
+    console.log('[MedusaApiClient] Adding shipping method:', { cartId, optionId });
+    const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({ option_id: optionId }),
+    });
+    return response.cart;
+  }
+
+  /** Create payment sessions for the cart */
+  async createPaymentSessions(cartId: string): Promise<MedusaCart> {
+    // Medusa v2.8+: Use Payment Collections instead of legacy cart payment-sessions
+    console.log('[MedusaApiClient] [v2.8] Creating payment collection + sessions for cart:', cartId)
+
+    // 1) Create or fetch the payment collection for this cart
+    const createPcEndpoint = `/store/payment-collections`
+    const pc = await this.makeRequestWithRetry<PaymentCollectionResponse>(createPcEndpoint, {
+      method: 'POST',
+      body: JSON.stringify({ cart_id: cartId })
+    })
+
+    const pcId = pc.payment_collection.id
+
+    // 2) Create payment sessions for that collection using the default system provider
+    const sessionsEndpoint = `/store/payment-collections/${pcId}/payment-sessions`
+    await this.makeRequestWithRetry<PaymentCollectionResponse>(sessionsEndpoint, {
+      method: 'POST',
+      body: JSON.stringify({ provider_id: 'pp_system_default', data: {} })
+    })
+
+    // 3) Return the updated cart to keep the original method contract
+    const updated = await this.getCart(cartId)
+    return updated
+  }
+
+  /** Select a specific payment session provider (manual) */
+  async selectPaymentSession(cartId: string, providerId: string): Promise<MedusaCart> {
+    // In v2 payment collections flow, provider selection happens when creating sessions.
+    // We keep this method for backwards compatibility and simply return the cart.
+    console.log('[MedusaApiClient] [v2.8] selectPaymentSession is a no-op; sessions were created with provider during payment-collections step', { cartId, providerId })
+    return this.getCart(cartId)
+  }
+
+  /** Complete the cart and expect an order in response */
+  async completeCart(cartId: string): Promise<CompleteCartResponse> {
+    const endpoint = `/store/carts/${cartId}/complete`;
+    console.log('[MedusaApiClient] Completing cart:', cartId);
+    const response = await this.makeRequestWithRetry<CompleteCartResponse>(endpoint, {
+      method: 'POST',
+    });
+    return response;
+  }
+
+  /** Retrieve an order by id (minimal fields) */
+  async getOrder(orderId: string): Promise<OrderMinimal> {
+    // Request expanded fields so the order confirmation page can render
+    // shipping address, shipping methods and items reliably.
+    const endpoint = `/store/orders/${orderId}?fields=*shipping_address,*shipping_methods,*items,*items.variant,*items.variant.product`;
+    console.log('[MedusaApiClient] Fetching order:', orderId);
+    const response = await this.makeRequestWithRetry<OrderResponse>(endpoint);
+    return response.order;
   }
 }
 

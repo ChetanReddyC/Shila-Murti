@@ -1,4 +1,5 @@
 const MEDUSA_API_BASE_URL = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000';
+const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
 
 interface FetchOptions extends RequestInit {
   timeout?: number;
@@ -24,6 +25,8 @@ async function httpClient<T>(endpoint: string, options: FetchOptions = {}): Prom
   const url = `${MEDUSA_API_BASE_URL}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
+    // Ensure Medusa Store APIs receive the required publishable key header
+    'x-publishable-api-key': PUBLISHABLE_KEY,
     ...options.headers,
   };
 
