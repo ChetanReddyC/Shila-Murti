@@ -6,6 +6,7 @@ import styles from './checkoutPage.module.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
+import { processCheckout } from '../../utils/checkoutOrchestrator';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -159,54 +160,50 @@ export default function CheckoutPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Prevent UI glitch by not mutating CartContext in this page at all.
-    // We only persist a snapshot and navigate; cart clearing will happen on the confirmation page.
-
-    // Build a serializable snapshot of exactly what was submitted
-    const orderSnapshot = {
-      timestamp: Date.now(),
-      cartId: cart?.id ?? null,
-      customer: formData,
-      shippingSelection: {
-        method: shippingMethod,
-        amount: effectiveShippingAmount,
-      },
-      paymentMethod,
-      items: cartItems.map((it) => ({
-        id: it.id,
-        title: it.title,
-        quantity: it.quantity,
-        unit_price: Number(it.unit_price || 0),
-        thumbnail: (it as any)?.thumbnail ?? (it as any)?.variant?.product?.thumbnail ?? null,
-        variant_id: (it as any)?.variant_id ?? (it as any)?.variant?.id ?? null,
-        product_id: (it as any)?.variant?.product_id ?? (it as any)?.variant?.product?.id ?? null,
-      })),
-      totals: {
-        subtotal,
-        shipping: effectiveShippingAmount,
-        taxes,
-        total,
-      },
-    };
-
-    try {
-      // Persist snapshot in sessionStorage with a short TTL
-      const payload = {
-        data: orderSnapshot,
-        // TTL: 30 minutes from now
-        expiresAt: Date.now() + 30 * 60 * 1000,
-      };
-      sessionStorage.setItem('order_checkout_snapshot', JSON.stringify(payload));
-    } catch (err) {
-      console.warn('[Checkout] Failed to persist order snapshot to sessionStorage:', err);
+    if (!cart || !cart.id || cartItems.length === 0) {
+      console.warn('[Checkout] Cannot submit without a valid cart and items');
+      return;
     }
 
-    // Process the order using real cart items (console log retained for visibility)
-    console.log('Order submitted:', orderSnapshot);
+    // Orchestrate checkout using backend (cheapest shipping, manual payment)
+    try {
+      const result = await processCheckout({
+        cartId: cart.id,
+        cartUpdate: {
+          // Email is optional in the current form; if needed, add an email field later
+          shipping_address: {
+            first_name: formData.name || 'Customer',
+            address_1: formData.address,
+            city: formData.city,
+            postal_code: formData.postalCode,
+            province: formData.state,
+            country_code: 'in',
+            phone: formData.contactNumber || undefined,
+          },
+        },
+        strategy: 'cheapest',
+        useManualPayment: true,
+      });
 
-    // Navigate immediately; DO NOT clear the cart here to avoid any flicker.
-    router.push('/order-confirmation');
+      if (result.success && result.order) {
+        try {
+          sessionStorage.setItem('order_result', JSON.stringify({
+            orderId: result.order.id,
+            displayId: result.order.display_id,
+            timestamp: Date.now(),
+          }));
+        } catch {}
+        router.push(`/order-confirmation?order_id=${encodeURIComponent(result.order.id)}`);
+        return;
+      }
+
+      // Fallback: store an error snapshot for display
+      console.warn('[Checkout] Checkout failed at step:', result.error?.step, result);
+      alert(result.error?.message || 'Checkout failed. Please try again.');
+    } catch (error: any) {
+      console.error('[Checkout] Unexpected error during checkout:', error);
+      alert(error?.message || 'Unexpected error during checkout');
+    }
   };
 
   // Loading or empty cart states - prevent proceeding with no items

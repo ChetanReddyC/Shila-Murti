@@ -5,8 +5,11 @@ import Header from '../../components/Header';
 import styles from './orderConfirmationPage.module.css';
 import cartStyles from '../cart/cartPage.module.css';
 import { useCart } from '../../contexts/CartContext';
+import { medusaApiClient } from '../../utils/medusaApiClient';
+import { useSearchParams } from 'next/navigation';
 
 export default function OrderConfirmationPage() {
+  const searchParams = useSearchParams();
   // Pull the latest cart to display what was purchased and clear it once safely on this page
   const { cart, clearCart } = useCart();
 
@@ -16,13 +19,39 @@ export default function OrderConfirmationPage() {
     expiresAt: number;
   }>(null);
 
-  // Use state to store values that will be set on the client side
-  const [orderNumber, setOrderNumber] = useState('#000000');
+  // Real order data if available
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string>('#000000');
   const [currentDate, setCurrentDate] = useState('');
   const [deliveryRange, setDeliveryRange] = useState('');
+  const [orderLoaded, setOrderLoaded] = useState(false);
+  const [orderItems, setOrderItems] = useState<any[] | null>(null);
+  const [orderTotals, setOrderTotals] = useState<{ subtotal: number; shipping: number; taxes: number; total: number } | null>(null);
+  const [orderAddress, setOrderAddress] = useState<any | null>(null)
+  const [orderShippingMethodName, setOrderShippingMethodName] = useState<string | null>(null)
   
-  // Use useEffect to run date calculations and load snapshot on the client side
+  // Use useEffect to run date calculations and load order/snapshot on the client side
   useEffect(() => {
+    const urlOrderId = searchParams.get('order_id');
+
+    // Try to read order result from session as set by checkout
+    try {
+      const rawResult = sessionStorage.getItem('order_result');
+      if (rawResult) {
+        const parsed = JSON.parse(rawResult);
+        if (parsed?.orderId) {
+          setOrderId(parsed.orderId);
+          if (typeof parsed.displayId === 'number') {
+            setOrderNumber(`#${String(parsed.displayId).padStart(6, '0')}`);
+          }
+        }
+      }
+    } catch {}
+
+    if (urlOrderId && !orderId) {
+      setOrderId(urlOrderId);
+    }
+
     // Load order snapshot from sessionStorage (if present and not expired)
     try {
       const raw = sessionStorage.getItem('order_checkout_snapshot');
@@ -55,15 +84,51 @@ export default function OrderConfirmationPage() {
     const endStr = deliveryEnd.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
     setDeliveryRange(`${startStr} - ${endStr}`);
 
-    // Clear snapshot after a short delay to avoid stale re-use on subsequent navigations
+    // Fetch order details if orderId available
+    const fetchOrder = async () => {
+      if (!orderId && !urlOrderId) {
+        setOrderLoaded(true);
+        return;
+      }
+      try {
+        const id = urlOrderId || orderId!;
+        const order = await medusaApiClient.getOrder(id);
+        // Populate display fields if available
+        if (typeof order.display_id === 'number') {
+          setOrderNumber(`#${String(order.display_id).padStart(6, '0')}`);
+        }
+        setOrderItems(order.items || null);
+        setOrderTotals({
+          subtotal: Number(order.subtotal || 0),
+          shipping: Number(order.shipping_total || 0),
+          taxes: Number(order.tax_total || 0),
+          total: Number(order.total || 0),
+        });
+        // Capture shipping address & method from order (preferred source)
+        try {
+          const shipAddr: any = (order as any)?.shipping_address || null
+          setOrderAddress(shipAddr)
+          const methodName: string | null = (order as any)?.shipping_methods?.[0]?.name || null
+          setOrderShippingMethodName(methodName)
+        } catch {}
+      } catch (err) {
+        console.warn('[OrderConfirmation] Failed to fetch order, will fall back to snapshot/cart', err);
+      } finally {
+        setOrderLoaded(true);
+      }
+    };
+
+    fetchOrder();
+
+    // Clear snapshot and lightweight result after a short delay to avoid stale re-use
     const clearSnapshotTimer = setTimeout(() => {
       try {
         sessionStorage.removeItem('order_checkout_snapshot');
+        sessionStorage.removeItem('order_result');
       } catch {}
     }, 60 * 1000); // 1 minute
 
-    // Gracefully clear the cart on the confirmation page to avoid flicker in Checkout.
-    // We defer by a tick to ensure the page has rendered its snapshot.
+    // Clear the cart after we have attempted to load order data
     const clearCartTimer = setTimeout(() => {
       Promise.resolve()
         .then(() => clearCart())
@@ -96,7 +161,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>{currentDate}</span>
               </div>
             </div>
-            {/* Order Items Table */}
+            {/* Order Items Table (prefer real order, then snapshot, then cart) */}
             <div className={`${cartStyles.itemsBox} ${styles.responsiveTable}`}>
               <table className={cartStyles.cartTable}>
                 <thead className={cartStyles.cartTableHeader}>
@@ -107,14 +172,16 @@ export default function OrderConfirmationPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(snapshot?.data?.items ?? cart?.items ?? []).map((item: any) => (
+                  {(orderItems ?? snapshot?.data?.items ?? cart?.items ?? []).map((item: any) => (
                     <tr key={item.id}>
                       <td className={cartStyles.itemCell}>
                         <span className={styles.itemName}>{item?.title ?? 'Item'}</span>
                       </td>
                       <td className={cartStyles.quantityCell}>{item.quantity}</td>
                       <td className={cartStyles.priceCell}>
-                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(Number(item.unit_price || 0))}
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
+                          Number(item.unit_price || item.subtotal || 0)
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -126,15 +193,18 @@ export default function OrderConfirmationPage() {
               <div className={styles.summaryItem}>
                 <span className={styles.label}>Name</span>
                 <span className={styles.value}>
-                  {snapshot?.data?.customer?.name
-                    ?? (cart as any)?.shipping_address?.first_name
-                    ?? '—'}
+                  {(orderAddress?.first_name || orderAddress?.last_name)
+                    ? `${orderAddress?.first_name ?? ''} ${orderAddress?.last_name ?? ''}`.trim()
+                    : (snapshot?.data?.customer?.name
+                        ?? (cart as any)?.shipping_address?.first_name
+                        ?? '—')}
                 </span>
               </div>
               <div className={styles.summaryItem}>
                 <span className={styles.label}>Contact Number</span>
                 <span className={styles.value}>
-                  {snapshot?.data?.customer?.contactNumber
+                  {orderAddress?.phone
+                    ?? snapshot?.data?.customer?.contactNumber
                     ?? (cart as any)?.shipping_address?.phone
                     ?? '—'}
                 </span>
@@ -142,15 +212,18 @@ export default function OrderConfirmationPage() {
               <div className={styles.shippingItem}>
                 <span className={styles.label}>Address</span>
                 <span className={styles.value}>
-                  {snapshot?.data?.customer
-                    ? `${snapshot.data.customer.address ?? ''}`.trim() || '—'
-                    : (cart as any)?.shipping_address?.address_1 ?? '—'}
+                  {orderAddress?.address_1
+                    ?? (snapshot?.data?.customer
+                          ? `${snapshot.data.customer.address ?? ''}`.trim() || '—'
+                          : (cart as any)?.shipping_address?.address_1)
+                    ?? '—'}
                 </span>
               </div>
               <div className={styles.summaryItem}>
                 <span className={styles.label}>City</span>
                 <span className={styles.value}>
-                  {snapshot?.data?.customer?.city
+                  {orderAddress?.city
+                    ?? snapshot?.data?.customer?.city
                     ?? (cart as any)?.shipping_address?.city
                     ?? '—'}
                 </span>
@@ -158,7 +231,8 @@ export default function OrderConfirmationPage() {
               <div className={styles.summaryItem}>
                 <span className={styles.label}>State</span>
                 <span className={styles.value}>
-                  {snapshot?.data?.customer?.state
+                  {orderAddress?.province
+                    ?? snapshot?.data?.customer?.state
                     ?? (cart as any)?.shipping_address?.province
                     ?? '—'}
                 </span>
@@ -166,7 +240,8 @@ export default function OrderConfirmationPage() {
               <div className={styles.summaryItem}>
                 <span className={styles.label}>Postal Code</span>
                 <span className={styles.value}>
-                  {snapshot?.data?.customer?.postalCode
+                  {orderAddress?.postal_code
+                    ?? snapshot?.data?.customer?.postalCode
                     ?? (cart as any)?.shipping_address?.postal_code
                     ?? '—'}
                 </span>
@@ -174,13 +249,15 @@ export default function OrderConfirmationPage() {
               <div className={styles.summaryItem}>
                 <span className={styles.label}>Shipping Method</span>
                 <span className={styles.value}>
-                  {snapshot?.data?.shippingSelection?.method
-                    ? (snapshot.data.shippingSelection.method === 'express'
-                        ? 'Express'
-                        : snapshot.data.shippingSelection.method === 'expedited'
-                          ? 'Expedited'
-                          : 'Standard')
-                    : (cart as any)?.shipping_methods?.[0]?.name ?? '—'}
+                  {orderShippingMethodName
+                    ?? (snapshot?.data?.shippingSelection?.method
+                          ? (snapshot.data.shippingSelection.method === 'express'
+                              ? 'Express'
+                              : snapshot.data.shippingSelection.method === 'expedited'
+                                ? 'Expedited'
+                                : 'Standard')
+                          : (cart as any)?.shipping_methods?.[0]?.name)
+                    ?? '—'}
                 </span>
               </div>
             </div>
@@ -190,16 +267,16 @@ export default function OrderConfirmationPage() {
                 <span className={styles.paymentLabel}>Subtotal</span>
                 <span className={styles.paymentValue}>
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
-                    Number(snapshot?.data?.totals?.subtotal ?? cart?.subtotal ?? 0)
+                    Number(orderTotals?.subtotal ?? snapshot?.data?.totals?.subtotal ?? cart?.subtotal ?? 0)
                   )}
                 </span>
               </div>
               <div className={styles.paymentItem}>
                 <span className={styles.paymentLabel}>Shipping</span>
                 <span className={styles.paymentValue}>
-                  {Number(snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0) > 0
+                  {Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0) > 0
                     ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
-                        Number(snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0)
+                        Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0)
                       )
                     : 'Free'}
                 </span>
@@ -208,7 +285,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.paymentLabel}>Taxes</span>
                 <span className={styles.paymentValue}>
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
-                    Number(snapshot?.data?.totals?.taxes ?? cart?.tax_total ?? 0)
+                    Number(orderTotals?.taxes ?? snapshot?.data?.totals?.taxes ?? cart?.tax_total ?? 0)
                   )}
                 </span>
               </div>
@@ -217,11 +294,11 @@ export default function OrderConfirmationPage() {
                 <span className={styles.paymentValue}>
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
                     Number(
-                      snapshot?.data?.totals?.total ??
+                      orderTotals?.total ?? snapshot?.data?.totals?.total ??
                       (
-                        Number(snapshot?.data?.totals?.subtotal ?? cart?.subtotal ?? 0) +
-                        Number(snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0) +
-                        Number(snapshot?.data?.totals?.taxes ?? cart?.tax_total ?? 0)
+                        Number(orderTotals?.subtotal ?? snapshot?.data?.totals?.subtotal ?? cart?.subtotal ?? 0) +
+                        Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0) +
+                        Number(orderTotals?.taxes ?? snapshot?.data?.totals?.taxes ?? cart?.tax_total ?? 0)
                       )
                     )
                   )}
