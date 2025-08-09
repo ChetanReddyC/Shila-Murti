@@ -7,6 +7,12 @@ export interface CheckoutInput {
   cartUpdate: UpdateCartPayload
   strategy?: ShippingSelectionStrategy
   useManualPayment?: boolean
+  /** Explicit shipping amount selected by the user (INR as stored in backend). If provided, we will try to match shipping options by this amount. */
+  selectedShippingAmount?: number
+  /** UI-selected key used to identify option by name when amounts differ by currency factor (e.g., paise vs rupees). */
+  selectedShippingKey?: 'standard' | 'expedited' | 'express'
+  /** Exact shipping option ids chosen by the user (supports multi-profile carts). These take precedence when present. */
+  selectedOptionIds?: string[]
 }
 
 export interface CheckoutProgressLog {
@@ -41,11 +47,40 @@ function groupOptionsByProfile(options: ShippingOption[]): Map<string, ShippingO
   return map
 }
 
+function normalizeName(value: string | undefined): string {
+  return String(value || '').toLowerCase()
+}
+
+function matchesKeyByName(option: ShippingOption, key?: 'standard' | 'expedited' | 'express'): boolean {
+  if (!key) return false
+  const name = normalizeName(option.name)
+  if (!name) return false
+  const aliases: Record<string, string[]> = {
+    standard: ['standard', 'regular', 'economy', 'free', 'ground'],
+    expedited: ['expedited', 'priority', 'fast'],
+    express: ['express', 'overnight', 'one-day', '1-2', 'same day', 'same-day'],
+  }
+  return aliases[key].some((kw) => name.includes(kw))
+}
+
+function matchesByAmount(option: ShippingOption, targetAmount?: number): boolean {
+  if (typeof targetAmount !== 'number') return false
+  const amt = Number((option as any).amount ?? 0)
+  if (amt === targetAmount) return true
+  // Handle currency factor mismatch (e.g., paise vs rupees)
+  if (amt === targetAmount * 100) return true
+  if (amt * 100 === targetAmount) return true
+  return false
+}
+
 export async function processCheckout(input: CheckoutInput, client: MedusaApiClient = medusaApiClient): Promise<CheckoutResult> {
   const logs: CheckoutProgressLog[] = []
   const { cartId, cartUpdate } = input
   const strategy: ShippingSelectionStrategy = input.strategy ?? 'cheapest'
   const useManual = input.useManualPayment ?? true
+  const targetAmount = typeof input.selectedShippingAmount === 'number' ? Number(input.selectedShippingAmount) : undefined
+  const selectedKey = input.selectedShippingKey
+  const selectedIds = new Set<string>((input.selectedOptionIds || []).filter(Boolean))
   let currentStep = 'initialize'
 
   if (!cartId) {
@@ -64,7 +99,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     const updatedCart = await client.updateCart(cartId, cartUpdate)
     logs.push({ step: 'update-cart', details: { cartId: updatedCart.id } })
 
-    // 2) Fetch shipping options and select one
+    // 2) Fetch shipping options and select one (per profile)
     currentStep = 'fetch-shipping-options'
     console.log('[CheckoutOrchestrator] Fetching shipping options', { cartId })
     const options = await client.getShippingOptionsForCart(cartId)
@@ -84,11 +119,32 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     currentStep = 'add-shipping-method'
     const added: Array<{ profile: string; optionId: string }> = []
     for (const [profileId, opts] of grouped.entries()) {
-      const cheapest = strategy === 'cheapest' ? selectCheapestOption(opts) : opts[0]
-      if (!cheapest) continue
-      console.log('[CheckoutOrchestrator] Adding shipping method', { cartId, profileId, optionId: cheapest.id })
-      await client.addShippingMethod(cartId, cheapest.id)
-      added.push({ profile: profileId, optionId: cheapest.id })
+      let chosen = null as ShippingOption | null
+
+      // Highest priority: exact id match provided by UI
+      if (!chosen && selectedIds.size > 0) {
+        chosen = opts.find((o) => selectedIds.has(o.id)) || null
+      }
+
+      // Prefer explicit match by name key
+      if (!chosen && selectedKey) {
+        chosen = opts.find((o) => matchesKeyByName(o, selectedKey)) || null
+      }
+
+      // Next: match by amount with currency factor tolerance
+      if (!chosen && typeof targetAmount === 'number') {
+        chosen = opts.find((o) => matchesByAmount(o, targetAmount)) || null
+      }
+
+      // Fallback: strategy
+      if (!chosen) {
+        chosen = strategy === 'cheapest' ? selectCheapestOption(opts) : opts[0]
+      }
+
+      if (!chosen) continue
+      console.log('[CheckoutOrchestrator] Adding shipping method', { cartId, profileId, optionId: chosen.id, amount: (chosen as any).amount })
+      await client.addShippingMethod(cartId, chosen.id)
+      added.push({ profile: profileId, optionId: chosen.id })
     }
     logs.push({ step: 'add-shipping-method', details: { added } })
 
