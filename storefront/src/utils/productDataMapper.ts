@@ -185,58 +185,88 @@ export class ProductDataMapper {
     }
 
     const totalVariants = product.variants.length;
-    let totalQuantity = 0;
+    let totalQuantity = 0; // legacy aggregate, kept for compatibility
     let availableVariants = 0;
     let hasBackorderVariants = false;
     let hasManagedInventory = false;
+    let hasUnmanagedVariants = false;
+    let totalEffectiveUnits = 0; // effective purchasable units across variants
 
     // Analyze each variant
     for (const variant of product.variants) {
-      // Handle Medusa v2 inventory structure
-      let variantQuantity = 0;
-      
-      // Check if variant has inventory_quantity (Medusa v1 style)
-      if (typeof variant.inventory_quantity === 'number') {
-        variantQuantity = variant.inventory_quantity;
-      } 
-      // Check for Medusa v2 inventory structure
-      else if (variant.inventory_items && variant.inventory_items.length > 0) {
-        const inventoryItem = variant.inventory_items[0];
-        if (inventoryItem.inventory?.location_levels && inventoryItem.inventory.location_levels.length > 0) {
-          variantQuantity = inventoryItem.inventory.location_levels[0].available_quantity || 0;
+      // Handle Medusa inventory structure (v1 and v2)
+      let variantQuantity = 0; // raw available sum (for legacy displays)
+      let variantEffectiveUnits = 0; // effective purchasable units considering required_quantity
+
+      // v1: single number at variant level (no required_quantity concept)
+      if (typeof variant.inventory_quantity === 'number' && variant.manage_inventory) {
+        variantQuantity = Math.max(0, variant.inventory_quantity);
+        variantEffectiveUnits = variantQuantity;
+      } else if (variant.inventory_items && variant.inventory_items.length > 0) {
+        // v2: compute per inventory item available units and take the min across required components
+        let minUnitsAcrossComponents: number | null = null;
+        for (const inventoryItem of variant.inventory_items) {
+          const required = Math.max(1, Number(inventoryItem.required_quantity) || 1);
+          const levels = inventoryItem.inventory?.location_levels || [];
+
+          let availableForItem = 0;
+          for (const level of levels) {
+            availableForItem += Math.max(0, level?.available_quantity || 0);
+          }
+
+          // legacy aggregate of raw quantity for visibility
+          variantQuantity += availableForItem;
+
+          const unitsForThisComponent = Math.floor(availableForItem / required);
+          if (minUnitsAcrossComponents === null) {
+            minUnitsAcrossComponents = unitsForThisComponent;
+          } else {
+            minUnitsAcrossComponents = Math.min(minUnitsAcrossComponents, unitsForThisComponent);
+          }
         }
+
+        variantEffectiveUnits = Math.max(0, minUnitsAcrossComponents ?? 0);
       }
-      
+
       totalQuantity += variantQuantity;
-      
-      if (variantQuantity > 0) {
-        availableVariants++;
-      }
-      
+      totalEffectiveUnits += variantEffectiveUnits;
+
+      // Track flags
       if (variant.allow_backorder) {
         hasBackorderVariants = true;
       }
-      
       if (variant.manage_inventory) {
         hasManagedInventory = true;
+      } else {
+        hasUnmanagedVariants = true;
+      }
+
+      // Determine if this variant is orderable
+      const variantOrderable = !variant.manage_inventory
+        ? true // unmanaged inventory => always available
+        : (variantEffectiveUnits > 0) || variant.allow_backorder;
+
+      if (variantOrderable) {
+        availableVariants++;
       }
     }
 
     // Determine overall stock status
-    const inStock = totalQuantity > 0;
-    const status = inStock 
+    const inStock = availableVariants > 0;
+    const status = totalQuantity > 0
       ? 'in_stock'
-      : hasBackorderVariants 
+      : (hasBackorderVariants || hasUnmanagedVariants)
         ? 'backorder'
         : 'out_of_stock';
 
     return {
       inStock,
-      quantity: totalQuantity,
-      allowBackorder: hasBackorderVariants,
+      // quantity reflects effective purchasable units where possible
+      quantity: totalEffectiveUnits > 0 ? totalEffectiveUnits : totalQuantity,
+      allowBackorder: hasBackorderVariants || hasUnmanagedVariants,
       managed: hasManagedInventory,
       status,
-      totalQuantity,
+      totalQuantity: totalEffectiveUnits > 0 ? totalEffectiveUnits : totalQuantity,
       availableVariants,
       totalVariants
     };

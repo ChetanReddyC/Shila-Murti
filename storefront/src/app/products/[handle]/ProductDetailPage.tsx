@@ -269,13 +269,17 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       return;
     }
 
-    // Check if product is in stock
+    // Check if product is in stock or available via backorder/unmanaged inventory
     if (!state.productData.inStock) {
-      updateState({ 
-        addToCartError: 'This product is currently out of stock.',
-        addToCartSuccess: false 
-      });
-      return;
+      // Allow proceeding if backorders are allowed or inventory is unmanaged (mapped as allowBackorder)
+      const allowBackorder = state.productData.inventory?.allowBackorder;
+      if (!allowBackorder) {
+        updateState({ 
+          addToCartError: 'This product is currently out of stock.',
+          addToCartSuccess: false 
+        });
+        return;
+      }
     }
 
     // Check if product has variants
@@ -287,7 +291,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       return;
     }
 
-    // Find the first available variant with stock
+    // Find the first available variant with stock/backorder/unmanaged
     let selectedVariant = null;
     for (const variant of state.product.variants) {
       // Check variant inventory
@@ -299,14 +303,22 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       }
       // Check Medusa v2 style inventory
       else if (variant.inventory_items && variant.inventory_items.length > 0) {
-        const inventoryItem = variant.inventory_items[0];
-        if (inventoryItem.inventory?.location_levels && inventoryItem.inventory.location_levels.length > 0) {
-          const availableQuantity = inventoryItem.inventory.location_levels[0].available_quantity || 0;
-          hasStock = availableQuantity >= state.selectedQuantity;
+        let availableQuantity = 0;
+        for (const inventoryItem of variant.inventory_items) {
+          const levels = inventoryItem.inventory?.location_levels || [];
+          for (const level of levels) {
+            availableQuantity += level?.available_quantity || 0;
+          }
         }
+        hasStock = availableQuantity >= state.selectedQuantity;
       }
       // If inventory is not managed, assume it's available
       else if (!variant.manage_inventory) {
+        hasStock = true;
+      }
+
+      // Allow selection when backorder is enabled even if no stock
+      if (!hasStock && variant.allow_backorder) {
         hasStock = true;
       }
 

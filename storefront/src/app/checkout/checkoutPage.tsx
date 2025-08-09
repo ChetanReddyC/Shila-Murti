@@ -28,8 +28,7 @@ export default function CheckoutPage() {
     contactNumber: ''
   });
 
-  // Shipping method state
-  const [shippingMethod, setShippingMethod] = useState('standard');
+  // Shipping method selection is driven by backend option ids
 
   // Payment method state
   const [paymentMethod, setPaymentMethod] = useState('creditCard');
@@ -57,13 +56,65 @@ export default function CheckoutPage() {
   const subtotal = Number(cart?.subtotal ?? 0);
   const backendShippingAmount = Number(cart?.shipping_total ?? 0);
 
-  // Client-side shipping charges (INR) mapped to selected method
-  const selectedShippingCharge =
-    shippingMethod === 'express' ? 1600 :
-    shippingMethod === 'expedited' ? 800 : 0;
+  // Shipping options and dynamic amounts sourced from backend at runtime
+  const [shippingOptions, setShippingOptions] = useState<Array<{ id: string; name: string; amount: number; estimate?: string }>>([])
+  // Derive an estimated delivery text for a shipping option
+  const getEstimate = (name: string, metadata?: Record<string, any>): string | undefined => {
+    if (metadata) {
+      const text = (metadata as any).delivery_estimate_text
+      const min = Number((metadata as any).min_days)
+      const max = Number((metadata as any).max_days)
+      if (typeof text === 'string' && text.trim()) return text.trim()
+      if (!Number.isNaN(min) && !Number.isNaN(max) && min > 0 && max >= min) {
+        return `${min}-${max} business days`
+      }
+      if (!Number.isNaN(min) && min > 0) {
+        return `${min} business days`
+      }
+    }
+    const lower = name.toLowerCase()
+    if (lower.includes('express') || lower.includes('overnight') || lower.includes('one-day') || lower.includes('1-2')) return '1-2 business days'
+    if (lower.includes('expedited') || lower.includes('priority') || lower.includes('fast')) return '2-3 business days'
+    if (lower.includes('standard') || lower.includes('economy') || lower.includes('ground') || lower.includes('regular') || lower.includes('free')) return '5-7 business days'
+    return undefined
+  }
 
-  // Choose the higher of backend shipping and the user's selected tier
-  const effectiveShippingAmount = Math.max(backendShippingAmount, selectedShippingCharge);
+  const [selectedShippingOptionId, setSelectedShippingOptionId] = useState<string | null>(null)
+
+  // Load eligible shipping options for the current cart
+  useEffect(() => {
+    const load = async () => {
+      if (!cart?.id) return
+      try {
+        const options = await (async () => {
+          // Use the medusaApiClient via dynamic import to avoid circular deps
+          const { medusaApiClient } = await import('../../utils/medusaApiClient')
+          return medusaApiClient.getShippingOptionsForCart(cart.id)
+        })()
+        const normalized = (options || []).map((o: any) => ({
+          id: o.id,
+          name: String(o.name || ''),
+          amount: Number(o.amount ?? 0),
+          estimate: getEstimate(String(o.name || ''), (o as any).metadata || (o as any).data)
+        }))
+        // Sort by amount ascending for stable order
+        normalized.sort((a, b) => Number(a.amount) - Number(b.amount))
+        setShippingOptions(normalized)
+        // Default to the first option if none selected yet
+        setSelectedShippingOptionId((prev) => prev ?? (normalized[0]?.id || null))
+      } catch (e) {
+        console.warn('[Checkout] Failed to load shipping options', e)
+      }
+    }
+    load()
+  }, [cart?.id])
+
+  // Use the backend option amount when we have a selected option; fallback to backend shipping_total
+  const selectedOptionAmount = (() => {
+    const found = shippingOptions.find((o) => o.id === selectedShippingOptionId)
+    return typeof found?.amount === 'number' ? Number(found.amount) : undefined
+  })()
+  const effectiveShippingAmount = typeof selectedOptionAmount === 'number' ? selectedOptionAmount : backendShippingAmount
 
   const shipping = effectiveShippingAmount > 0 ? formatCurrency(effectiveShippingAmount) : 'Free';
   const taxes = Number(cart?.tax_total ?? 0);
@@ -92,9 +143,9 @@ export default function CheckoutPage() {
     if (formData.postalCode) filledFields++;
     if (formData.contactNumber) filledFields++;
     
-    // Shipping method selection (1 field)
+    // Shipping option selection (1 field)
     totalFields += 1;
-    if (shippingMethod) filledFields++; // Always filled since we have a default
+    if (selectedShippingOptionId) filledFields++;
     
     // Payment method selection (1 field)
     totalFields += 1;
@@ -110,7 +161,7 @@ export default function CheckoutPage() {
     
     const progress = (filledFields / totalFields) * 100;
     setFormProgress(progress);
-  }, [formData, shippingMethod, paymentMethod, paymentDetails]);
+  }, [formData, selectedShippingOptionId, paymentMethod, paymentDetails]);
 
   // Add scroll event listener to check if progress bar should be sticky
   useEffect(() => {
@@ -148,9 +199,9 @@ export default function CheckoutPage() {
   };
 
   // Handle shipping method change
-  const handleShippingMethodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setShippingMethod(e.target.value);
-  };
+  const handleShippingOptionIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedShippingOptionId(e.target.value)
+  }
 
   // Handle payment method change
   const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,6 +234,8 @@ export default function CheckoutPage() {
         },
         strategy: 'cheapest',
         useManualPayment: true,
+        selectedShippingAmount: effectiveShippingAmount,
+        selectedOptionIds: selectedShippingOptionId ? [selectedShippingOptionId] : [],
       });
 
       if (result.success && result.order) {
@@ -374,59 +427,31 @@ export default function CheckoutPage() {
                 <h2 className={styles.sectionTitle}>Shipping Method</h2>
                 
                 <div className={styles.shippingOptions}>
-                  <div className={styles.shippingOption}>
-                    <input 
-                      type="radio" 
-                      id="standard" 
-                      name="shippingMethod" 
-                      value="standard" 
-                      checked={shippingMethod === 'standard'} 
-                      onChange={handleShippingMethodChange} 
-                      className={styles.radioInput} 
-                    />
-                    <label htmlFor="standard" className={styles.radioLabel}>
-                      <div className={styles.shippingOptionDetails}>
-                        <div className={styles.shippingOptionName}>Standard (5-7 business days)</div>
-                        <div className={styles.shippingOptionPrice}>Free</div>
-                      </div>
-                    </label>
-                  </div>
-                  
-                  <div className={styles.shippingOption}>
-                    <input 
-                      type="radio" 
-                      id="expedited" 
-                      name="shippingMethod" 
-                      value="expedited" 
-                      checked={shippingMethod === 'expedited'} 
-                      onChange={handleShippingMethodChange} 
-                      className={styles.radioInput} 
-                    />
-                    <label htmlFor="expedited" className={styles.radioLabel}>
-                      <div className={styles.shippingOptionDetails}>
-                        <div className={styles.shippingOptionName}>Expedited (2-3 business days)</div>
-                        <div className={styles.shippingOptionPrice}>₹800.00</div>
-                      </div>
-                    </label>
-                  </div>
-                  
-                  <div className={styles.shippingOption}>
-                    <input 
-                      type="radio" 
-                      id="express" 
-                      name="shippingMethod" 
-                      value="express" 
-                      checked={shippingMethod === 'express'} 
-                      onChange={handleShippingMethodChange} 
-                      className={styles.radioInput} 
-                    />
-                    <label htmlFor="express" className={styles.radioLabel}>
-                      <div className={styles.shippingOptionDetails}>
-                        <div className={styles.shippingOptionName}>Express (1-2 business days)</div>
-                        <div className={styles.shippingOptionPrice}>₹1600.00</div>
-                      </div>
-                    </label>
-                  </div>
+                  {(shippingOptions || []).map((opt) => (
+                    <div key={opt.id} className={styles.shippingOption}>
+                      <input
+                        type="radio"
+                        id={`ship_${opt.id}`}
+                        name="shippingOptionId"
+                        value={opt.id}
+                        checked={selectedShippingOptionId === opt.id}
+                        onChange={handleShippingOptionIdChange}
+                        className={styles.radioInput}
+                      />
+                      <label htmlFor={`ship_${opt.id}`} className={styles.radioLabel}>
+                        <div className={styles.shippingOptionDetails}>
+                          <div className={styles.shippingOptionName}>
+                            {opt.name || 'Shipping'}{opt.estimate ? ` (${opt.estimate})` : ''}
+                          </div>
+                          <div className={styles.shippingOptionPrice}>
+                            {opt.amount > 0 ?
+                              new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(Number(opt.amount))
+                              : 'Free'}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  ))}
                 </div>
               </div>
               

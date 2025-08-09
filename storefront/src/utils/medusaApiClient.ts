@@ -210,20 +210,51 @@ export class MedusaApiClient {
     const id = setTimeout(() => controller.abort(), this.timeout);
 
     try {
+      // Build headers and preflight allowance dynamically
+      const baseHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-publishable-api-key': this.publishableApiKey,
+      };
+
+      // Normalize provided headers
+      const provided: Record<string, string> = {};
+      const inputHeaders = options.headers as HeadersInit | undefined;
+      if (inputHeaders) {
+        if (Array.isArray(inputHeaders)) {
+          for (const [k, v] of inputHeaders) provided[k] = String(v);
+        } else if (typeof (inputHeaders as any).forEach === 'function') {
+          (inputHeaders as any).forEach((value: string, key: string) => {
+            provided[key] = value;
+          });
+        } else {
+          Object.assign(provided, inputHeaders as Record<string, string>);
+        }
+      }
+
+      // Compose Access-Control-Request-Headers to include custom headers such as Idempotency-Key
+      const requestedHeaders = new Set<string>(
+        (provided['Access-Control-Request-Headers'] || 'content-type,accept,x-publishable-api-key')
+          .split(',')
+          .map((h) => h.trim().toLowerCase())
+          .filter(Boolean)
+      );
+      if (provided['Idempotency-Key'] || provided['idempotency-key']) {
+        requestedHeaders.add('idempotency-key');
+      }
+
+      const finalHeaders: Record<string, string> = {
+        ...baseHeaders,
+        'Access-Control-Request-Headers': Array.from(requestedHeaders).join(','),
+        ...provided,
+      };
+
       const response = await fetch(resource, {
         ...options,
         signal: controller.signal,
         mode: 'cors',
         credentials: 'omit',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-publishable-api-key': this.publishableApiKey,
-          // Explicitly advertise requested headers for preflight clarity
-          // Some proxies/frameworks behave better when this header is present
-          'Access-Control-Request-Headers': 'content-type,accept,x-publishable-api-key',
-          ...options.headers,
-        },
+        headers: finalHeaders,
       });
 
       clearTimeout(id);
@@ -327,6 +358,8 @@ export class MedusaApiClient {
     const requestKey = this.generateRequestKey(endpoint, options);
     const method = options.method || 'GET';
     const startTime = performance.now();
+    // Generate a unique idempotency key for this request attempt (stable across retries in this call)
+    const idempotencyKey = method.toUpperCase() !== 'GET' ? `${requestKey}:${startTime}` : undefined;
     let retryCount = 0;
     
     // Check if there's already a pending request for this endpoint
@@ -360,7 +393,27 @@ export class MedusaApiClient {
           retryCount = attempt;
           
           try {
-            const response = await this.fetchWithTimeout(url, options);
+            // Ensure idempotency for non-GET requests to prevent duplicate effects on retries
+            let normalizedHeaders: Record<string, string> = {};
+            const original = options.headers as HeadersInit | undefined;
+            if (original) {
+              if (Array.isArray(original)) {
+                for (const [k, v] of original) {
+                  normalizedHeaders[k] = String(v);
+                }
+              } else if (typeof (original as any).forEach === 'function' && typeof (original as any).keys === 'function') {
+                (original as any).forEach((value: string, key: string) => {
+                  normalizedHeaders[key] = value;
+                });
+              } else {
+                normalizedHeaders = { ...(original as Record<string, string>) };
+              }
+            }
+            if (idempotencyKey && !normalizedHeaders['Idempotency-Key']) {
+              normalizedHeaders['Idempotency-Key'] = idempotencyKey;
+            }
+
+            const response = await this.fetchWithTimeout(url, { ...options, headers: normalizedHeaders });
 
             if (!response.ok) {
               const errorText = await response.text().catch(() => '');
