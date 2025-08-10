@@ -25,7 +25,7 @@ export const fragmentShaderSource = `
     return mix(
       mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
       mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-    u.y);
+      u.y);
   }
   float fbm(vec2 p) {
     float v = 0.0;

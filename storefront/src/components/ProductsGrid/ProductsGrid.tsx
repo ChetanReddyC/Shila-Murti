@@ -1,10 +1,11 @@
-import React, { memo } from 'react';
+import React, { memo, useRef } from 'react';
 import ProductCardWithShader from '../ProductCardWithShader/ProductCardWithShader';
 import ProductCardSkeleton from '../ProductCardSkeleton';
 import { ErrorState, EmptyState } from '../ErrorStates';
 import { ProductCardData } from '../../utils/productDataMapper';
 import { ProductsServiceError } from '../../services/productsService';
 import styles from './ProductsGrid.module.css';
+import HoverEffectOverlay, { HoverOverlayAPI } from '../HoverEffectOverlay';
 
 interface ProductsGridProps {
   products: ProductCardData[];
@@ -95,13 +96,15 @@ const ProductsGrid: React.FC<ProductsGridProps> = memo(({
   }
 
   // Success state - show products
+  const overlayRef = useRef<HoverOverlayAPI | null>(null);
   return (
     <div className={styles.productsGrid}>
       {products.map((product, index) => (
         <div key={product.title || `product-${index}`} className={styles.productCardWrapper}>
-          <ProductCardWithShader product={product} />
+          <ProductCardWithShader product={product} overlayRef={overlayRef} />
         </div>
       ))}
+      <HoverEffectOverlay ref={overlayRef} debug={process.env.NODE_ENV !== 'production'} />
     </div>
   );
 }, arePropsEqual);

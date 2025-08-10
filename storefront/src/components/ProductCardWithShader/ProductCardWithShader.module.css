@@ -74,7 +74,7 @@
   border-radius: 8px;
   overflow: hidden;
   background-color: #fff;
-  z-index: 1;
+  z-index: 1; /* background layer */
   box-sizing: border-box;
   /* Ensure border is included in the width/height calculation */
 }
@@ -100,7 +100,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 20;
+  z-index: 1000; /* ensure above overlayed canvas */
   /* Increased from 10 to 20 to stay above all shader effects */
   pointer-events: none;
   /* Allow clicks to pass through to the card */
@@ -116,13 +116,13 @@
   object-position: center;
   transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   transform-origin: center center;
-  z-index: 20;
+  z-index: 1000; /* ensure above overlayed canvas */
   /* Increased from 10 to 20 to stay above all shader effects */
 }
 
 .foregroundImageHovered {
   transform: translateY(-35px) scale(1.15);
-  z-index: 100;
+  z-index: 1100;
   /* Extremely high z-index to ensure it appears above all other elements */
 }
 
@@ -134,7 +134,7 @@
   height: 100%;
   overflow: hidden;
   /* Changed from visible to hidden to prevent overflow */
-  z-index: 5;
+  z-index: 50; /* shader layer below foreground */
   /* Position between card content and foreground image */
   border-radius: 8px;
   /* Match the card's border radius */

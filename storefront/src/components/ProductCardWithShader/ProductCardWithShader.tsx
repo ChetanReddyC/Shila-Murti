@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, memo, useEffect } from 'react';
 import Link from 'next/link';
-import ShaderCanvas from '../ShaderCanvas/ShaderCanvas';
-import EdgeGradientShaderCanvas from '../EdgeGradientShaderCanvas';
+import type { HoverOverlayAPI } from '../HoverEffectOverlay';
 import OptimizedImage from '../OptimizedImage';
 import { performanceMonitor } from '../../utils/performanceMonitor';
 import { CurrencyFormatter } from '../../utils/currencyFormatter';
@@ -23,6 +22,7 @@ interface ProductCardWithShaderProps {
     dimensions?: string;
     inStock?: boolean;
   };
+  overlayRef?: React.RefObject<HoverOverlayAPI | null>;
 }
 
 // Custom comparison function for React.memo
@@ -50,7 +50,7 @@ const arePropsEqual = (
   );
 };
 
-const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ product }) => {
+const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ product, overlayRef }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isHoveringImageSection, setIsHoveringImageSection] = useState(false);
 
@@ -151,27 +151,34 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
       const rotX = normY * maxRotation;
 
       imageSectionRef.current!.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+      overlayRef?.current?.updatePointer?.(e.clientX, e.clientY);
     });
-  }, [isHoveringImageSection]);
+  }, [isHoveringImageSection, overlayRef]);
 
   const handleContainerMouseLeave = useCallback(() => {
     resetTilt();
     setIsHovering(false);
     setIsHoveringImageSection(false);
-  }, [resetTilt]);
+    overlayRef?.current?.endHover?.();
+  }, [resetTilt, overlayRef]);
 
   const handleContainerMouseEnter = useCallback(() => {
     setIsHovering(true);
+    // Overlay is activated on image section enter to limit effect to the image only
   }, []);
 
   const handleImageSectionMouseEnter = useCallback(() => {
     setIsHoveringImageSection(true);
-  }, []);
+    if (imageSectionRef.current) {
+      overlayRef?.current?.beginHover?.(imageSectionRef.current);
+    }
+  }, [overlayRef]);
 
   const handleImageSectionMouseLeave = useCallback(() => {
     setIsHoveringImageSection(false);
     resetTilt();
-  }, [resetTilt]);
+    overlayRef?.current?.endHover?.();
+  }, [resetTilt, overlayRef]);
 
   return (
     <Link href={`/products/${productHandle}`} className={styles.cardLink}>
@@ -217,10 +224,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
             </div>
           </div>
 
-          <div className={styles.effectsWrapper}>
-            <ShaderCanvas isHovering={isHovering} />
-            <EdgeGradientShaderCanvas isHovering={isHovering} />
-          </div>
+          {/* Effects are rendered by shared overlay; per-card canvases removed */}
         </div>
 
         {/* Product details section - no 3D rotation effect */}

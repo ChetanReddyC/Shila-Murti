@@ -32,11 +32,13 @@ export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, v
     const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
 
     if (!vertexShader || !fragmentShader) {
+      console.warn('Shader compilation failed, disabling shader effects');
       return;
     }
 
     const program = createProgram(gl, vertexShader, fragmentShader);
     if (!program) {
+      console.warn('Shader program linking failed, disabling shader effects');
       return;
     }
     programRef.current = program;
