@@ -164,8 +164,13 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
 
   const handleContainerMouseEnter = useCallback(() => {
     setIsHovering(true);
-    // Overlay is activated on image section enter to limit effect to the image only
-  }, []);
+    // Activate overlay for the whole card, but position it over the image section
+    if (imageSectionRef.current) {
+      overlayRef?.current?.beginHover?.(imageSectionRef.current);
+    } else if (containerRef.current) {
+      overlayRef?.current?.beginHover?.(containerRef.current);
+    }
+  }, [overlayRef]);
 
   const handleImageSectionMouseEnter = useCallback(() => {
     setIsHoveringImageSection(true);
@@ -177,8 +182,8 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
   const handleImageSectionMouseLeave = useCallback(() => {
     setIsHoveringImageSection(false);
     resetTilt();
-    overlayRef?.current?.endHover?.();
-  }, [resetTilt, overlayRef]);
+    // Do not end overlay here; keep it visible while hovering the details section
+  }, [resetTilt]);
 
   return (
     <Link href={`/products/${productHandle}`} className={styles.cardLink}>
@@ -228,8 +233,16 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
           {/* Effects are rendered by shared overlay; per-card canvases removed */}
         </div>
 
-        {/* Product details section - no 3D rotation effect */}
-        <div className={styles.productDetails}>
+        {/* Product details section - keep overlay active on hover to show shader */}
+        <div
+          className={styles.productDetails}
+          onMouseEnter={() => {
+            if (imageSectionRef.current) {
+              overlayRef?.current?.beginHover?.(imageSectionRef.current);
+            }
+          }}
+          onMouseMove={(e) => overlayRef?.current?.updatePointer?.(e.clientX, e.clientY)}
+        >
           <h3 className={styles.productTitle}>{product.title}</h3>
           {product.subtitle && (
             <p className={styles.productSubtitle}>{product.subtitle}</p>
