@@ -218,6 +218,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
                 alt={product.title}
                 fallbackSrc="/images/placeholder-product.svg"
                 className={`${styles.foregroundImage} ${isHovering ? styles.foregroundImageHovered : ''}`}
+                containerClassName={styles.foregroundContainer}
                 priority={false}
                 showRetryButton={false}
               />
