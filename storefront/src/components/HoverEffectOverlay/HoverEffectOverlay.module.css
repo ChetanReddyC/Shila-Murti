@@ -1,0 +1,17 @@
+.overlayRoot {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999; /* above cards but below global UI if needed */
+}
+
+.overlayCanvas {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  background: transparent;
+  will-change: transform, width, height, opacity, top, left;
+  z-index: 50; /* between background (z ~1) and foreground (>=1000) */
+}
+
+

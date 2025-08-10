@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import styles from './ShaderCanvas.module.css';
 import { useShaderEffect } from '../../hooks/useShaderEffect';
 import { vertexShaderSource, fragmentShaderSource } from '../../utils/shaderSources';
@@ -9,11 +9,24 @@ interface ShaderCanvasProps {
 
 const ShaderCanvas: React.FC<ShaderCanvasProps> = ({ isHovering }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { setHover } = useShaderEffect(canvasRef, vertexShaderSource, fragmentShaderSource);
+  const [shaderError, setShaderError] = useState(false);
+  
+  // Wrap the shader effect with error handling
+  let shaderHook;
+  try {
+    shaderHook = useShaderEffect(canvasRef, vertexShaderSource, fragmentShaderSource);
+  } catch (error) {
+    console.error('Shader initialization failed:', error);
+    setShaderError(true);
+  }
+
+  const { setHover } = shaderHook || { setHover: () => {} };
 
   useEffect(() => {
-    setHover(isHovering);
-  }, [isHovering, setHover]);
+    if (!shaderError) {
+      setHover(isHovering);
+    }
+  }, [isHovering, setHover, shaderError]);
 
   // Handle manual resizing
   useEffect(() => {
@@ -56,6 +69,11 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({ isHovering }) => {
       }
     };
   }, []);
+
+  // If shader failed to initialize, return a hidden canvas to avoid layout issues
+  if (shaderError) {
+    return <canvas ref={canvasRef} className={styles.shaderCanvas} style={{ backgroundColor: 'transparent', display: 'none' }} />;
+  }
 
   return <canvas ref={canvasRef} className={styles.shaderCanvas} style={{ backgroundColor: 'transparent' }} />;
 };

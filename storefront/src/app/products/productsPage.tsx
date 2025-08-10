@@ -87,6 +87,12 @@ export default function ProductsPage() {
     if (typeof window !== 'undefined') {
       (window as any).debugMedusaApi = debugMedusaApiResponse;
       console.log('🔧 Debug function available: window.debugMedusaApi()');
+      
+      // Also make shader test available
+      import('../../utils/testShaderCompilation').then(({ testShaderCompilation }) => {
+        (window as any).testShaderCompilation = testShaderCompilation;
+        console.log('🔧 Shader test function available: window.testShaderCompilation()');
+      });
     }
     
     return () => {

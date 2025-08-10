@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import styles from './EdgeGradientShaderCanvas.module.css';
 import { useShaderEffect } from '../../hooks/useShaderEffect';
 import { edgeGradientVertexShaderSource, edgeGradientFragmentShaderSource } from '../../utils/edgeGradientShaderSources';
@@ -10,16 +10,29 @@ interface EdgeGradientShaderCanvasProps {
 const EdgeGradientShaderCanvas: React.FC<EdgeGradientShaderCanvasProps> = ({ isHovering }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { setHover } = useShaderEffect(
-    canvasRef, 
-    edgeGradientVertexShaderSource, 
-    edgeGradientFragmentShaderSource
-  );
+  const [shaderError, setShaderError] = useState(false);
+  
+  // Wrap the shader effect with error handling
+  let shaderHook;
+  try {
+    shaderHook = useShaderEffect(
+      canvasRef, 
+      edgeGradientVertexShaderSource, 
+      edgeGradientFragmentShaderSource
+    );
+  } catch (error) {
+    console.error('Edge gradient shader initialization failed:', error);
+    setShaderError(true);
+  }
+
+  const { setHover } = shaderHook || { setHover: () => {} };
 
   // Handle hover state changes
   useEffect(() => {
-    setHover(isHovering);
-  }, [isHovering, setHover]);
+    if (!shaderError) {
+      setHover(isHovering);
+    }
+  }, [isHovering, setHover, shaderError]);
 
   // Handle manual resizing
   useEffect(() => {
@@ -87,6 +100,23 @@ const EdgeGradientShaderCanvas: React.FC<EdgeGradientShaderCanvasProps> = ({ isH
     // Prevent default to avoid scrolling while interacting with the card
     e.preventDefault();
   };
+
+  // If shader failed to initialize, return a hidden canvas to avoid layout issues
+  if (shaderError) {
+    return (
+      <div 
+        ref={containerRef}
+        className={styles.canvasContainer}
+        style={{ display: 'none' }}
+      >
+        <canvas 
+          ref={canvasRef} 
+          className={styles.edgeGradientCanvas} 
+          style={{ backgroundColor: 'transparent' }} 
+        />
+      </div>
+    );
+  }
 
   return (
     <div 

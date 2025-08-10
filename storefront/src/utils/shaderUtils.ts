@@ -8,7 +8,10 @@ export function createShader(gl: WebGLRenderingContext, type: number, source: st
   gl.compileShader(shader);
 
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+    const shaderType = type === gl.VERTEX_SHADER ? 'vertex' : 'fragment';
+    const errorLog = gl.getShaderInfoLog(shader);
+    console.error(`An error occurred compiling the ${shaderType} shader:`, errorLog);
+    console.error('Shader source:', source);
     gl.deleteShader(shader);
     return null;
   }
