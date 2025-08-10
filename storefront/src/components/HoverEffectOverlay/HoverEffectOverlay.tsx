@@ -99,7 +99,13 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
           if (computed.position === 'static') {
             (cardElement as HTMLElement).style.position = 'relative';
           }
-          cardElement.appendChild(canvas);
+          // Insert canvas before the foreground wrapper if present, so it remains below the foreground
+          const fgWrapper = cardElement.parentElement?.querySelector?.('.foregroundWrapper') as HTMLElement | null;
+          if (fgWrapper && fgWrapper.parentElement === cardElement.parentElement) {
+            cardElement.appendChild(canvas);
+          } else {
+            cardElement.appendChild(canvas);
+          }
           // Reset style for in-card hosting
           canvas.style.left = '0px';
           canvas.style.top = '0px';
