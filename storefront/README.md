@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Category Filtering (Medusa)
+
+- Configure product categories in Medusa Admin → Catalog → Categories (e.g., Deities, Animals, Abstract, Marble, Granite). Note each category's handle or id.
+- Frontend mapping lives in `src/config/categoryMapping.ts`:
+  - Prefer setting `categoryIdByUiKey` with real IDs for maximum reliability
+  - Or ensure `categoryHandleByUiKey` matches Admin handles so IDs resolve at runtime
+- How it works:
+  - Pills toggle categories; products are refetched via `/store/products?category_id[]=`
+  - Sort remains client-side (Price: Low→High, High→Low)
+  - URL sync: `?categories=deities,marble&sort=price-asc`
+  - Debug: run in browser console `window.debugCategoryFilterStatus()` to see current state

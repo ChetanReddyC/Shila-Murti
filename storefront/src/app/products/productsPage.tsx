@@ -9,6 +9,9 @@ import { ProductCardData } from '../../utils/productDataMapper';
 import { useRetry } from '../../hooks/useRetry';
 import { debugMedusaApiResponse } from '../../utils/debugApiResponse';
 import styles from './productsPage.module.css';
+import { UiCategoryKey, resolveCategoryIdsByUiKeys } from '../../config/categoryMapping';
+import { shouldShowMissingCategoryNotice } from '../../config/categoryUtils';
+import { medusaApiClient } from '../../utils/medusaApiClient';
 
 // Memoized state interface to prevent unnecessary re-renders
 interface ProductsState {
@@ -16,6 +19,8 @@ interface ProductsState {
   loading: boolean;
   error: ProductsServiceError | null;
 }
+
+type SortOption = 'price-asc' | 'price-desc';
 
 export default function ProductsPage() {
   // Use a single state object to minimize state updates
@@ -81,12 +86,39 @@ export default function ProductsPage() {
   // Effect to fetch products on component mount and cleanup
   useEffect(() => {
     isMountedRef.current = true;
+
+    // Parse URL for initial sort and categories
+    let shouldFetchAll = true;
+    try {
+      const url = new URL(window.location.href);
+      const sort = url.searchParams.get('sort');
+      if (sort === 'price-asc' || sort === 'price-desc') {
+        setSortOption(sort);
+      }
+
+      const categoriesParam = url.searchParams.get('categories');
+      if (categoriesParam) {
+        const keys = categoriesParam
+          .split(',')
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => ['deities', 'animals', 'abstract', 'marble', 'granite'].includes(s)) as UiCategoryKey[];
+        if (keys.length > 0) {
+          setSelectedCategories(new Set(keys));
+          shouldFetchAll = false; // category effect will handle fetching
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    if (shouldFetchAll) {
     fetchProducts();
+    }
     
     // Make debug function available in browser console
     if (typeof window !== 'undefined') {
       (window as any).debugMedusaApi = debugMedusaApiResponse;
-      console.log('🔧 Debug function available: window.debugMedusaApi()');
+      console.log('🔧 Debug functions: window.debugMedusaApi(), window.debugCategoryFilterStatus()');
       
       // Also make shader test available
       import('../../utils/testShaderCompilation').then(({ testShaderCompilation }) => {
@@ -99,6 +131,8 @@ export default function ProductsPage() {
       isMountedRef.current = false;
     };
   }, [fetchProducts]);
+
+  // (moved below category state to satisfy linter)
 
   // Retry handler using the retry hook
   const handleRetry = useCallback(async () => {
@@ -123,22 +157,234 @@ export default function ProductsPage() {
   // Memoize computed values to prevent unnecessary re-renders
   const isLoading = useMemo(() => state.loading || isRetrying, [state.loading, isRetrying]);
   
+  // Sort state and derived sorted products
+  const [sortOpen, setSortOpen] = useState<boolean>(false);
+  const [sortOption, setSortOption] = useState<SortOption>('price-asc');
+  const sortMenuRef = useRef<HTMLDivElement | null>(null);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
+  const [highlightStyle, setHighlightStyle] = useState<{ transform: string; height: number; opacity: number }>({ transform: 'translateY(0px)', height: 0, opacity: 0 });
+  const [moreOpen, setMoreOpen] = useState<boolean>(false);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const defaultCategoryKeys: UiCategoryKey[] = ['deities', 'animals', 'abstract', 'marble', 'granite'];
+  const toLabel = (handle: string) => handle.length ? handle.charAt(0).toUpperCase() + handle.slice(1) : handle;
+  type CategoryItem = { id: string; handle: string; name?: string | null };
+  const [allCategories, setAllCategories] = useState<CategoryItem[]>([]);
+  const [visibleSuggestions, setVisibleSuggestions] = useState<UiCategoryKey[]>(defaultCategoryKeys);
+
+  // Load categories from Medusa Admin (Store API) so new categories appear automatically
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await medusaApiClient.getProductCategories({ limit: 200 });
+        const list: CategoryItem[] = (res.product_categories || []).map((c: any) => ({
+          id: c.id,
+          handle: c.handle || '',
+          name: c.name || '',
+        }));
+        if (!cancelled) setAllCategories(list);
+      } catch (e) {
+        console.warn('[ProductsPage] Failed to fetch categories list', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Category selection state (task 2)
+  const [selectedCategories, setSelectedCategories] = useState<Set<UiCategoryKey>>(new Set());
+  const [pendingFetch, setPendingFetch] = useState<boolean>(false);
+  const debounceRef = useRef<number | null>(null);
+  const fetchVersionRef = useRef<number>(0);
+  const [lastCategoryFetchMs, setLastCategoryFetchMs] = useState<number | null>(null);
+  const [lastResolvedCategoryIds, setLastResolvedCategoryIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
+        // Defer closing slightly to allow any ongoing highlight animation to finish
+        requestAnimationFrame(() => setTimeout(() => setSortOpen(false), 50));
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setMoreOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Animate moving highlight to the selected option
+  useEffect(() => {
+    if (!sortOpen) {
+      setHighlightStyle(prev => ({ ...prev, opacity: 0 }));
+      return;
+    }
+    const menu = sortMenuRef.current;
+    if (!menu) return;
+    // Match DOM order of options
+    const optionKeys: SortOption[] = ['price-asc', 'price-desc'];
+    const index = optionKeys.indexOf(sortOption);
+    const rows = menu.querySelectorAll(':scope > li');
+    const target = rows[index] as HTMLElement | undefined;
+    if (!target) return;
+
+    // Use offsetTop/offsetHeight relative to the UL (which is positioned),
+    // avoiding transform measurement issues and padding math.
+    const offsetY = target.offsetTop;
+    const height = target.offsetHeight;
+
+    setHighlightStyle({ transform: `translateY(${offsetY}px)`, height, opacity: 1 });
+  }, [sortOpen, sortOption]);
+
+  // Debounced fetch when selected categories change
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+    }
+    // Debounce ~200ms
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        setPendingFetch(true);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[ProductsPage] Selected categories:', Array.from(selectedCategories.values()));
+        }
+        const t0 = performance.now();
+        const version = ++fetchVersionRef.current;
+        const ids = await resolveCategoryIdsByUiKeys(selectedCategories, medusaApiClient);
+        setLastResolvedCategoryIds(ids);
+        // If no categories selected, fetch all as before
+        if (ids.length === 0) {
+          await fetchProducts();
+        } else {
+          updateState({ loading: true, error: null });
+          const fetchedProducts = await productsService.fetchProducts({ category_id: ids });
+          // Only apply if this is the latest fetch to avoid race conditions
+          if (isMountedRef.current && version === fetchVersionRef.current) {
+            updateState({ products: fetchedProducts, loading: false });
+          }
+        }
+        if (process.env.NODE_ENV !== 'production') {
+          const t1 = performance.now();
+          const took = Math.round(t1 - t0);
+          setLastCategoryFetchMs(took);
+          console.log('[ProductsPage] Category fetch completed in', took, 'ms');
+        }
+      } catch (err) {
+        if (isMountedRef.current) {
+          const serviceError = err as ProductsServiceError;
+          updateState({ error: serviceError, loading: false });
+          console.error('Failed to fetch products by categories:', serviceError);
+        }
+      } finally {
+        setPendingFetch(false);
+      }
+    }, 200);
+
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [selectedCategories, fetchProducts, updateState]);
+
+  const toggleCategory = useCallback((key: UiCategoryKey) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Keep debugCategoryFilterStatus in sync with state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).debugCategoryFilterStatus = () => ({
+        selectedCategories: Array.from(selectedCategories.values()),
+        loading: pendingFetch,
+        lastCategoryFetchMs,
+      });
+    }
+  }, [selectedCategories, pendingFetch, lastCategoryFetchMs]);
+
+  const clearCategories = useCallback(() => {
+    setSelectedCategories(new Set());
+  }, []);
+
+  const removeSuggestion = useCallback((key: UiCategoryKey) => {
+    setVisibleSuggestions(prev => prev.filter(k => String(k) !== String(key)));
+    setSelectedCategories(prev => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const sortLabel = useMemo(() => {
+    switch (sortOption) {
+      case 'price-asc':
+        return 'Price: Low to High';
+      case 'price-desc':
+        return 'Price: High to Low';
+      default:
+        return 'Price';
+    }
+  }, [sortOption]);
+
+  // Optional URL sync for categories and sort
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      // sort
+      url.searchParams.set('sort', sortOption);
+      // categories by handle (use label keys)
+      const handles = Array.from(selectedCategories.values());
+      if (handles.length > 0) url.searchParams.set('categories', handles.join(','));
+      else url.searchParams.delete('categories');
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // ignore URL errors in non-browser environments
+    }
+  }, [selectedCategories, sortOption]);
+
+  const sortedProducts = useMemo(() => {
+    const annotated = state.products.map((product, index) => ({ product, index }));
+
+    annotated.sort((a, b) => {
+      const aVal = a.product.price == null ? (sortOption === 'price-desc' ? -Infinity : Infinity) : a.product.price;
+      const bVal = b.product.price == null ? (sortOption === 'price-desc' ? -Infinity : Infinity) : b.product.price;
+      const primary = sortOption === 'price-asc' ? aVal - bVal : bVal - aVal;
+      if (primary !== 0) return primary;
+      // Stable tiebreaker
+      return a.index - b.index;
+    });
+
+    return annotated.map(x => x.product);
+  }, [state.products, sortOption]);
+  
   // Memoize grid props to prevent unnecessary re-renders of ProductsGrid
   const gridProps = useMemo(() => ({
-    products: state.products,
+    products: sortedProducts,
     loading: isLoading,
     error: state.error,
     onRetry: handleRetry,
     retryCount,
     maxRetries: 3,
     skeletonCount: 6
-  }), [state.products, isLoading, state.error, handleRetry, retryCount]);
+  }), [sortedProducts, isLoading, state.error, handleRetry, retryCount]);
 
   return (
     <div
       className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
       style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
     >
+      {/* Live region for screen readers to announce product count changes */}
+      <div aria-live="polite" className={styles.srOnly}>
+        {sortedProducts.length} products loaded
+      </div>
       <div className="layout-container flex h-full grow flex-col">
         {/* Using the Header component */}
         <Header />
@@ -146,40 +392,141 @@ export default function ProductsPage() {
         <div className="px-40 flex flex-1 justify-center py-5">
           <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
             <p className="py-8 text-[#141414] tracking-light text-[32px] font-bold leading-tight">Stone Idols</p>
-            <div className="flex flex-col gap-6">
-              <div className="flex gap-3 flex-wrap">
-                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
-                  <span className={styles.pillFilterLabel}>Deities</span>
-                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
-                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+            <div className="flex flex-col gap-6 items-start">
+              <div className={styles.pillContainer}>
+              <div className={styles.pillGrid}>
+                {visibleSuggestions
+                  .filter((key) => allCategories.length === 0 || allCategories.some(c => (c.handle || '').toLowerCase() === String(key)))
+                  .slice(0, 3)
+                  .map((key) => {
+                    const cat = allCategories.find(c => (c.handle || '').toLowerCase() === String(key));
+                    const label = cat?.name || toLabel(String(key));
+                    return (
+                  <button
+                    key={String(key)}
+                    type="button"
+                    onClick={() => toggleCategory(key)}
+                    className={styles.pillFilterButton}
+                    aria-pressed={selectedCategories.has(key)}
+                    aria-label={`Toggle ${label} category`}
+                  >
+                    <span className={styles.pillFilterLabel}>{label}</span>
+                    <svg
+                      className={styles.pillClose}
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 256 256"
+                      aria-hidden="true"
+                      onClick={(e) => { e.stopPropagation(); removeSuggestion(key); }}
+                    >
+                      <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
                   </svg>
                 </button>
-                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
-                  <span className={styles.pillFilterLabel}>Animals</span>
-                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
-                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                  </svg>
-                </button>
-                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
-                  <span className={styles.pillFilterLabel}>Abstract</span>
-                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
-                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                  </svg>
+                );})}
+                <button
+                  type="button"
+                  onClick={clearCategories}
+                  className={`${styles.pillFilterButton} ${styles.pillClearButton}`}
+                  aria-label="Clear category filters"
+                >
+                  <span className={styles.pillFilterLabel}>Clear</span>
                 </button>
               </div>
-              <div className="flex gap-3 flex-wrap">
-                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
-                  <span className={styles.pillFilterLabel}>Marble</span>
+              <div className={styles.pillGrid}>
+                {visibleSuggestions
+                  .filter((key) => allCategories.length === 0 || allCategories.some(c => (c.handle || '').toLowerCase() === String(key)))
+                  .slice(3)
+                  .map((key) => {
+                    const cat = allCategories.find(c => (c.handle || '').toLowerCase() === String(key));
+                    const label = cat?.name || toLabel(String(key));
+                    return (
+                  <button
+                    key={String(key)}
+                    type="button"
+                    onClick={() => toggleCategory(key)}
+                    className={styles.pillFilterButton}
+                    aria-pressed={selectedCategories.has(key)}
+                    aria-label={`Toggle ${label} category`}
+                  >
+                    <span className={styles.pillFilterLabel}>{label}</span>
+                    <svg
+                      className={styles.pillClose}
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 256 256"
+                      aria-hidden="true"
+                      onClick={(e) => { e.stopPropagation(); removeSuggestion(key); }}
+                    >
+                      <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
+                  </svg>
+                </button>
+                );})}
+                {/* Extra selected categories appear inline after default row 2 */}
+                {Array.from(selectedCategories)
+                  .filter((key) => !defaultCategoryKeys.includes(key as UiCategoryKey))
+                  .map((key) => (
+                    <button
+                      key={String(key)}
+                      type="button"
+                      onClick={() => toggleCategory(key)}
+                      className={styles.pillFilterButton}
+                      aria-pressed={selectedCategories.has(key)}
+                      aria-label={`Toggle ${String(key)} category`}
+                    >
+                      <span className={styles.pillFilterLabel}>{toLabel(String(key))}</span>
+                      {selectedCategories.has(key) ? (
+                        <svg className={styles.pillClose} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256" aria-hidden="true">
+                          <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
+                  </svg>
+                      ) : null}
+                </button>
+                  ))}
+                {/* More button */}
+                <div className={styles.moreMenuWrapper} ref={moreMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setMoreOpen(o => !o)}
+                    className={styles.pillFilterButton}
+                    aria-expanded={moreOpen}
+                    aria-haspopup="listbox"
+                  >
+                    <span className={styles.pillFilterLabel}>More</span>
                   <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
                     <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
                   </svg>
                 </button>
-                <button className={styles.pillFilterButton} aria-haspopup="listbox" aria-expanded="false">
-                  <span className={styles.pillFilterLabel}>Granite</span>
-                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
-                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+                  {moreOpen && (
+                    <ul className={styles.moreMenu} role="listbox">
+                      {allCategories
+                        .filter((c) => !defaultCategoryKeys.includes(c.handle as UiCategoryKey))
+                        .filter((c) => !selectedCategories.has(c.handle))
+                        .map((c) => (
+                        <li key={c.id} role="option" aria-selected={selectedCategories.has(c.handle)}>
+                          <button
+                            type="button"
+                            className={styles.moreMenuItem}
+                            onClick={() => toggleCategory(c.handle)}
+                          >
+                            <span className={styles.pillFilterLabel}>{c.name || toLabel(c.handle)}</span>
+                            {selectedCategories.has(c.handle) ? (
+                              <svg className={styles.pillClose} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256" aria-hidden="true">
+                                <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
                   </svg>
+                            ) : null}
                 </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </div>
+              </div>
+              {shouldShowMissingCategoryNotice(selectedCategories, lastResolvedCategoryIds) && (
+                <div className={styles.noticeBox} role="status">
+                  Some filters selected but no matching categories were resolved. Please ensure category handles/IDs are configured in Admin and mapping is correct.
+                </div>
+              )}
               </div>
             </div>
             <div className="@container">
@@ -205,14 +552,55 @@ export default function ProductsPage() {
               </div>
             </div>
             <div className="flex gap-3 p-3 flex-wrap pr-4">
-              <button className="flex h-8 w-35 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#f2f2f2] pl-4 pr-2">
-                <p className="text-[#141414] text-sm font-medium leading-normal">Sort by: Price</p>
-                <div className="text-[#141414]" data-icon="CaretDown" data-size="20px" data-weight="regular">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+              <div className={styles.sortWrapper} ref={sortMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setSortOpen(o => !o)}
+                  aria-haspopup="listbox"
+                  aria-expanded={sortOpen}
+                  aria-controls="sort-menu"
+                  className={`${styles.pillFilterButton} ${styles.sortButton}`}
+                >
+                  <p className="text-[#141414] text-sm font-medium leading-normal">Sort by: {sortLabel}</p>
+                  <div className={styles.pillChevron} data-icon="CaretDown" data-size="18px" data-weight="regular">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true">
                     <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
                   </svg>
                 </div>
               </button>
+
+                <ul
+                  id="sort-menu"
+                  role="listbox"
+                  className={`${styles.sortMenu} ${sortOpen ? styles.sortMenuOpen : ''}`}
+                >
+                    <div
+                      ref={highlightRef}
+                      className={styles.sortMenuHighlight}
+                      style={{ transform: highlightStyle.transform, height: highlightStyle.height, opacity: highlightStyle.opacity }}
+                      aria-hidden="true"
+                    />
+                    <li role="option" aria-selected={sortOption === 'price-asc'} style={{ listStyle: 'none' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setSortOption('price-asc'); }}
+                        className={`${styles.sortMenuItem} ${sortOption === 'price-asc' ? styles.sortMenuItemActive : ''}`}
+                      >
+                        Price: Low to High
+                      </button>
+                    </li>
+                    <li role="option" aria-selected={sortOption === 'price-desc'} style={{ listStyle: 'none' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setSortOption('price-desc'); }}
+                        className={`${styles.sortMenuItem} ${sortOption === 'price-desc' ? styles.sortMenuItemActive : ''}`}
+                      >
+                        Price: High to Low
+                      </button>
+                    </li>
+                
+                </ul>
+              </div>
             </div>
             
             {/* Products Grid with Enhanced Loading and Error States */}
