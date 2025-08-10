@@ -295,7 +295,12 @@ export class ProductsService {
    * Generates a cache key based on operation and parameters
    */
   private generateCacheKey(operation: string, params: any): string {
-    const paramString = JSON.stringify(params);
+    // Normalize category_id[] for stable keys
+    const normalized = { ...params };
+    if (Array.isArray(normalized.category_id)) {
+      normalized.category_id = [...normalized.category_id].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    }
+    const paramString = JSON.stringify(normalized);
     return `${operation}:${paramString}`;
   }
 

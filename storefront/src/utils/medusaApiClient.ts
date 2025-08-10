@@ -42,6 +42,14 @@ export interface MedusaProductsResponse {
   limit: number;
 }
 
+export interface MedusaProductCategoriesResponse {
+  product_categories: Array<{ id: string; handle?: string; name?: string }>;
+  count: number;
+  offset?: number;
+  limit?: number;
+  [key: string]: unknown;
+}
+
 // ---- Checkout-specific types ----
 export interface UpdateCartPayload {
   email?: string;
@@ -519,8 +527,10 @@ export class MedusaApiClient {
     if (params.offset !== undefined) queryParams.append('offset', params.offset.toString());
     if (params.region_id) queryParams.append('region_id', params.region_id);
     if (params.sales_channel_id) queryParams.append('sales_channel_id', params.sales_channel_id);
-    if (params.category_id) {
-      params.category_id.forEach(id => queryParams.append('category_id[]', id));
+    if (params.category_id && params.category_id.length > 0) {
+      // Stable sort to keep cache keys and endpoints consistent
+      const sorted = [...params.category_id].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+      sorted.forEach(id => queryParams.append('category_id[]', id));
     }
 
     // For Medusa v2, try using fields parameter to include related data
@@ -532,6 +542,18 @@ export class MedusaApiClient {
     console.log('[MedusaApiClient] Final endpoint:', endpoint);
     
     return this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
+  }
+
+  async getProductCategories(params: { limit?: number; offset?: number; handle?: string } = {}): Promise<MedusaProductCategoriesResponse> {
+    const queryParams = new URLSearchParams();
+    if (params.limit !== undefined) queryParams.append('limit', String(params.limit));
+    if (params.offset !== undefined) queryParams.append('offset', String(params.offset));
+    if (params.handle) queryParams.append('handle', params.handle);
+
+    const endpoint = `/store/product-categories${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    console.log('[MedusaApiClient] Fetching product categories with params:', params);
+    console.log('[MedusaApiClient] Final endpoint:', endpoint);
+    return this.makeRequestWithRetry<MedusaProductCategoriesResponse>(endpoint);
   }
 
   async getRegions(): Promise<MedusaRegionsResponse> {
