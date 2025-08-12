@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from '../../components/Header';
 import styles from './accountPage.module.css';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+const PasskeySection = dynamic(() => import('./PasskeySection'), { ssr: false })
 
 export default function AccountPage() {
   // State to keep track of active tab
@@ -15,7 +17,8 @@ export default function AccountPage() {
     'Order History',
     'Wishlist',
     'Address Book',
-    'Payment Methods'
+    'Payment Methods',
+    'Security'
   ];
 
   // Order history data
@@ -292,6 +295,14 @@ export default function AccountPage() {
                   </div>
                   
                   <button className={styles.actionButton}>Add New Payment Method</button>
+                </>
+              )}
+
+              {/* Security Tab Content */}
+              {activeTab === 'Security' && (
+                <>
+                  <h2 className={styles.sectionTitle}>Security</h2>
+                  <PasskeySection />
                 </>
               )}
             </div>

@@ -18,6 +18,7 @@ module.exports = defineConfig({
         'http://localhost:3000,http://127.0.0.1:3000',
       jwtSecret: process.env.JWT_SECRET || "supersecret",
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
+      // AUTH_JWKS_URL is consumed by custom middlewares to verify JWTs from the storefront
     },
     currencies: [
       {
