@@ -10,7 +10,6 @@ import { useRetry } from '../../hooks/useRetry';
 import { debugMedusaApiResponse } from '../../utils/debugApiResponse';
 import styles from './productsPage.module.css';
 import { UiCategoryKey, resolveCategoryIdsByUiKeys } from '../../config/categoryMapping';
-import { shouldShowMissingCategoryNotice } from '../../config/categoryUtils';
 import { medusaApiClient } from '../../utils/medusaApiClient';
 
 // Memoized state interface to prevent unnecessary re-renders
@@ -101,11 +100,14 @@ export default function ProductsPage() {
         const keys = categoriesParam
           .split(',')
           .map((s) => s.trim().toLowerCase())
-          .filter((s) => ['deities', 'animals', 'abstract', 'marble', 'granite'].includes(s)) as UiCategoryKey[];
+          .filter((s) => s.length > 0) as UiCategoryKey[];
         if (keys.length > 0) {
           setSelectedCategories(new Set(keys));
           shouldFetchAll = false; // category effect will handle fetching
         }
+      } else {
+        // If no categories in URL, ensure our preselected defaults are applied
+        setSelectedCategories(new Set(preselectedCategoryKeys));
       }
     } catch {
       // ignore
@@ -166,11 +168,12 @@ export default function ProductsPage() {
   const [moreOpen, setMoreOpen] = useState<boolean>(false);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const defaultCategoryKeys: UiCategoryKey[] = ['deities', 'animals', 'abstract', 'marble', 'granite'];
+  // Default preselected categories (when URL has none)
+  const preselectedCategoryKeys: UiCategoryKey[] = ['deities', 'marble'];
   const toLabel = (handle: string) => handle.length ? handle.charAt(0).toUpperCase() + handle.slice(1) : handle;
   type CategoryItem = { id: string; handle: string; name?: string | null };
   const [allCategories, setAllCategories] = useState<CategoryItem[]>([]);
-  const [visibleSuggestions, setVisibleSuggestions] = useState<UiCategoryKey[]>(defaultCategoryKeys);
+  // No mockup/default pills; we show only selected categories and the More/Clear actions
 
   // Load categories from Medusa Admin (Store API) so new categories appear automatically
   useEffect(() => {
@@ -192,7 +195,7 @@ export default function ProductsPage() {
   }, []);
 
   // Category selection state (task 2)
-  const [selectedCategories, setSelectedCategories] = useState<Set<UiCategoryKey>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<UiCategoryKey>>(new Set(preselectedCategoryKeys));
   const [pendingFetch, setPendingFetch] = useState<boolean>(false);
   const debounceRef = useRef<number | null>(null);
   const fetchVersionRef = useRef<number>(0);
@@ -314,14 +317,7 @@ export default function ProductsPage() {
     setSelectedCategories(new Set());
   }, []);
 
-  const removeSuggestion = useCallback((key: UiCategoryKey) => {
-    setVisibleSuggestions(prev => prev.filter(k => String(k) !== String(key)));
-    setSelectedCategories(prev => {
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-  }, []);
+  // No suggestion removal needed since we do not render mockup pills anymore
 
   const sortLabel = useMemo(() => {
     switch (sortOption) {
@@ -395,94 +391,33 @@ export default function ProductsPage() {
             <div className="flex flex-col gap-6 items-start">
               <div className={styles.pillContainer}>
               <div className={styles.pillGrid}>
-                {visibleSuggestions
-                  .filter((key) => allCategories.length === 0 || allCategories.some(c => (c.handle || '').toLowerCase() === String(key)))
-                  .slice(0, 3)
-                  .map((key) => {
-                    const cat = allCategories.find(c => (c.handle || '').toLowerCase() === String(key));
-                    const label = cat?.name || toLabel(String(key));
-                    return (
-                  <button
-                    key={String(key)}
-                    type="button"
-                    onClick={() => toggleCategory(key)}
-                    className={styles.pillFilterButton}
-                    aria-pressed={selectedCategories.has(key)}
-                    aria-label={`Toggle ${label} category`}
-                  >
-                    <span className={styles.pillFilterLabel}>{label}</span>
-                    <svg
-                      className={styles.pillClose}
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 256 256"
-                      aria-hidden="true"
-                      onClick={(e) => { e.stopPropagation(); removeSuggestion(key); }}
-                    >
-                      <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
-                  </svg>
-                </button>
-                );})}
-                <button
-                  type="button"
-                  onClick={clearCategories}
-                  className={`${styles.pillFilterButton} ${styles.pillClearButton}`}
-                  aria-label="Clear category filters"
-                >
-                  <span className={styles.pillFilterLabel}>Clear</span>
-                </button>
-              </div>
-              <div className={styles.pillGrid}>
-                {visibleSuggestions
-                  .filter((key) => allCategories.length === 0 || allCategories.some(c => (c.handle || '').toLowerCase() === String(key)))
-                  .slice(3)
-                  .map((key) => {
-                    const cat = allCategories.find(c => (c.handle || '').toLowerCase() === String(key));
-                    const label = cat?.name || toLabel(String(key));
-                    return (
-                  <button
-                    key={String(key)}
-                    type="button"
-                    onClick={() => toggleCategory(key)}
-                    className={styles.pillFilterButton}
-                    aria-pressed={selectedCategories.has(key)}
-                    aria-label={`Toggle ${label} category`}
-                  >
-                    <span className={styles.pillFilterLabel}>{label}</span>
-                    <svg
-                      className={styles.pillClose}
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 256 256"
-                      aria-hidden="true"
-                      onClick={(e) => { e.stopPropagation(); removeSuggestion(key); }}
-                    >
-                      <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
-                  </svg>
-                </button>
-                );})}
-                {/* Extra selected categories appear inline after default row 2 */}
-                {Array.from(selectedCategories)
-                  .filter((key) => !defaultCategoryKeys.includes(key as UiCategoryKey))
-                  .map((key) => (
+                {/* Selected categories appear as pills */}
+                {Array.from(selectedCategories).map((key) => {
+                  const label = toLabel(String(key));
+                  return (
                     <button
                       key={String(key)}
                       type="button"
                       onClick={() => toggleCategory(key)}
                       className={styles.pillFilterButton}
                       aria-pressed={selectedCategories.has(key)}
-                      aria-label={`Toggle ${String(key)} category`}
+                      aria-label={`Toggle ${label} category`}
                     >
-                      <span className={styles.pillFilterLabel}>{toLabel(String(key))}</span>
-                      {selectedCategories.has(key) ? (
-                        <svg className={styles.pillClose} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256" aria-hidden="true">
-                          <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
-                  </svg>
-                      ) : null}
-                </button>
-                  ))}
+                      <span className={styles.pillFilterLabel}>{label}</span>
+                      <svg
+                        className={styles.pillClose}
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 256 256"
+                        aria-hidden="true"
+                        onClick={(e) => { e.stopPropagation(); toggleCategory(key); }}
+                      >
+                        <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
+                      </svg>
+                    </button>
+                  );
+                })}
                 {/* More button */}
                 <div className={styles.moreMenuWrapper} ref={moreMenuRef}>
                   <button
@@ -500,7 +435,6 @@ export default function ProductsPage() {
                   {moreOpen && (
                     <ul className={styles.moreMenu} role="listbox">
                       {allCategories
-                        .filter((c) => !defaultCategoryKeys.includes(c.handle as UiCategoryKey))
                         .filter((c) => !selectedCategories.has(c.handle))
                         .map((c) => (
                         <li key={c.id} role="option" aria-selected={selectedCategories.has(c.handle)}>
@@ -521,12 +455,17 @@ export default function ProductsPage() {
                     </ul>
                   )}
               </div>
+                {/* Clear button follows immediately after More */}
+                <button
+                  type="button"
+                  onClick={clearCategories}
+                  className={`${styles.pillFilterButton} ${styles.pillClearButton}`}
+                  aria-label="Clear category filters"
+                >
+                  <span className={styles.pillFilterLabel}>Clear</span>
+                </button>
               </div>
-              {shouldShowMissingCategoryNotice(selectedCategories, lastResolvedCategoryIds) && (
-                <div className={styles.noticeBox} role="status">
-                  Some filters selected but no matching categories were resolved. Please ensure category handles/IDs are configured in Admin and mapping is correct.
-                </div>
-              )}
+              {/* Removed missing category notice per updated design */}
               </div>
             </div>
             <div className="@container">

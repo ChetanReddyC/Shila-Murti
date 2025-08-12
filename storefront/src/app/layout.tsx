@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Public_Sans, Noto_Sans } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "../contexts";
+import AuthSessionProvider from "@/providers/SessionProvider";
 
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -28,9 +29,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${publicSans.variable} ${notoSans.variable} w-full`}>
-        <CartProvider>
-          {children}
-        </CartProvider>
+        <AuthSessionProvider>
+          <CartProvider>
+            {children}
+          </CartProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

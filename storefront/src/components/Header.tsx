@@ -1,11 +1,13 @@
 'use client';
 
 import { FC, useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { useCart } from '../contexts/CartContext';
 import styles from './Header.module.css';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading } = useCart();
+  const { data: session } = useSession();
 
   // Only show the cart badge after the user has visited the cart page at least once,
   // and hide it while the user is actively on the /cart route.
@@ -191,6 +193,13 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                 </a>
               ))}
             </nav>
+
+            {/* User info */}
+            {session?.user && (
+              <div style={{ marginRight: 12, color: '#141414', fontSize: 14 }}>
+                {session.user.email || session.user.name || session.user.phone || 'Signed in'}
+              </div>
+            )}
 
             {/* Icons */}
             <div className={styles.iconContainer}>
