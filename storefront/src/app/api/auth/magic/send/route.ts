@@ -16,7 +16,7 @@ function generateToken(): string {
 
 export async function POST(req: NextRequest) {
   const start = Date.now()
-  const { email } = await req.json().catch(() => ({}))
+  const { email, state, phone } = await req.json().catch(() => ({}))
   if (!email || typeof email !== 'string') {
     return new Response(JSON.stringify({ ok: false, error: 'email_required' }), { status: 400 })
   }
@@ -33,8 +33,10 @@ export async function POST(req: NextRequest) {
   } catch {}
   const token = generateToken()
   const tokenHash = await bcrypt.hash(token, 10)
-  await kvSet(`magic:${normalized}`, { tokenHash }, MAGIC_TTL_SECONDS)
-  const url = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/auth/magic/confirm?token=${encodeURIComponent(token)}&email=${encodeURIComponent(normalized)}`
+  await kvSet(`magic:${normalized}`, { tokenHash, phonePrimary: typeof phone === 'string' ? phone : undefined }, MAGIC_TTL_SECONDS)
+  const qs = new URLSearchParams({ token, email: normalized })
+  if (state && typeof state === 'string') qs.set('state', state)
+  const url = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/auth/magic/confirm?${qs.toString()}`
   const res = await sendMagicLink(normalized, url)
   if (!res.ok) {
     console.error('[MAGIC SEND] failed', { email: normalized, error: res.error })

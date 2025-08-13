@@ -25,12 +25,13 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
-    // Session-binding provider: accepts an identifier and establishes a session
+    // Session-binding provider: accepts an identifier and establishes a session (optionally with customerId)
     Credentials({
       id: 'session',
       name: 'Session',
       credentials: {
         identifier: { label: 'identifier', type: 'text' },
+        customerId: { label: 'customerId', type: 'text' },
       },
       async authorize(credentials) {
         const identifier = (credentials?.identifier || '').toString()
@@ -41,6 +42,7 @@ export const authOptions: NextAuthOptions = {
         else user.phone = identifier
         // comboRequired resolved when we call this after MFA
         user.comboRequired = false
+        if (credentials?.customerId) user.customerId = String(credentials.customerId)
         return user
       },
     }),
@@ -82,6 +84,7 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === 'otp') token.otpOK = true
       if (account?.provider === 'magic') token.magicOK = true
       if (user?.comboRequired !== undefined) token.comboRequired = (user as any).comboRequired
+      if ((user as any)?.customerId) token.customerId = (user as any).customerId
       token.mfaComplete = token.comboRequired ? Boolean(token.otpOK && token.magicOK) : true
       return token
     },
@@ -91,6 +94,7 @@ export const authOptions: NextAuthOptions = {
         otpOK: token.otpOK ?? false,
         magicOK: token.magicOK ?? false,
         mfaComplete: token.mfaComplete,
+        customerId: (token as any).customerId,
       })
       return session
     },

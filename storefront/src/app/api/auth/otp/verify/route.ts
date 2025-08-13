@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { kvGet, kvDel } from '@/lib/kv'
+import { kvGet, kvDel, kvSet } from '@/lib/kv'
 import { kafkaEmit } from '@/lib/kafka'
 import { getCounter } from '@/lib/metrics'
 import bcrypt from 'bcryptjs'
@@ -51,6 +51,17 @@ export async function POST(req: NextRequest) {
   }
 
   await kvDel(foundKey) // single-use
+  // Mark OTP verified for elevation check (short TTL)
+  try {
+    const ttl = parseInt(process.env.OTP_OK_TTL_SECONDS || '600', 10)
+    if (phoneRaw) {
+      const digits = phoneRaw.replace(/\D/g, '')
+      await kvSet(`otp:ok:+${digits}`, 1, ttl)
+    }
+    if (emailRaw) {
+      await kvSet(`otp:ok:${emailRaw.toLowerCase()}`, 1, ttl)
+    }
+  } catch {}
   try { await kafkaEmit('auth.combo_mfa_passed', { identifier: phoneRaw || emailRaw, factor: 'otp', timestamp: Date.now() }) } catch {}
   try { const c = await getCounter({ name: 'auth_otp_verify_success_total', help: 'OTP verify success total' }); c.inc() } catch {}
   return new Response(JSON.stringify({ ok: true }), { status: 200 })
