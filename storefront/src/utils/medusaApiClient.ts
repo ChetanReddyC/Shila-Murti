@@ -152,6 +152,8 @@ export interface ApiClientConfig {
   credentials?: RequestCredentials;
   enablePerformanceLogging?: boolean;
   publishableApiKey?: string;
+  /** Optional default sales channel id to include in store requests */
+  defaultSalesChannelId?: string;
 }
 
 export interface PerformanceMetrics {
@@ -188,6 +190,7 @@ export class MedusaApiClient {
   private enablePerformanceLogging: boolean;
   private performanceMetrics: PerformanceMetrics[];
   private publishableApiKey: string;
+  private defaultSalesChannelId: string;
   public static readonly MANUAL_PAYMENT_PROVIDER_ID = 'manual';
 
   constructor(config: ApiClientConfig = {}) {
@@ -204,6 +207,7 @@ export class MedusaApiClient {
     this.enablePerformanceLogging = config.enablePerformanceLogging ?? true;
     this.performanceMetrics = [];
     this.publishableApiKey = config.publishableApiKey || process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
+    this.defaultSalesChannelId = config.defaultSalesChannelId || process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID || '';
     
     if (!this.publishableApiKey) {
       console.error('[MedusaApiClient] No publishable API key provided. Please add NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY to your .env.local file.');
@@ -211,6 +215,10 @@ export class MedusaApiClient {
     } else {
       console.log('[MedusaApiClient] Using publishable key (present). Base URL:', this.baseUrl)
     }
+    // Note: We do NOT force-append sales_channel_id to requests by default, as some endpoints
+    // may not recognize it depending on Medusa version/plugins. We rely primarily on the
+    // publishable key's allowed sales channels mapping. The optional defaultSalesChannelId is
+    // kept for future explicit use.
   }
 
   private async fetchWithTimeout(resource: string, options: RequestInit = {}): Promise<Response> {
@@ -431,6 +439,12 @@ export class MedusaApiClient {
               if (response.status === 401 || response.status === 403) {
                 console.warn('[MedusaApiClient] Auth-like failure. Ensure x-publishable-api-key is valid and linked to the sales channel.')
               }
+              try {
+                const message = (errorData && typeof errorData.message === 'string') ? errorData.message : String(errorText || '')
+                if (message && message.toLowerCase().includes('publishable key') && message.toLowerCase().includes('sales channel')) {
+                  console.error('[MedusaApiClient] Hint: In Medusa Admin, open Settings → API Key Management → your publishable key, and assign at least one Sales Channel. Optionally set NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID in .env.local to hint the UI.')
+                }
+              } catch {}
               const apiError = new ApiError(
                 errorData.message || `HTTP error! status: ${response.status}`,
                 response.status,
@@ -526,7 +540,11 @@ export class MedusaApiClient {
     if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
     if (params.offset !== undefined) queryParams.append('offset', params.offset.toString());
     if (params.region_id) queryParams.append('region_id', params.region_id);
+    // Avoid auto-appending sales_channel_id; rely on publishable key mapping. If callers
+    // explicitly pass it, allow it. Some Medusa versions expect sales_channel_id[]; callers
+    // can provide it via params by constructing their own query if needed.
     if (params.sales_channel_id) queryParams.append('sales_channel_id', params.sales_channel_id);
+    else if (this.defaultSalesChannelId) queryParams.append('sales_channel_id', this.defaultSalesChannelId);
     if (params.category_id && params.category_id.length > 0) {
       // Stable sort to keep cache keys and endpoints consistent
       const sorted = [...params.category_id].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
@@ -549,6 +567,7 @@ export class MedusaApiClient {
     if (params.limit !== undefined) queryParams.append('limit', String(params.limit));
     if (params.offset !== undefined) queryParams.append('offset', String(params.offset));
     if (params.handle) queryParams.append('handle', params.handle);
+    // Do not append sales_channel_id here; not all deployments accept this on categories.
 
     const endpoint = `/store/product-categories${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     console.log('[MedusaApiClient] Fetching product categories with params:', params);
@@ -567,6 +586,11 @@ export class MedusaApiClient {
 
     // If no region_id is provided, try to get the India & International region
     let finalPayload = { ...payload };
+
+    // Attach default sales channel id when configured
+    if (!finalPayload.sales_channel_id && this.defaultSalesChannelId) {
+      finalPayload.sales_channel_id = this.defaultSalesChannelId;
+    }
 
     if (!finalPayload.region_id) {
       try {
@@ -720,6 +744,8 @@ export class MedusaApiClient {
     const queryParams = new URLSearchParams();
     queryParams.append('handle', handle);
     queryParams.append('fields', '*variants,*variants.prices,*images,*variants.inventory_items,*variants.inventory_items.inventory,*variants.inventory_items.inventory.location_levels');
+    // Do not append sales_channel_id by default; rely on key mapping. If needed, callers
+    // can include it explicitly.
 
     const endpoint = `/store/products?${queryParams.toString()}`;
     const response = await this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);

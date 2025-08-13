@@ -6,10 +6,12 @@ export const debugMedusaApiResponse = async () => {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000';
     const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
+    const salesChannelId = process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID || '';
     
     console.log('🔍 Testing Medusa API connection...');
     console.log('Base URL:', baseUrl);
     console.log('Publishable Key:', publishableKey ? 'Present' : 'Missing');
+    console.log('Default Sales Channel:', salesChannelId ? salesChannelId : '(none)');
     
     // First, test regions
     console.log('🌍 Testing regions endpoint...');
@@ -40,7 +42,8 @@ export const debugMedusaApiResponse = async () => {
     
     // Test products without expand
     console.log('📦 Testing products endpoint (basic)...');
-    const basicResponse = await fetch(`${baseUrl}/store/products`, {
+    const basicUrl = `${baseUrl}/store/products${salesChannelId ? `?sales_channel_id=${encodeURIComponent(salesChannelId)}` : ''}`;
+    const basicResponse = await fetch(basicUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +68,8 @@ export const debugMedusaApiResponse = async () => {
     
     // Test products with expand
     console.log('📦 Testing products endpoint (with expand)...');
-    const expandedResponse = await fetch(`${baseUrl}/store/products?expand=variants,variants.prices,images,options,variants.options`, {
+    const expandedUrl = `${baseUrl}/store/products?expand=variants,variants.prices,images,options,variants.options${salesChannelId ? `&sales_channel_id=${encodeURIComponent(salesChannelId)}` : ''}`;
+    const expandedResponse = await fetch(expandedUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
