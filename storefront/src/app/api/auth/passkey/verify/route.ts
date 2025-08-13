@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import type { NextRequest } from 'next/server'
 import { verifyAuthenticationResponse } from '@simplewebauthn/server'
+import { getCounter, getHistogram } from '@/lib/metrics'
 import { kvGet, kvDel, kvSet } from '@/lib/kv'
 
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost'
@@ -45,6 +46,7 @@ function normalizeCandidatesFromBody(body: any): string[] {
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now()
   const body = await req.json().catch(() => ({}))
   let cid = await ensureCustomerIdFromBody(body)
   if (!cid) {
@@ -93,7 +95,10 @@ export async function POST(req: NextRequest) {
   })
 
   await kvDel(`webauthn:auth:${cid}`)
-  if (!verification.verified) return new Response(JSON.stringify({ comboRequired: true }), { status: 200 })
+  if (!verification.verified) {
+    try { const c = await getCounter({ name: 'auth_passkey_failure_total', help: 'Passkey verify failure total' }); c.inc() } catch {}
+    return new Response(JSON.stringify({ comboRequired: true }), { status: 200 })
+  }
 
   // Update counter
   const newCounter = verification.authenticationInfo?.newCounter
@@ -103,6 +108,8 @@ export async function POST(req: NextRequest) {
 
   // Successful platform passkey auth: skip combo-MFA
   // Also provide a minimal descriptor so the client can refresh passkey lists immediately
+  try { const h = await getHistogram({ name: 'auth_passkey_verify_latency_ms', help: 'Passkey verification latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
+  try { const c = await getCounter({ name: 'auth_passkey_success_total', help: 'Passkey verify success total' }); c.inc() } catch {}
   return new Response(JSON.stringify({ comboRequired: false, credentialId: body.id, counter: newCounter ?? credRecord.counter }), { status: 200 })
 }
 

@@ -1,3 +1,25 @@
+import type { NextRequest } from 'next/server'
+
+export const runtime = 'edge'
+
+export async function GET(_req: NextRequest) {
+  const jwkPrivateRaw = process.env.AUTH_SIGNING_JWK
+  if (!jwkPrivateRaw) {
+    return new Response(JSON.stringify({ keys: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+  try {
+    const jose = await import('jose')
+    const parsed = JSON.parse(jwkPrivateRaw) as any
+    const pub = await jose.importJWK(parsed, 'RS256')
+    const pubJwk = await jose.exportJWK(pub)
+    const kid = parsed?.kid || process.env.AUTH_JWKS_KID || 'dev-2024-01-01'
+    const jwkWithKid = { ...pubJwk, kid, alg: 'RS256', use: 'sig', kty: (pubJwk as any).kty }
+    return new Response(JSON.stringify({ keys: [jwkWithKid] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  } catch {
+    return new Response(JSON.stringify({ keys: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+}
+
 export const runtime = 'edge'
 
 function buildJwks(): { keys: any[] } {

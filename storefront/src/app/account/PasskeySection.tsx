@@ -36,6 +36,22 @@ export default function PasskeySection() {
   }, [])
 
   useEffect(() => { refresh() }, [refresh])
+  // Auto-prompt registration when entering /account if no credentials exist yet
+  useEffect(() => {
+    if (!customerId) return
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/account/passkeys?customer_id=${encodeURIComponent(customerId)}`)
+        const json = await res.json().catch(() => ({}))
+        const count = Array.isArray(json?.credentials) ? json.credentials.length : 0
+        if (count === 0) {
+          // Programmatically click the setup button by invoking its logic
+          const btn = document.querySelector('button:contains("Set up passkey on this device")') as HTMLButtonElement | null
+          if (btn) btn.click()
+        }
+      } catch {}
+    })()
+  }, [customerId])
   // Also refresh when a passkey auth just happened (best-effort)
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -49,6 +65,13 @@ export default function PasskeySection() {
       } catch {}
     }, 2000)
     return () => clearInterval(tid)
+  }, [refresh])
+
+  // Re-check on window focus (covers the case where magic link completed in another tab)
+  useEffect(() => {
+    const onFocus = () => { refresh() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [refresh])
 
   return (

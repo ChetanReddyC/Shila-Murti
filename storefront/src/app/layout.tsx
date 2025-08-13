@@ -3,6 +3,7 @@ import { Public_Sans, Noto_Sans } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "../contexts";
 import AuthSessionProvider from "@/providers/SessionProvider";
+import PasskeyNudge from "@/components/PasskeyNudge";
 
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -31,6 +32,8 @@ export default function RootLayout({
       <body className={`${publicSans.variable} ${notoSans.variable} w-full`}>
         <AuthSessionProvider>
           <CartProvider>
+            {/* Global post-elevation passkey prompt */}
+            <PasskeyNudge />
             {children}
           </CartProvider>
         </AuthSessionProvider>

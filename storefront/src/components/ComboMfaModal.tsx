@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { signIn } from 'next-auth/react'
 import styles from './ComboMfaModal.module.css'
 
 interface ComboMfaModalProps {
@@ -20,11 +21,16 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
   const [otpVerifyDebug, setOtpVerifyDebug] = useState<string>('')
   const [magicSendDebug, setMagicSendDebug] = useState<string>('')
   const [emailInput, setEmailInput] = useState<string>(identifier.email || '')
+  const [stateToken] = useState<string>(() => {
+    // Correlate magic send/confirm/status to avoid false positives
+    try { return (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`) as string } catch { return `${Date.now()}-${Math.random()}` }
+  })
   const startedRef = useRef(false)
 
   const startFlows = useCallback(async () => {
     try {
       // Kick off OTP send
+      try { if (identifier.phone && typeof window !== 'undefined') sessionStorage.setItem('mfa_phone', identifier.phone) } catch {}
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -43,13 +49,15 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
     if (identifier.email) {
       try {
         // Kick off magic link send if we already have an email
+        let phoneForSend: string | undefined
+        try { phoneForSend = typeof window !== 'undefined' ? sessionStorage.getItem('mfa_phone') || undefined : undefined } catch {}
         const res = await fetch('/api/auth/magic/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: identifier.email }),
+          body: JSON.stringify({ email: identifier.email, state: stateToken, phone: phoneForSend }),
         })
         let body: any = {}
-        try { body = await res.json() } catch {}
+          try { body = await res.json() } catch {}
         const dbg = { at: new Date().toISOString(), request: { email: identifier.email }, response: { status: res.status, body } }
         setMagicSendDebug(JSON.stringify(dbg, null, 2))
         console.info('[ComboMFA] Magic send result', dbg)
@@ -74,7 +82,7 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
     const id = setInterval(async () => {
       try {
         if (!emailInput) return
-        const qs = `?email=${encodeURIComponent(emailInput)}`
+        const qs = `?email=${encodeURIComponent(emailInput)}&state=${encodeURIComponent(stateToken)}`
         const res = await fetch(`/api/auth/magic/status${qs}`)
         if (!res.ok) return
         const { verified } = await res.json()
@@ -170,17 +178,13 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
         } catch {
           // If browser blocks automatic WebAuthn due to user activation policy, ignore; user can add from Security tab
         }
-        // Bind a session using the identifier to populate session.user
-        await fetch('/api/auth/[...nextauth]', { method: 'POST' }).catch(() => {})
-        // Trigger next-auth signIn with our session provider
-        // Using a query call to next-auth client endpoint
-        const form = new FormData()
-        form.set('callbackUrl', '/')
-        form.set('json', 'true')
-        form.set('csrfToken', '')
-        form.set('provider', 'session')
-        form.set('0', identifierValue)
-        await fetch('/api/auth/callback/session?identifier=' + encodeURIComponent(identifierValue), { method: 'POST', body: form }).catch(() => {})
+        // Bind a session using the identifier and include customerId for caching
+        try {
+          const customerIdForSession = json?.customerId ? String(json.customerId) : undefined
+          await signIn('session', { identifier: identifierValue, customerId: customerIdForSession, redirect: true, callbackUrl: '/' })
+        } catch {
+          // fallback no-op; user is redirected anyway
+        }
       }).finally(() => {
         onComplete()
         try { if (typeof window !== 'undefined') window.sessionStorage.setItem('identifier', identifier.email || identifier.phone || '') } catch {}
@@ -240,7 +244,7 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
                 const res = await fetch('/api/auth/magic/send', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email: emailInput }),
+          body: JSON.stringify({ email: emailInput, state: stateToken, phone: (typeof window !== 'undefined' ? sessionStorage.getItem('mfa_phone') || undefined : undefined) }),
                 })
                 let body: any = {}
                 try { body = await res.json() } catch {}

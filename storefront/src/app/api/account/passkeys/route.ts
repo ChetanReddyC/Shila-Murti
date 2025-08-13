@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { kvListKeys, kvGet, kvDel } from '@/lib/kv'
+import { kvListKeys, kvGet, kvDel, kvSet } from '@/lib/kv'
 
 export const runtime = 'edge'
 
@@ -36,6 +36,15 @@ export async function DELETE(req: NextRequest) {
   if (!credentialId) return new Response(JSON.stringify({ ok: false, error: 'credential_id_required' }), { status: 400 })
   try {
     await kvDel(`webauthn:cred:${customerId}:${credentialId}`)
+    // Best-effort decrement: read current count and clamp at 0
+    try {
+      const countKey = `webauthn:cred:count:${customerId}`
+      const current = await kvGet<string | number | null>(countKey)
+      const n = (typeof current === 'number' ? current : parseInt(String(current || '0'), 10)) || 0
+      const next = Math.max(0, n - 1)
+      await kvSet(countKey, String(next))
+      if (next === 0) await kvSet(`webauthn:cred:exists:${customerId}`, '0')
+    } catch {}
     return new Response(JSON.stringify({ ok: true }), { status: 200 })
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: 'delete_failed' }), { status: 500 })

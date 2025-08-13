@@ -35,6 +35,17 @@ export async function POST(req: NextRequest) {
   await kvSet(`webauthn:cred:${userId}:${record.credentialID}`, record)
   await kvDel(`webauthn:reg:${userId}`)
 
+  // Mark presence counter/flag for policy gate
+  try {
+    const countKey = `webauthn:cred:count:${userId}`
+    const existsKey = `webauthn:cred:exists:${userId}`
+    // Best-effort, non-atomic increment for CF; Upstash helper exists but not required
+    const current = await kvGet<string | number | null>(countKey)
+    const n = (typeof current === 'number' ? current : parseInt(String(current || '0'), 10)) || 0
+    await kvSet(countKey, String(n + 1))
+    await kvSet(existsKey, '1')
+  } catch {}
+
   return new Response(JSON.stringify({ verified: true }), { status: 200 })
 }
 
