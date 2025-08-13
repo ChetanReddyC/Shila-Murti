@@ -69,35 +69,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
       inStock: product.inStock
     });
 
-    // If price is 0, let's test the API directly
-    if (!product.price || product.price === 0) {
-      console.log('🔍 Price is 0, testing API directly...');
-      fetch('http://localhost:9000/store/products?region_id=reg_01JYR9W6MVF236JPJ91FFG427S', {
-        headers: {
-          'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
-        }
-      })
-        .then(res => res.json())
-        .then(data => {
-          console.log('🔍 Direct API test result:', {
-            productsCount: data.products?.length,
-            firstProduct: data.products?.[0] ? {
-              title: data.products[0].title,
-              variantsCount: data.products[0].variants?.length,
-              firstVariant: data.products[0].variants?.[0] ? {
-                prices: data.products[0].variants[0].prices,
-                material: data.products[0].variants[0].material,
-                dimensions: {
-                  length: data.products[0].variants[0].length,
-                  width: data.products[0].variants[0].width,
-                  height: data.products[0].variants[0].height
-                }
-              } : null
-            } : null
-          });
-        })
-        .catch(err => console.error('🔍 Direct API test failed:', err));
-    }
+    // If price is 0, we keep logs minimal to avoid noisy direct API calls in production
   }, [product]);
 
   // Helper function to format price with proper currency
