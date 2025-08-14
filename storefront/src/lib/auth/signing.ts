@@ -6,6 +6,7 @@ export type BridgeClaims = JWTPayload & {
   otpOK?: boolean
   magicOK?: boolean
   mfaComplete?: boolean
+  purpose?: string
 }
 
 async function importPrivateKey(): Promise<{ key: CryptoKey; kid: string } | null> {

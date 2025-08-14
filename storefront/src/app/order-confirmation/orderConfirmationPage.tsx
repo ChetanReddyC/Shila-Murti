@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from '../../components/Header';
+import dynamic from 'next/dynamic'
 import styles from './orderConfirmationPage.module.css';
 import cartStyles from '../cart/cartPage.module.css';
 import { useCart } from '../../contexts/CartContext';
@@ -10,8 +11,9 @@ import { useSearchParams } from 'next/navigation';
 
 export default function OrderConfirmationPage() {
   const searchParams = useSearchParams();
-  // Pull the latest cart to display what was purchased and clear it once safely on this page
-  const { cart, clearCart } = useCart();
+  // Use cart context only for protection and silent clearing; capture cart once for fallback display
+  const { clearCartSilently, setOrderConfirmationProtection, cart } = useCart();
+  const [fallbackCart, setFallbackCart] = useState<any | null>(null);
 
   // Snapshot from checkout (preferred for display)
   const [snapshot, setSnapshot] = useState<null | {
@@ -32,6 +34,17 @@ export default function OrderConfirmationPage() {
   
   // Use useEffect to run date calculations and load order/snapshot on the client side
   useEffect(() => {
+    // Activate order confirmation protection and clear cart silently after mount
+    try { setOrderConfirmationProtection(true) } catch {}
+    // Defer silent clearing until after initial content is prepared to avoid visible empty-cart flash
+    const clearTimer = setTimeout(() => {
+      try { void clearCartSilently() } catch (e) {
+        console.warn('[OrderConfirmation] Silent cart clear failed on mount', e)
+      }
+    }, 1200);
+    // Capture cart once at mount to keep UI stable regardless of later cart updates
+    setFallbackCart(cart ?? null);
+    
     const urlOrderId = searchParams.get('order_id');
 
     // Try to read order result from session as set by checkout
@@ -120,26 +133,36 @@ export default function OrderConfirmationPage() {
 
     fetchOrder();
 
-    // Clear snapshot and lightweight result after a short delay to avoid stale re-use
+    // Do not clear snapshot/order_result immediately; keep them available while on this page
+    // to avoid race conditions with session/login events. We can clear them when the user
+    // leaves the page or on a later visit.
     const clearSnapshotTimer = setTimeout(() => {
-      try {
-        sessionStorage.removeItem('order_checkout_snapshot');
-        sessionStorage.removeItem('order_result');
-      } catch {}
-    }, 60 * 1000); // 1 minute
-
-    // Clear the cart after we have attempted to load order data
-    const clearCartTimer = setTimeout(() => {
-      Promise.resolve()
-        .then(() => clearCart())
-        .catch((e) => console.warn('[OrderConfirmation] Failed to clear cart:', e));
+      // Intentionally disabled immediate clearing
     }, 0);
 
     return () => {
       clearTimeout(clearSnapshotTimer);
-      clearTimeout(clearCartTimer);
+      clearTimeout(clearTimer);
     };
-  }, [clearCart]);
+  }, [clearCartSilently, setOrderConfirmationProtection]);
+
+  const PasskeyNudge = React.useMemo(() => dynamic(() => import('../../components/PasskeyNudge'), { ssr: false }), [])
+
+  // Add a listener to prevent navigation away from this page
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Function to check if we're trying to navigate away to /cart
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Set a flag to indicate we're on the order confirmation page
+      sessionStorage.setItem('order_confirmation_active', String(Date.now() + 30000));
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   return (
     <div className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
@@ -148,9 +171,13 @@ export default function OrderConfirmationPage() {
         <Header />
         <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
           <div className={styles.container}>
+            {/* Prevent accidental navigation away due to cart state changes by not rendering any links to /cart here */}
             <h1 className={styles.title}>Thank you for your order!</h1>
             <p className={styles.description}>Your order has been successfully placed. You will receive an email confirmation shortly with your order details.</p>
             <h2 className={styles.sectionTitle}>Order Summary</h2>
+            <div style={{ margin: '12px 0' }}>
+              <PasskeyNudge />
+            </div>
             <div className={styles.summaryContainer}>
               <div className={styles.summaryItem}>
                 <span className={styles.label}>Order Number</span>
@@ -161,7 +188,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>{currentDate}</span>
               </div>
             </div>
-            {/* Order Items Table (prefer real order, then snapshot, then cart) */}
+            {/* Order Items Table (prefer real order, then snapshot, then captured cart at mount) */}
             <div className={`${cartStyles.itemsBox} ${styles.responsiveTable}`}>
               <table className={cartStyles.cartTable}>
                 <thead className={cartStyles.cartTableHeader}>
@@ -172,7 +199,7 @@ export default function OrderConfirmationPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(orderItems ?? snapshot?.data?.items ?? cart?.items ?? []).map((item: any) => (
+                  {(orderItems ?? snapshot?.data?.items ?? fallbackCart?.items ?? []).map((item: any) => (
                     <tr key={item.id}>
                       <td className={cartStyles.itemCell}>
                         <span className={styles.itemName}>{item?.title ?? 'Item'}</span>
@@ -196,7 +223,7 @@ export default function OrderConfirmationPage() {
                   {(orderAddress?.first_name || orderAddress?.last_name)
                     ? `${orderAddress?.first_name ?? ''} ${orderAddress?.last_name ?? ''}`.trim()
                     : (snapshot?.data?.customer?.name
-                        ?? (cart as any)?.shipping_address?.first_name
+                        ?? (fallbackCart as any)?.shipping_address?.first_name
                         ?? '—')}
                 </span>
               </div>
@@ -205,7 +232,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>
                   {orderAddress?.phone
                     ?? snapshot?.data?.customer?.contactNumber
-                    ?? (cart as any)?.shipping_address?.phone
+                    ?? (fallbackCart as any)?.shipping_address?.phone
                     ?? '—'}
                 </span>
               </div>
@@ -215,7 +242,7 @@ export default function OrderConfirmationPage() {
                   {orderAddress?.address_1
                     ?? (snapshot?.data?.customer
                           ? `${snapshot.data.customer.address ?? ''}`.trim() || '—'
-                          : (cart as any)?.shipping_address?.address_1)
+                          : (fallbackCart as any)?.shipping_address?.address_1)
                     ?? '—'}
                 </span>
               </div>
@@ -224,7 +251,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>
                   {orderAddress?.city
                     ?? snapshot?.data?.customer?.city
-                    ?? (cart as any)?.shipping_address?.city
+                    ?? (fallbackCart as any)?.shipping_address?.city
                     ?? '—'}
                 </span>
               </div>
@@ -233,7 +260,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>
                   {orderAddress?.province
                     ?? snapshot?.data?.customer?.state
-                    ?? (cart as any)?.shipping_address?.province
+                    ?? (fallbackCart as any)?.shipping_address?.province
                     ?? '—'}
                 </span>
               </div>
@@ -242,7 +269,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>
                   {orderAddress?.postal_code
                     ?? snapshot?.data?.customer?.postalCode
-                    ?? (cart as any)?.shipping_address?.postal_code
+                    ?? (fallbackCart as any)?.shipping_address?.postal_code
                     ?? '—'}
                 </span>
               </div>
@@ -256,7 +283,7 @@ export default function OrderConfirmationPage() {
                               : snapshot.data.shippingSelection.method === 'expedited'
                                 ? 'Expedited'
                                 : 'Standard')
-                          : (cart as any)?.shipping_methods?.[0]?.name)
+                          : (fallbackCart as any)?.shipping_methods?.[0]?.name)
                     ?? '—'}
                 </span>
               </div>
@@ -267,16 +294,16 @@ export default function OrderConfirmationPage() {
                 <span className={styles.paymentLabel}>Subtotal</span>
                 <span className={styles.paymentValue}>
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
-                    Number(orderTotals?.subtotal ?? snapshot?.data?.totals?.subtotal ?? cart?.subtotal ?? 0)
+                    Number(orderTotals?.subtotal ?? snapshot?.data?.totals?.subtotal ?? fallbackCart?.subtotal ?? 0)
                   )}
                 </span>
               </div>
               <div className={styles.paymentItem}>
                 <span className={styles.paymentLabel}>Shipping</span>
                 <span className={styles.paymentValue}>
-                  {Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0) > 0
+                  {Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? fallbackCart?.shipping_total ?? 0) > 0
                     ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
-                        Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0)
+                        Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? fallbackCart?.shipping_total ?? 0)
                       )
                     : 'Free'}
                 </span>
@@ -285,7 +312,7 @@ export default function OrderConfirmationPage() {
                 <span className={styles.paymentLabel}>Taxes</span>
                 <span className={styles.paymentValue}>
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
-                    Number(orderTotals?.taxes ?? snapshot?.data?.totals?.taxes ?? cart?.tax_total ?? 0)
+                    Number(orderTotals?.taxes ?? snapshot?.data?.totals?.taxes ?? fallbackCart?.tax_total ?? 0)
                   )}
                 </span>
               </div>
@@ -296,9 +323,9 @@ export default function OrderConfirmationPage() {
                     Number(
                       orderTotals?.total ?? snapshot?.data?.totals?.total ??
                       (
-                        Number(orderTotals?.subtotal ?? snapshot?.data?.totals?.subtotal ?? cart?.subtotal ?? 0) +
-                        Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? cart?.shipping_total ?? 0) +
-                        Number(orderTotals?.taxes ?? snapshot?.data?.totals?.taxes ?? cart?.tax_total ?? 0)
+                        Number(orderTotals?.subtotal ?? snapshot?.data?.totals?.subtotal ?? fallbackCart?.subtotal ?? 0) +
+                        Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? fallbackCart?.shipping_total ?? 0) +
+                        Number(orderTotals?.taxes ?? snapshot?.data?.totals?.taxes ?? fallbackCart?.tax_total ?? 0)
                       )
                     )
                   )}
@@ -314,3 +341,4 @@ export default function OrderConfirmationPage() {
     </div>
   );
 }
+

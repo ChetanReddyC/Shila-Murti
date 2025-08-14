@@ -3,65 +3,53 @@
 import { FC, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCart } from '../contexts/CartContext';
+import { isOrderConfirmationProtectionActive } from '../utils/orderConfirmationProtection';
 import styles from './Header.module.css';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
-  const { getTotalItems, loading: cartLoading } = useCart();
+  const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
   const { data: session } = useSession();
+  const [hydrated, setHydrated] = useState(false);
 
-  // Only show the cart badge after the user has visited the cart page at least once,
-  // and hide it while the user is actively on the /cart route.
   const [hasVisitedCart, setHasVisitedCart] = useState<boolean>(false);
   const [isOnCartPage, setIsOnCartPage] = useState<boolean>(false);
+  const [isOnOrderConfirmation, setIsOnOrderConfirmation] = useState<boolean>(false);
   const [lastSeenCount, setLastSeenCount] = useState<number>(0);
 
   useEffect(() => {
-    // SSR-safe guards
     if (typeof window === 'undefined') return;
+    setHydrated(true);
 
-    // Read persisted flags
     try {
       const visited = window.sessionStorage.getItem('hasVisitedCart') === 'true';
       setHasVisitedCart(visited);
       const storedLastSeen = Number(window.sessionStorage.getItem('cartLastSeenCount') || '0');
       setLastSeenCount(Number.isFinite(storedLastSeen) ? storedLastSeen : 0);
-    } catch {
-      // ignore storage errors
-    }
+    } catch {}
 
-    // Determine current route
     const updateRouteState = () => {
       const path = window.location.pathname || '';
-      // Avoid scheduling updates during useInsertionEffect phase by deferring with microtask
       Promise.resolve().then(() => {
         setIsOnCartPage(path === '/cart' || path.startsWith('/cart/'));
+        setIsOnOrderConfirmation(path.startsWith('/order-confirmation'));
       });
     };
 
     updateRouteState();
-
-    // Keep route state in sync on client-side navigations (Next.js)
     const onPopState = () => updateRouteState();
     window.addEventListener('popstate', onPopState);
-
-    // Instead of monkey-patching history, listen to navigation events Next.js emits
-    // Next 13+ dispatches a 'next-router-navigation' CustomEvent; also rely on popstate above.
     const onNextNav = () => updateRouteState();
     window.addEventListener('next-router-navigation', onNextNav as EventListener);
-
     return () => {
       window.removeEventListener('popstate', onPopState);
       window.removeEventListener('next-router-navigation', onNextNav as EventListener);
     };
   }, []);
 
-  // When a user visits /cart, record that they've seen the current count.
-  // This makes the badge only show for NEW items added since the last cart visit.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (isOnCartPage) {
       try {
-        // Defer storage and state updates to avoid clashing with insertion effects during navigation
         Promise.resolve().then(() => {
           window.sessionStorage.setItem('hasVisitedCart', 'true');
           const currentCount = getTotalItems();
@@ -69,169 +57,105 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           setLastSeenCount(currentCount);
           if (!hasVisitedCart) setHasVisitedCart(true);
         });
-      } catch {
-        // ignore storage errors
-      }
+      } catch {}
     }
   }, [isOnCartPage, hasVisitedCart, getTotalItems]);
 
-  const totalItems = getTotalItems();
-
-  // Show badge if:
-  // - User has visited cart at least once (so they know what the number means)
-  // - User is not currently on the cart page
-  // - There are NEW items since they last visited the cart (totalItems > lastSeenCount)
-  const shouldShowBadge =
-    hasVisitedCart && !isOnCartPage && totalItems > lastSeenCount;
+  const protectionActive = hydrated ? (isOrderConfirmationActive() || isOrderConfirmationProtectionActive()) : false;
+  const preventCartNavigation = hydrated ? (isOnOrderConfirmation || protectionActive) : false;
+  const totalItems = preventCartNavigation ? 0 : getTotalItems();
+  const shouldShowBadge = hasVisitedCart && !isOnCartPage && totalItems > lastSeenCount;
 
   return (
-    <div className="w-full" style={{ height: "100px" }}>
+    <div className="w-full" style={{ height: '100px' }}>
       <header className={styles.header}>
-        {/* SVG Filter for Glass Effect */}
-        <svg style={{ display: "none" }}>
-          <filter
-            id="glass-distortion"
-            x="0%"
-            y="0%"
-            width="100%"
-            height="100%"
-            filterUnits="objectBoundingBox"
-          >
-            <feTurbulence
-              type="fractalNoise"
-              baseFrequency="0.000 0.000"
-              numOctaves="1"
-              seed="17"
-              result="turbulence"
-            />
+        <svg style={{ display: 'none' }}>
+          <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+            <feTurbulence type="fractalNoise" baseFrequency="0.000 0.000" numOctaves="1" seed="17" result="turbulence" />
             <feComponentTransfer in="turbulence" result="mapped">
               <feFuncR type="gamma" amplitude="1" exponent="10" offset="0.5" />
               <feFuncG type="gamma" amplitude="0" exponent="1" offset="0" />
               <feFuncB type="gamma" amplitude="0" exponent="1" offset="0.5" />
             </feComponentTransfer>
             <feGaussianBlur in="turbulence" stdDeviation="0" result="softMap" />
-            <feSpecularLighting
-              in="softMap"
-              surfaceScale="1"
-              specularConstant="1"
-              specularExponent="100"
-              lightingColor="white"
-              result="specLight"
-            >
+            <feSpecularLighting in="softMap" surfaceScale="1" specularConstant="1" specularExponent="100" lightingColor="white" result="specLight">
               <fePointLight x="-200" y="-200" z="300" />
             </feSpecularLighting>
-            <feComposite
-              in="specLight"
-              operator="arithmetic"
-              k1="0"
-              k2="1"
-              k3="1"
-              k4="0"
-              result="litImage"
-            />
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="softMap"
-              scale="200"
-              xChannelSelector="R"
-              yChannelSelector="G"
-            />
+            <feComposite in="specLight" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="litImage" />
+            <feDisplacementMap in="SourceGraphic" in2="softMap" scale="200" xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </svg>
 
-        {/* Glass layers */}
         <div
           className="absolute inset-0 z-0 overflow-hidden rounded-inherit"
-          style={{
-            backdropFilter: "blur(2px)",
-            filter: "url(#glass-distortion)",
-            isolation: "isolate",
-          }}
+          style={{ backdropFilter: 'blur(2px)', filter: 'url(#glass-distortion)', isolation: 'isolate' }}
         />
         <div
           className="absolute inset-0 z-10"
           style={{
-            backgroundColor: "rgba(255, 255, 255, 0.25)",
-            backgroundImage: "linear-gradient(to right, rgba(115,115,115,0.5), rgba(115,115,115,0.5))",
+            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+            backgroundImage: 'linear-gradient(to right, rgba(115,115,115,0.5), rgba(115,115,115,0.5))',
             backgroundSize: `${showProgress ? progress : 0}% 100%`,
-            backgroundRepeat: "no-repeat",
-            borderRadius: "8px",
-            transition: "background-size 0.5s ease",
+            backgroundRepeat: 'no-repeat',
+            borderRadius: '8px',
+            transition: 'background-size 0.5s ease',
           }}
         />
         <div
           className="absolute inset-0 z-20 overflow-hidden"
-          style={{
-            boxShadow:
-              "inset 2px 2px 1px 0 rgba(255, 255, 255, 0), inset -1px -1px 1px 1px rgba(255, 255, 255, 0)",
-          }}
+          style={{ boxShadow: 'inset 2px 2px 1px 0 rgba(255, 255, 255, 0), inset -1px -1px 1px 1px rgba(255, 255, 255, 0)' }}
         />
 
-
-        {/* Header Content */}
         <div className="relative z-30 flex w-full justify-between items-center">
-          {/* Logo/brand */}
           <div className={styles.brandContainer}>
             <h2 className={styles.brand}>Shila Murthi</h2>
           </div>
 
           <div className="flex items-center">
-            {/* Navigation links - hidden on mobile via CSS */}
             <nav className={styles.navContainer}>
               {[
-                { label: "Home", href: "/" },
-                { label: "Shop", href: "/products" },
-                { label: "About", href: "#" },
-                { label: "Contact", href: "/contact" },
+                { label: 'Home', href: '/' },
+                { label: 'Shop', href: '/products' },
+                { label: 'About', href: '#' },
+                { label: 'Contact', href: '/contact' },
               ].map((link) => (
-                <a
-                  key={link.label}
-                  className={styles.navLink}
-                  href={link.href}
-                >
+                <a key={link.label} className={styles.navLink} href={link.href}>
                   {link.label}
                 </a>
               ))}
             </nav>
 
-            {/* User info */}
-            {session?.user && (
+            {hydrated && session?.user && (
               <div style={{ marginRight: 12, color: '#141414', fontSize: 14 }}>
                 {session.user.email || session.user.name || session.user.phone || 'Signed in'}
               </div>
             )}
 
-            {/* Icons */}
             <div className={styles.iconContainer}>
-              {/* Search button */}
               <button className={styles.iconButton} aria-label="Search">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 256 256"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M229.66 218.34l-50.07-50.06a88.11 88.11 0 10-11.31 11.31l50.06 50.07a8 8 0 0011.32-11.32zM40 112a72 72 0 1172 72 72.08 72.08 0 01-72-72z" />
                 </svg>
               </button>
 
-              {/* Cart button with indicator */}
-              <a href="/cart" className={`${styles.iconButton} ${styles.cartButton}`} aria-label={`Cart (${getTotalItems()} items)`}>
+              <a
+                href={preventCartNavigation ? '#' : '/cart'}
+                onClick={(e) => {
+                  if (preventCartNavigation) {
+                    e.preventDefault();
+                    return false;
+                  }
+                }}
+                className={`${styles.iconButton} ${styles.cartButton} ${preventCartNavigation ? styles.cartButtonDisabled : ''}`}
+                aria-label={`Cart (${totalItems} items)`}
+                title={preventCartNavigation ? 'Cart is temporarily disabled after order completion.' : 'Open cart'}
+              >
                 <div className={styles.cartIconContainer}>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                    viewBox="0 0 256 256"
-                  >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                     <path d="M216 40H40A16 16 0 0024 56v144a16 16 0 0016 16h176a16 16 0 0016-16V56a16 16 0 00-16-16zm0 160H40V56h176zM176 88a48 48 0 01-96 0 8 8 0 0116 0 32 32 0 0064 0 8 8 0 0116 0z" />
                   </svg>
                   {shouldShowBadge && (
-                    <span className={`${styles.cartBadge} ${cartLoading ? styles.cartBadgeLoading : ''}`}>
-                      {totalItems}
-                    </span>
+                    <span className={`${styles.cartBadge} ${cartLoading ? styles.cartBadgeLoading : ''}`}>{totalItems}</span>
                   )}
                 </div>
               </a>
@@ -244,3 +168,5 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
 };
 
 export default Header;
+
+

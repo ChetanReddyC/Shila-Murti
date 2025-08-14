@@ -148,8 +148,12 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     }
     logs.push({ step: 'add-shipping-method', details: { added } })
 
-    // Validate coverage by comparing required item profiles vs added methods
-    const cartAfterShipping = await client.getCart(cartId)
+    // Validate coverage by comparing required item profiles vs added methods.
+    // Fetch updated cart and a fresh options list in parallel to reduce round trips.
+    const [cartAfterShipping, remainingOptions] = await Promise.all([
+      client.getCart(cartId),
+      client.getShippingOptionsForCart(cartId),
+    ])
     const itemProfiles = new Set<string>()
     ;(cartAfterShipping.items as any[])?.forEach((it: any) => {
       const pid = it?.variant?.product?.shipping_profile_id || it?.variant?.product?.profile_id
@@ -166,7 +170,6 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     itemProfiles.forEach((pid) => { if (!methodProfiles.has(pid)) missingProfiles.push(pid) })
 
     if (missingProfiles.length > 0) {
-      const remainingOptions = await client.getShippingOptionsForCart(cartId)
       for (const target of missingProfiles) {
         const candidates = remainingOptions.filter((o: any) => String((o as any).shipping_profile_id || (o as any).profile_id) === String(target))
         const pick = selectCheapestOption(candidates as any)
@@ -221,6 +224,9 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
       if (err.status === 404) {
         step = 'cart-expired'
         message = 'Your cart has expired or was not found. Please start checkout again.'
+      } else if (err.status === 400 && /already completed/i.test(err.message || '')) {
+        step = 'cart-completed'
+        message = 'This cart was already completed. We will clear it so you can try again.'
       } else if (err.type === 'network') {
         message = 'Network issue prevented checkout. Check your connection and try again.'
       } else if (err.type === 'timeout') {

@@ -251,6 +251,8 @@ export interface MedusaCart {
   updated_at: string;
   deleted_at: string | null;
   metadata?: Record<string, any>;
+  /** Present when the cart is already completed in Medusa */
+  completed_at?: string | null;
 }
 
 export interface Region {

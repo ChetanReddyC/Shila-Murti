@@ -55,7 +55,22 @@ export default function MagicDonePage() {
         }
       } catch {}
 
-      window.location.replace('/account')
+      // Check if we're in a checkout flow with order confirmation active
+      const orderConfirmationActive = sessionStorage.getItem('order_confirmation_active');
+      const isCheckoutFlow = state && state.startsWith('checkout-');
+      
+      if (isCheckoutFlow || orderConfirmationActive) {
+        // If in checkout flow, close this window/tab rather than redirect
+        // This prevents disrupting the checkout flow in the original tab
+        try {
+          window.close();
+          return; // In case close fails, don't redirect
+        } catch {}
+      }
+      
+      // If not in checkout or close failed, route back to the app root
+      const base = (typeof window !== 'undefined') ? (window.location.origin || '') : ''
+      window.location.replace(base || '/')
     })()
   }, [])
 
