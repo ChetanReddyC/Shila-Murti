@@ -154,6 +154,11 @@
   position: relative;
 }
 
+.cartButtonDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .cartIconContainer {
   position: relative;
   display: flex;

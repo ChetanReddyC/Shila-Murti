@@ -10,7 +10,7 @@ import { processCheckout } from '../../utils/checkoutOrchestrator';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, loading, refreshCart, clearCart } = useCart();
+  const { cart, loading, refreshCart, clearCart, setOrderConfirmationProtection, clearCartSilently } = useCart();
 
   // Ensure we have fresh cart data when entering checkout
   useEffect(() => {
@@ -39,6 +39,93 @@ export default function CheckoutPage() {
     expiryDate: '',
     cvv: ''
   });
+
+  // Identity method and state (Task 2)
+  const [identityMethod, setIdentityMethod] = useState<'phone' | 'email'>('phone')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [identityError, setIdentityError] = useState<string | null>(null)
+
+  // OTP flow state
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpVerifying, setOtpVerifying] = useState(false)
+
+  // Magic link flow state
+  const [magicSending, setMagicSending] = useState(false)
+  const [magicSent, setMagicSent] = useState(false)
+  const [magicVerified, setMagicVerified] = useState(false)
+  const magicPollTimerRef = useRef<any>(null)
+
+  // Purchase readiness gate
+  const [purchaseReady, setPurchaseReady] = useState(false)
+  const [customerId, setCustomerId] = useState<string | null>(null)
+  // Persist readiness across refresh with a short TTL (5 minutes)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('checkout_identity')
+      if (raw) {
+        const data = JSON.parse(raw)
+        if (data && data.expiresAt && data.expiresAt > Date.now()) {
+          setPurchaseReady(Boolean(data.purchaseReady))
+          setCustomerId(data.customerId || null)
+          if (typeof data.identityMethod === 'string') setIdentityMethod(data.identityMethod)
+          if (typeof data.phone === 'string') setPhone(data.phone)
+          if (typeof data.email === 'string') setEmail(data.email)
+        } else {
+          sessionStorage.removeItem('checkout_identity')
+        }
+      }
+    } catch {}
+  }, [])
+  useEffect(() => {
+    try {
+      const ttlMs = 5 * 60 * 1000
+      const blob = {
+        purchaseReady,
+        customerId,
+        identityMethod,
+        phone,
+        email,
+        expiresAt: Date.now() + ttlMs,
+      }
+      sessionStorage.setItem('checkout_identity', JSON.stringify(blob))
+    } catch {}
+  }, [purchaseReady, customerId, identityMethod, phone, email])
+
+  // Map backend error codes to user-friendly messages
+  const mapIdentityError = (
+    source: 'otp-send' | 'otp-verify' | 'magic-send' | 'checkout-verify',
+    code?: string,
+    status?: number,
+  ): string => {
+    const c = String(code || '').toLowerCase()
+    if (source === 'otp-send') {
+      if (c === 'identifier_required') return 'Please enter your WhatsApp phone number.'
+      if (c === 'rate_limited_identifier' || status === 429) return 'Too many OTP requests for this number. Please try again later.'
+      if (c === 'rate_limited_ip') return 'Too many OTP requests from your network. Please wait and try again.'
+      if (c === 'wa_send_failed') return 'Failed to send WhatsApp OTP. Please check your number or try again later.'
+      return 'Unable to send OTP. Please try again.'
+    }
+    if (source === 'otp-verify') {
+      if (c === 'invalid_code') return 'The OTP you entered is invalid.'
+      if (c === 'expired_or_missing') return 'Your OTP has expired. Please request a new one.'
+      return 'Failed to verify OTP. Please try again.'
+    }
+    if (source === 'magic-send') {
+      if (c === 'email_required') return 'Please enter a valid email address.'
+      if (c === 'rate_limited' || status === 429) return 'Too many emails sent. Please try again later.'
+      if (c === 'email_send_failed') return 'Failed to send the magic link. Please try again.'
+      return 'Unable to send magic link. Please try again.'
+    }
+    // checkout-verify
+    if (c === 'identifier_required') return 'Please provide your phone or email to continue.'
+    if (c === 'not_verified') return 'Verification is not complete. Please verify and try again.'
+    if (c === 'ensure_failed') return 'We could not prepare your account. Please try again.'
+    if (status && status >= 500) return 'Temporary error. Please try again.'
+    return 'Verification failed. Please try again.'
+  }
 
   // Derive cart-based values
   const cartItems = cart?.items ?? [];
@@ -208,6 +295,164 @@ export default function CheckoutPage() {
     setPaymentMethod(e.target.value);
   };
 
+  // Reset identity states when switching method
+  const onIdentityMethodChange = (method: 'phone' | 'email') => {
+    setIdentityMethod(method)
+    setIdentityError(null)
+    setOtpSending(false)
+    setOtpSent(false)
+    setOtpCode('')
+    setOtpVerifying(false)
+    setMagicSending(false)
+    setMagicSent(false)
+    setMagicVerified(false)
+    if (magicPollTimerRef.current) {
+      clearInterval(magicPollTimerRef.current)
+      magicPollTimerRef.current = null
+    }
+    setPurchaseReady(false)
+    setCustomerId(null)
+  }
+
+  // Send OTP for phone flow
+  const sendOtp = async () => {
+    try {
+      setIdentityError(null)
+      if (!phone.trim()) {
+        setIdentityError('Enter a valid phone number')
+        return
+      }
+      setOtpSending(true)
+      const res = await fetch('/api/auth/otp/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || body?.ok !== true) {
+        throw new Error(mapIdentityError('otp-send', body?.error, res.status))
+      }
+      setOtpSent(true)
+    } catch (e: any) {
+      setIdentityError(e?.message || mapIdentityError('otp-send'))
+    } finally {
+      setOtpSending(false)
+    }
+  }
+
+  // Verify OTP, then checkout-verify
+  const verifyOtp = async () => {
+    try {
+      setIdentityError(null)
+      if (!otpCode || !/^\d{6}$/.test(otpCode)) {
+        setIdentityError('Enter the 6-digit OTP code')
+        return
+      }
+      setOtpVerifying(true)
+      const vr = await fetch('/api/auth/otp/verify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, code: otpCode })
+      })
+      const vj = await vr.json().catch(() => ({}))
+      if (!vr.ok || vj?.ok !== true) {
+        throw new Error(mapIdentityError('otp-verify', vj?.error, vr.status))
+      }
+      // Checkout verify
+      if (!cart?.id) throw new Error('Cart not ready for verification')
+      const cr = await fetch('/api/auth/session/checkout/verify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, cartId: cart.id })
+      })
+      const cj = await cr.json().catch(() => ({}))
+      if (!cr.ok || cj?.ok !== true) {
+        throw new Error(mapIdentityError('checkout-verify', cj?.error, cr.status))
+      }
+      setCustomerId(String(cj.customerId || ''))
+      setPurchaseReady(true)
+    } catch (e: any) {
+      setIdentityError(e?.message || mapIdentityError('otp-verify'))
+      setPurchaseReady(false)
+      setCustomerId(null)
+    } finally {
+      setOtpVerifying(false)
+    }
+  }
+
+  // Send magic link and start polling
+  const sendMagic = async () => {
+    try {
+      setIdentityError(null)
+      const em = email.trim().toLowerCase()
+      if (!em || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+        setIdentityError('Enter a valid email')
+        return
+      }
+      if (!cart?.id) {
+        setIdentityError('Cart not ready for verification')
+        return
+      }
+      setMagicSending(true)
+      const state = `checkout-${cart.id}`
+      const mr = await fetch('/api/auth/magic/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: em, state })
+      })
+      const mj = await mr.json().catch(() => ({}))
+      if (!mr.ok || mj?.ok !== true) {
+        throw new Error(mapIdentityError('magic-send', mj?.error, mr.status))
+      }
+      setMagicSent(true)
+      // Start polling for status
+      if (magicPollTimerRef.current) clearInterval(magicPollTimerRef.current)
+      let attempts = 0
+      magicPollTimerRef.current = setInterval(async () => {
+        attempts += 1
+        try {
+          const url = `/api/auth/magic/status?email=${encodeURIComponent(em)}&state=${encodeURIComponent(state)}`
+          const sr = await fetch(url)
+          const sj = await sr.json().catch(() => ({}))
+          if (sj?.verified) {
+            clearInterval(magicPollTimerRef.current)
+            magicPollTimerRef.current = null
+            setMagicVerified(true)
+            // Checkout verify
+            const cr = await fetch('/api/auth/session/checkout/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: em, cartId: cart.id })
+            })
+            const cj = await cr.json().catch(() => ({}))
+            if (cr.ok && cj?.ok === true) {
+              setCustomerId(String(cj.customerId || ''))
+              setPurchaseReady(true)
+            } else {
+              setIdentityError(mapIdentityError('checkout-verify', cj?.error, cr.status))
+            }
+          }
+        } catch {}
+        // Stop after ~5 minutes or 150 attempts at 2s
+        if (attempts >= 150) {
+          clearInterval(magicPollTimerRef.current)
+          magicPollTimerRef.current = null
+        }
+      }, 2000)
+    } catch (e: any) {
+      setIdentityError(e?.message || mapIdentityError('magic-send'))
+    } finally {
+      setMagicSending(false)
+    }
+  }
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (magicPollTimerRef.current) clearInterval(magicPollTimerRef.current)
+    }
+  }, [])
+
+  const goToOrderConfirmation = React.useCallback((orderId?: string) => {
+    try { setOrderConfirmationProtection(true) } catch {}
+    router.push(orderId ? `/order-confirmation?order_id=${encodeURIComponent(orderId)}` : '/order-confirmation')
+  }, [router, setOrderConfirmationProtection, clearCartSilently])
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,12 +460,86 @@ export default function CheckoutPage() {
       console.warn('[Checkout] Cannot submit without a valid cart and items');
       return;
     }
+    if ((cart as any)?.completed_at) {
+      // If the cart is already completed, attempt to route to the thank-you page instead of clearing
+      try {
+        // Prefer previously stored order result
+        const raw = sessionStorage.getItem('order_result')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (parsed?.orderId) {
+            goToOrderConfirmation(parsed.orderId)
+            return
+          }
+        }
+      } catch {}
+
+      // If we have a verified customer, fetch their latest order and route there
+      try {
+        if (customerId) {
+          const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+          const data = await res.json().catch(() => ({}))
+          const orders = Array.isArray(data?.orders) ? data.orders : []
+          if (orders.length > 0) {
+            // Pick the most recent order by created_at
+            orders.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+            const latest = orders[0]
+            if (latest?.id) {
+              try {
+                sessionStorage.setItem('order_result', JSON.stringify({ orderId: latest.id, displayId: latest.display_id, timestamp: Date.now() }))
+              } catch {}
+              goToOrderConfirmation(latest.id)
+              return
+            }
+          }
+        }
+      } catch {}
+
+      // Fallback: route without id and let the page use snapshot/cart
+      goToOrderConfirmation()
+      return
+    }
+    if (!purchaseReady) {
+      alert('Please verify your identity to continue. Use phone OTP or email magic link in the Identity Verification section.')
+      return
+    }
 
     // Orchestrate checkout using backend (cheapest shipping, manual payment)
     try {
+      // Persist a lightweight snapshot before we finalize, so the thank-you page can render even if order fetch lags
+      try {
+        const ttlMs = 10 * 60 * 1000
+        const snapshot = {
+          data: {
+            items: cartItems,
+            totals: {
+              subtotal,
+              shipping: Number(effectiveShippingAmount || 0),
+              taxes,
+              total,
+            },
+            customer: {
+              name: formData.name,
+              contactNumber: formData.contactNumber,
+              address: formData.address,
+              city: formData.city,
+              state: formData.state,
+              postalCode: formData.postalCode,
+            },
+            shippingSelection: {
+              optionId: selectedShippingOptionId,
+              amount: Number(effectiveShippingAmount || 0),
+            },
+          },
+          expiresAt: Date.now() + ttlMs,
+        }
+        sessionStorage.setItem('order_checkout_snapshot', JSON.stringify(snapshot))
+      } catch {}
+
       const result = await processCheckout({
         cartId: cart.id,
         cartUpdate: {
+          email: (purchaseReady && identityMethod === 'email' && email.trim()) ? email.trim().toLowerCase() : undefined,
           // Email is optional in the current form; if needed, add an email field later
           shipping_address: {
             first_name: formData.name || 'Customer',
@@ -239,6 +558,7 @@ export default function CheckoutPage() {
       });
 
       if (result.success && result.order) {
+        // Persist lightweight result and redirect immediately to thanks page
         try {
           sessionStorage.setItem('order_result', JSON.stringify({
             orderId: result.order.id,
@@ -246,13 +566,114 @@ export default function CheckoutPage() {
             timestamp: Date.now(),
           }));
         } catch {}
-        router.push(`/order-confirmation?order_id=${encodeURIComponent(result.order.id)}`);
+        // Set protection first to prevent races, then navigate
+        goToOrderConfirmation(result.order.id);
+
+        // Fire-and-forget post-purchase side effects without blocking navigation
+        setTimeout(() => {
+          // 1) Profile update
+          try {
+            const payload: any = {
+              first_name: formData.name || 'Customer',
+              phone: formData.contactNumber || undefined,
+            }
+            if (identityMethod === 'email' && (email || '').trim()) {
+              payload.email = (email || '').trim().toLowerCase()
+            }
+            void fetch('/api/account/profile', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
+              .then(async (res) => {
+                if (!res.ok) {
+                  const text = await res.text().catch(() => '')
+                  console.warn('[Checkout] Profile update failed (non-blocking):', res.status, text)
+                  if (res.status === 401 || res.status === 403) {
+                    try { console.info('[Metrics] account_profile_hardening_denied_total++') } catch {}
+                  }
+                  try { console.info('[Metrics] post_purchase_profile_update_failure_total++') } catch {}
+                }
+              })
+              .catch((e) => {
+                console.warn('[Checkout] Profile update error (non-blocking):', e)
+                try { console.info('[Metrics] post_purchase_profile_update_failure_total++') } catch {}
+              })
+          } catch (e) {
+            console.warn('[Checkout] Profile update threw (non-blocking):', e)
+            try { console.info('[Metrics] post_purchase_profile_update_failure_total++') } catch {}
+          }
+
+          // 2) Programmatic sign-in
+          try {
+            const identifierValue = (identityMethod === 'email')
+              ? (email || '').trim().toLowerCase()
+              : (phone || '').trim()
+            import('next-auth/react').then(({ signIn }) => {
+              signIn('session', { identifier: identifierValue, customerId: customerId || undefined, redirect: false })
+                .then(() => { try { console.info('[Metrics] post_purchase_login_success_total++') } catch {} })
+                .catch((e) => { console.warn('[Checkout] signIn failed (non-blocking):', e); try { console.info('[Metrics] post_purchase_login_failure_total++') } catch {} })
+            }).catch(() => {})
+          } catch {}
+        }, 0)
+
         return;
       }
 
-      // Fallback: store an error snapshot for display
+      // Fallbacks when checkout fails
       console.warn('[Checkout] Checkout failed at step:', result.error?.step, result);
-      alert(result.error?.message || 'Checkout failed. Please try again.');
+      if (result.error?.step === 'cart-completed') {
+        // Attempt to recover latest order and route to thank-you
+        try {
+          if (customerId) {
+            const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+            const data = await res.json().catch(() => ({}))
+            const orders = Array.isArray(data?.orders) ? data.orders : []
+            if (orders.length > 0) {
+              orders.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+              const latest = orders[0]
+              if (latest?.id) {
+                try {
+                  sessionStorage.setItem('order_result', JSON.stringify({ orderId: latest.id, displayId: latest.display_id, timestamp: Date.now() }))
+                } catch {}
+                goToOrderConfirmation(latest.id)
+                return
+              }
+            }
+          }
+        } catch {}
+        // As a last resort, route without id so the page uses the snapshot/cart
+        goToOrderConfirmation()
+        return
+      }
+      try {
+        const msg = String(result.error?.message || '').toLowerCase()
+        if (msg.includes('idempotency')) console.info('[Metrics] idempotency_replay_total++')
+      } catch {}
+
+      // General recovery attempt: try to locate a recent order for this verified customer and navigate
+      try {
+        if (customerId) {
+          const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+          const data = await res.json().catch(() => ({}))
+          const orders = Array.isArray(data?.orders) ? data.orders : []
+          if (orders.length > 0) {
+            orders.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+            const latest = orders[0]
+            if (latest?.id) {
+              try {
+                sessionStorage.setItem('order_result', JSON.stringify({ orderId: latest.id, displayId: latest.display_id, timestamp: Date.now() }))
+              } catch {}
+              goToOrderConfirmation(latest.id)
+              return
+            }
+          }
+        }
+      } catch {}
+
+      // As a final fallback, route to thank-you without id so snapshot renders
+      goToOrderConfirmation()
+      return
     } catch (error: any) {
       console.error('[Checkout] Unexpected error during checkout:', error);
       alert(error?.message || 'Unexpected error during checkout');
@@ -324,6 +745,7 @@ export default function CheckoutPage() {
             <h1 className={styles.title}>Checkout</h1>
             
             <form onSubmit={handleSubmit}>
+              
               {/* Shipping Information Section */}
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>Shipping Information</h2>
@@ -552,6 +974,108 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
+              {/* Identity Verification Section (Task 2) */}
+              <div className={styles.section}>
+                <h2 className={styles.sectionTitle}>Identity Verification</h2>
+                {purchaseReady && (
+                  <div className="mb-3 text-green-600">Now you can purchase. {customerId ? `(Customer: ${customerId})` : ''}</div>
+                )}
+                {identityError && (
+                  <div className="mb-3 text-red-600">{identityError}</div>
+                )}
+                <div className={styles.formRow}>
+                  <div className={styles.paymentOption}>
+                    <input
+                      type="radio"
+                      id="identity_phone"
+                      name="identityMethod"
+                      value="phone"
+                      checked={identityMethod === 'phone'}
+                      onChange={() => onIdentityMethodChange('phone')}
+                      className={styles.radioInput}
+                    />
+                    <label htmlFor="identity_phone" className={styles.radioLabel}>WhatsApp Phone</label>
+                  </div>
+                  <div className={styles.paymentOption}>
+                    <input
+                      type="radio"
+                      id="identity_email"
+                      name="identityMethod"
+                      value="email"
+                      checked={identityMethod === 'email'}
+                      onChange={() => onIdentityMethodChange('email')}
+                      className={styles.radioInput}
+                    />
+                    <label htmlFor="identity_email" className={styles.radioLabel}>Email</label>
+                  </div>
+                </div>
+                {identityMethod === 'phone' ? (
+                  <div>
+                    <div className={styles.formGroup}>
+                      <label htmlFor="phone" className={styles.label}>Phone Number (WhatsApp)</label>
+                      <input
+                        type="text"
+                        id="phone"
+                        name="phone"
+                        className={styles.input}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g., +1 555 123 4567"
+                      />
+                    </div>
+                    <div className="flex gap-2 mb-2">
+                      <button type="button" className={styles.placeOrderButton} onClick={sendOtp} disabled={otpSending || !phone.trim()}>
+                        {otpSending ? 'Sending...' : (otpSent ? 'Resend OTP' : 'Send OTP')}
+                      </button>
+                    </div>
+                    {otpSent && (
+                      <div className={styles.formGroup}>
+                        <label htmlFor="otp" className={styles.label}>Enter OTP</label>
+                        <input
+                          type="text"
+                          id="otp"
+                          name="otp"
+                          className={styles.input}
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value)}
+                          placeholder="6-digit code"
+                        />
+                        <div className="mt-2">
+                          <button type="button" className={styles.placeOrderButton} onClick={verifyOtp} disabled={otpVerifying || !otpCode}>
+                            {otpVerifying ? 'Verifying...' : 'Verify'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className={styles.formGroup}>
+                      <label htmlFor="email" className={styles.label}>Email</label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        className={styles.input}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                    <div className="flex gap-2 mb-2">
+                      <button type="button" className={styles.placeOrderButton} onClick={sendMagic} disabled={magicSending || !email.trim()}>
+                        {magicSending ? 'Sending...' : (magicSent ? 'Resend Magic Link' : 'Send Magic Link')}
+                      </button>
+                    </div>
+                    {magicSent && !magicVerified && (
+                      <div className="text-gray-600">We sent a link to your email. Click it and return here; we are checking every few seconds...</div>
+                    )}
+                    {magicVerified && (
+                      <div className="text-green-600">Email verified.</div>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {/* Order Summary Section */}
               <div className={styles.section}>
@@ -599,7 +1123,7 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 
-                <button type="submit" className={styles.placeOrderButton}>
+                <button type="submit" className={styles.placeOrderButton} disabled={!purchaseReady}>
                   Place Order
                 </button>
               </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, useRef } from 'react';
 import { MedusaCart } from '../types/medusa';
 import { medusaApiClient, ApiError } from '../utils/medusaApiClient';
 import { useErrorHandler } from '../hooks/useErrorHandler';
@@ -11,6 +11,7 @@ interface CartState {
   loading: boolean;
   error: string | null;
   cartId: string | null;
+  orderConfirmationProtection: boolean;
 }
 
 // Cart actions
@@ -20,6 +21,8 @@ type CartAction =
   | { type: 'SET_CART'; payload: MedusaCart }
   | { type: 'SET_CART_ID'; payload: string | null }
   | { type: 'CLEAR_CART' }
+  | { type: 'CLEAR_CART_SILENTLY' }
+  | { type: 'SET_ORDER_CONFIRMATION_PROTECTION'; payload: boolean }
   | { type: 'RESET_STATE' };
 
 // Cart context interface
@@ -31,12 +34,15 @@ interface CartContextType {
   removeFromCart: (lineItemId: string) => Promise<void>;
   updateQuantity: (lineItemId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  clearCartSilently: () => Promise<void>;
   getTotalItems: () => number;
   refreshCart: () => Promise<void>;
   createCart: () => Promise<void>;
   clearError: () => void;
   retryLastOperation: () => Promise<void>;
   isRetryable: boolean;
+  isOrderConfirmationActive: () => boolean;
+  setOrderConfirmationProtection: (active: boolean) => void;
 }
 
 // Initial state
@@ -45,6 +51,7 @@ const initialState: CartState = {
   loading: false,
   error: null,
   cartId: null,
+  orderConfirmationProtection: false,
 };
 
 // Cart reducer
@@ -91,6 +98,17 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         cartId: null,
         error: null,
       };
+    case 'CLEAR_CART_SILENTLY':
+      return {
+        ...state,
+        cart: null,
+        cartId: null,
+      };
+    case 'SET_ORDER_CONFIRMATION_PROTECTION':
+      return {
+        ...state,
+        orderConfirmationProtection: action.payload,
+      };
     case 'RESET_STATE':
       return initialState;
     default:
@@ -100,6 +118,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
 // Session storage keys
 const CART_ID_KEY = 'medusa_cart_id';
+import {
+  ORDER_CONFIRMATION_ACTIVE_KEY,
+  DEFAULT_TTL_MS as ORDER_CONFIRMATION_TTL_MS,
+  getOrderConfirmationProtectionExpiry,
+  isOrderConfirmationProtectionActive as extIsActive,
+  setOrderConfirmationProtection as extSetActive,
+} from '../utils/orderConfirmationProtection';
 
 // Create context
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -143,6 +168,9 @@ export function CartProvider({ children }: CartProviderProps) {
     }
   };
 
+  // Guard to prevent concurrent silent clearing operations
+  const silentClearInProgressRef = useRef(false);
+
   const getCartIdFromSession = (): string | null => {
     try {
       const cartId = sessionStorage.getItem(CART_ID_KEY);
@@ -168,8 +196,39 @@ export function CartProvider({ children }: CartProviderProps) {
     }
   };
 
+  // Order confirmation protection helpers (sessionStorage-backed with TTL)
+  const getOrderConfirmationActive = React.useCallback((): boolean => {
+    return extIsActive();
+  }, []);
+
+  const setOrderConfirmationProtection = React.useCallback((active: boolean): void => {
+    try {
+      extSetActive(active, ORDER_CONFIRMATION_TTL_MS);
+    } catch (error) {
+      console.warn('[CartContext] Failed to persist protection flag; falling back to in-memory state only', error);
+    }
+    dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: active });
+  }, []);
+
+  const isOrderConfirmationActive = React.useCallback((): boolean => {
+    const expiry = getOrderConfirmationProtectionExpiry();
+    return typeof expiry === 'number' ? expiry > Date.now() : false;
+  }, []);
+
+  // Keep in-memory state in sync with persisted flag without dispatching during render
+  useEffect(() => {
+    const derivedActive = isOrderConfirmationActive();
+    if (derivedActive !== state.orderConfirmationProtection) {
+      dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: derivedActive });
+    }
+  }, [isOrderConfirmationActive, state.orderConfirmationProtection]);
+
   // Create a new cart
   const createCart = React.useCallback(async (): Promise<void> => {
+    if (isOrderConfirmationActive()) {
+      console.log('[CartContext] Order confirmation protection active; skipping createCart');
+      return;
+    }
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     setLastOperation({ type: 'createCart', params: [] });
@@ -189,7 +248,7 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error; // Re-throw so calling components can handle it
     }
-  }, []);
+  }, [isOrderConfirmationActive]);
 
   // Handle cart session expiration and recreation
   const handleCartExpiration = React.useCallback(async (): Promise<void> => {
@@ -204,6 +263,10 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Refresh cart from API with enhanced error handling
   const refreshCart = React.useCallback(async (): Promise<void> => {
+    if (isOrderConfirmationActive()) {
+      console.log('[CartContext] Order confirmation protection active; skipping refreshCart');
+      return;
+    }
     const cartId = state.cartId || getCartIdFromSession();
     
     if (!cartId) {
@@ -218,7 +281,13 @@ export function CartProvider({ children }: CartProviderProps) {
     try {
       console.log('[CartContext] Refreshing cart:', cartId);
       const cart = await medusaApiClient.getCart(cartId);
-      
+      // If the cart is already completed, treat as expired and clear
+      if ((cart as any)?.completed_at) {
+        console.log('[CartContext] Retrieved completed cart on refresh; clearing session');
+        await handleCartExpiration();
+        setLastOperation(null);
+        return;
+      }
       dispatch({ type: 'SET_CART', payload: cart });
       setLastOperation(null); // Clear last operation on success
       console.log('[CartContext] Cart refreshed successfully, items:', cart.items?.length || 0);
@@ -235,10 +304,14 @@ export function CartProvider({ children }: CartProviderProps) {
         dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
     }
-  }, [state.cartId, handleCartExpiration, handleApiError]);
+  }, [state.cartId, handleCartExpiration, handleApiError, isOrderConfirmationActive]);
 
   // Add item to cart with enhanced session management
   const addToCart = React.useCallback(async (variantId: string, quantity: number): Promise<void> => {
+    if (isOrderConfirmationActive()) {
+      console.log('[CartContext] Order confirmation protection active; skipping addToCart');
+      return;
+    }
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     setLastOperation({ type: 'addToCart', params: [variantId, quantity] });
@@ -253,7 +326,16 @@ export function CartProvider({ children }: CartProviderProps) {
         try {
           console.log('[CartContext] Found cart ID but no cart object, refreshing...');
           currentCart = await medusaApiClient.getCart(cartId);
-          dispatch({ type: 'SET_CART', payload: currentCart });
+          if ((currentCart as any)?.completed_at) {
+            console.log('[CartContext] Refreshed cart is completed; clearing and creating a new cart');
+            removeCartIdFromSession();
+            dispatch({ type: 'CLEAR_CART' });
+            currentCart = null as any;
+            cartId = null;
+          }
+          if (currentCart) {
+            dispatch({ type: 'SET_CART', payload: currentCart as MedusaCart });
+          }
         } catch (refreshError) {
           console.log('[CartContext] Failed to refresh existing cart, will create new one');
           removeCartIdFromSession();
@@ -262,6 +344,14 @@ export function CartProvider({ children }: CartProviderProps) {
         }
       }
       
+      // If we still have a cart object but it's completed, discard it before creating a new one
+      if (currentCart && (currentCart as any)?.completed_at) {
+        console.log('[CartContext] Current cart is completed; discarding before add');
+        await handleCartExpiration();
+        currentCart = null as any;
+        cartId = null;
+      }
+
       // Create new cart if needed
       if (!currentCart) {
         try {
@@ -299,10 +389,14 @@ export function CartProvider({ children }: CartProviderProps) {
       
       throw error; // Re-throw so calling components can handle it
     }
-  }, [state.cart, state.cartId, handleApiError]);
+  }, [state.cart, state.cartId, handleApiError, isOrderConfirmationActive]);
 
   // Remove item from cart
   const removeFromCart = React.useCallback(async (lineItemId: string): Promise<void> => {
+    if (isOrderConfirmationActive()) {
+      console.log('[CartContext] Order confirmation protection active; skipping removeFromCart');
+      return;
+    }
     if (!state.cart) {
       throw new Error('No cart available');
     }
@@ -349,10 +443,14 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
     }
-  }, [state.cart, handleApiError]);
+  }, [state.cart, handleApiError, isOrderConfirmationActive]);
 
   // Update item quantity in cart
   const updateQuantity = React.useCallback(async (lineItemId: string, quantity: number): Promise<void> => {
+    if (isOrderConfirmationActive()) {
+      console.log('[CartContext] Order confirmation protection active; skipping updateQuantity');
+      return;
+    }
     if (!state.cart) {
       throw new Error('No cart available');
     }
@@ -389,16 +487,39 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
     }
-  }, [state.cart, removeFromCart, handleApiError]);
+  }, [state.cart, removeFromCart, handleApiError, isOrderConfirmationActive]);
 
   // Clear cart (reset state and remove from session)
   const clearCart = React.useCallback(async (): Promise<void> => {
+    // Do not force route changes here. Just clear state and id.
     dispatch({ type: 'CLEAR_CART' });
     removeCartIdFromSession();
     setLastOperation(null);
     clearErrorHandler();
     console.log('[CartContext] Cart cleared');
   }, [clearErrorHandler]);
+
+  // Clear cart silently: reset state and session without touching loading/error
+  const clearCartSilently = React.useCallback(async (): Promise<void> => {
+    if (silentClearInProgressRef.current) {
+      return;
+    }
+    silentClearInProgressRef.current = true;
+    try {
+      dispatch({ type: 'CLEAR_CART_SILENTLY' });
+      removeCartIdFromSession();
+      console.log('[CartContext] Cart cleared silently');
+    } catch (error) {
+      // Graceful degradation: log and attempt a best-effort non-silent clear without surfacing UI states
+      console.warn('[CartContext] Silent clear encountered an error; applying fallback clear', error);
+      try {
+        dispatch({ type: 'CLEAR_CART' });
+        removeCartIdFromSession();
+      } catch {}
+    } finally {
+      silentClearInProgressRef.current = false;
+    }
+  }, []);
 
   // Clear error state
   const clearError = React.useCallback((): void => {
@@ -452,28 +573,53 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Validate cart session integrity
   const validateCartSession = React.useCallback(async (cartId: string): Promise<boolean> => {
+    if (isOrderConfirmationActive()) {
+      console.log('[CartContext] Order confirmation protection active; validateCartSession -> false');
+      return false;
+    }
     try {
       console.log('[CartContext] Validating cart session:', cartId);
-      await medusaApiClient.getCart(cartId);
+      const cart = await medusaApiClient.getCart(cartId);
+      if ((cart as any)?.completed_at) {
+        console.log('[CartContext] Cart session points to a completed cart; invalid');
+        return false;
+      }
       console.log('[CartContext] Cart session is valid');
       return true;
     } catch (error) {
       console.log('[CartContext] Cart session is invalid or expired:', error);
       return false;
     }
-  }, []);
+  }, [isOrderConfirmationActive]);
 
   // Initialize cart on mount and handle session management
   useEffect(() => {
     const initializeCart = async () => {
-      const savedCartId = getCartIdFromSession();
+      // Check if we're in a post-order state where cart recovery should be blocked
+      if (typeof window !== 'undefined') {
+        const active = isOrderConfirmationActive();
+        if (active) {
+          dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: true });
+          console.log('[CartContext] Order confirmation active; skipping cart recovery');
+          return;
+        }
+      }
       
+      const path = typeof window !== 'undefined' ? window.location.pathname : ''
+      const savedCartId = getCartIdFromSession();
+
+      // On order-confirmation page, do not recover cart to avoid any interference; user just placed an order.
+      if (path && path.startsWith('/order-confirmation')) {
+        console.log('[CartContext] On order confirmation; skipping cart recovery');
+        // Set a marker to prevent any cart-related redirects for the next 30 seconds
+        setOrderConfirmationProtection(true);
+        return
+      }
+
       if (savedCartId) {
         console.log('[CartContext] Found saved cart ID, attempting to recover:', savedCartId);
-        
         // Validate the cart session before using it
         const isValidSession = await validateCartSession(savedCartId);
-        
         if (isValidSession) {
           dispatch({ type: 'SET_CART_ID', payload: savedCartId });
           await refreshCart();
@@ -488,7 +634,21 @@ export function CartProvider({ children }: CartProviderProps) {
     };
 
     initializeCart();
-  }, []);
+  }, [isOrderConfirmationActive, setOrderConfirmationProtection]);
+
+  // Handle browser back/forward: if user navigates to order confirmation, refresh protection TTL
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      if (path && path.startsWith('/order-confirmation')) {
+        setOrderConfirmationProtection(true);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [setOrderConfirmationProtection]);
 
   // Handle browser session end - cleanup on beforeunload
   useEffect(() => {
@@ -512,6 +672,10 @@ export function CartProvider({ children }: CartProviderProps) {
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (!document.hidden && state.cartId) {
+        // Do not auto-refresh on order confirmation page to avoid flicker/redirects
+        const path = typeof window !== 'undefined' ? window.location.pathname : ''
+        if (path && path.startsWith('/order-confirmation')) return
+        if (isOrderConfirmationActive()) return
         console.log('[CartContext] Page became visible, refreshing cart state');
         await refreshCart();
       }
@@ -522,7 +686,7 @@ export function CartProvider({ children }: CartProviderProps) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [state.cartId]);
+  }, [state.cartId, isOrderConfirmationActive, refreshCart]);
 
   // Handle network connectivity changes to ensure cart persistence
   useEffect(() => {
@@ -531,6 +695,7 @@ export function CartProvider({ children }: CartProviderProps) {
       
       // If we have a cart ID but no cart data, try to refresh
       if (state.cartId && !state.cart) {
+        if (isOrderConfirmationActive()) return
         console.log('[CartContext] Attempting to restore cart after reconnection');
         await refreshCart();
       }
@@ -548,11 +713,14 @@ export function CartProvider({ children }: CartProviderProps) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [state.cartId, state.cart]);
+  }, [state.cartId, state.cart, isOrderConfirmationActive, refreshCart]);
 
   // Periodic cart session validation to ensure persistence
   useEffect(() => {
     if (!state.cartId || !state.cart) {
+      return;
+    }
+    if (isOrderConfirmationActive()) {
       return;
     }
 
@@ -572,7 +740,7 @@ export function CartProvider({ children }: CartProviderProps) {
     return () => {
       clearInterval(validationInterval);
     };
-  }, [state.cartId, state.cart]);
+  }, [state.cartId, state.cart, isOrderConfirmationActive, handleCartExpiration]);
 
   // Context value
   const contextValue: CartContextType = React.useMemo(() => ({
@@ -583,13 +751,16 @@ export function CartProvider({ children }: CartProviderProps) {
     removeFromCart,
     updateQuantity,
     clearCart,
+    clearCartSilently,
     getTotalItems,
     refreshCart,
     createCart,
     clearError,
     retryLastOperation,
     isRetryable: errorState.isRetryable || (lastOperation !== null && isRetryableError(errorState.originalError)),
-  }), [state.cart, state.loading, state.error, errorState.error, addToCart, removeFromCart, updateQuantity, clearCart, getTotalItems, refreshCart, createCart, clearError, retryLastOperation, errorState.isRetryable, lastOperation, isRetryableError, errorState.originalError]);
+    isOrderConfirmationActive,
+    setOrderConfirmationProtection,
+  }), [state.cart, state.loading, state.error, errorState.error, addToCart, removeFromCart, updateQuantity, clearCart, clearCartSilently, getTotalItems, refreshCart, createCart, clearError, retryLastOperation, errorState.isRetryable, lastOperation, isRetryableError, errorState.originalError, isOrderConfirmationActive, setOrderConfirmationProtection]);
 
   return (
     <CartContext.Provider value={contextValue}>
