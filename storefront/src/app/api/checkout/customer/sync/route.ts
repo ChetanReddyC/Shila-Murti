@@ -117,6 +117,24 @@ export async function POST(req: NextRequest) {
           }), { status: 400 })
         }
       }
+      
+      // Validate country code format if provided
+      if (formData.address.country_code && formData.address.country_code.length !== 2) {
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'invalid_country_code',
+          message: 'Country code must be a 2-character ISO code (e.g., "IN")'
+        }), { status: 400 })
+      }
+      
+      // Validate postal code format for India
+      if (formData.address.postal_code && !/^\d{6}$/.test(formData.address.postal_code.trim())) {
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'invalid_postal_code',
+          message: 'Postal code must be 6 digits for Indian addresses'
+        }), { status: 400 })
+      }
     }
     
     // Ensure customer is WhatsApp authenticated
@@ -200,10 +218,11 @@ export async function POST(req: NextRequest) {
         first_name: formData.first_name,
         last_name: formData.last_name || '',
         address_1: formData.address.address_1,
+        address_2: formData.address.address_2 || null, // Include address_2 field
         city: formData.address.city,
         postal_code: formData.address.postal_code,
         province: formData.address.province,
-        country_code: formData.address.country_code,
+        country_code: formData.address.country_code || 'IN', // Default to India
         phone: formData.phone, // Use shipping phone for the address record
         metadata: {
           source: 'checkout',

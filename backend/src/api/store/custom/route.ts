@@ -121,9 +121,33 @@ async function handleCustomerRequest(
         phone: phone || resultCustomer.phone
       };
       
-      // Always include addresses if provided
+      // Include addresses directly in customer update payload
       if (addresses?.length) {
-        updatePayload.addresses = addresses;
+        // Transform addresses to the expected format
+        const transformedAddresses = addresses.map((address: any) => ({
+          first_name: address.first_name || parsedFirstName,
+          last_name: address.last_name || parsedLastName || '',
+          address_1: address.address_1?.trim(),
+          address_2: address.address_2?.trim() || null,
+          city: address.city?.trim(),
+          postal_code: address.postal_code?.trim(),
+          province: address.province?.trim() || null,
+          country_code: (address.country_code || 'IN').toUpperCase(),
+          phone: address.phone?.trim() || null,
+          metadata: {
+            source: 'checkout',
+            created_from_sync: true,
+            sync_timestamp: new Date().toISOString(),
+            ...(address.metadata || {})
+          }
+        }));
+        
+        updatePayload.addresses = transformedAddresses;
+        
+        console.log('[CUSTOMER_UPDATE] Including addresses in update payload:', {
+          customerId: resultCustomer.id,
+          addressCount: transformedAddresses.length
+        });
       }
       
       // Enhanced metadata with consolidation information
@@ -158,10 +182,13 @@ async function handleCustomerRequest(
       try {
         const updateResult = await customerModuleService.updateCustomers(resultCustomer.id, updatePayload);
         
-        // Fetch updated customer to verify changes
+        // Fetch updated customer to verify changes and include addresses
         const [finalCustomer] = await customerModuleService.listCustomers(
           { id: resultCustomer.id },
-          { take: 1 }
+          { 
+            take: 1,
+            relations: ['addresses'] // Include addresses in the response
+          }
         );
         
         console.log('[CUSTOMER_UPDATE] Successfully updated customer:', {
@@ -194,10 +221,27 @@ async function handleCustomerRequest(
     const safePassword = password || randomUUID();
     
     // Use the customer data prepared by enhanced customer service
+    // Include addresses in customer creation data
     const customerCreateData = {
       ...resultCustomer, // This contains the enhanced metadata
       password: safePassword,
-      addresses // Add addresses from request
+      addresses: addresses?.length ? addresses.map((address: any) => ({
+        first_name: address.first_name || parsedFirstName,
+        last_name: address.last_name || parsedLastName || '',
+        address_1: address.address_1?.trim(),
+        address_2: address.address_2?.trim() || null,
+        city: address.city?.trim(),
+        postal_code: address.postal_code?.trim(),
+        province: address.province?.trim() || null,
+        country_code: (address.country_code || 'IN').toUpperCase(),
+        phone: address.phone?.trim() || null,
+        metadata: {
+          source: 'checkout',
+          created_from_sync: true,
+          sync_timestamp: new Date().toISOString(),
+          ...(address.metadata || {})
+        }
+      })) : []
     };
     
     console.log('[CUSTOMER_CREATE] Customer creation payload:', {
@@ -220,11 +264,34 @@ async function handleCustomerRequest(
     console.log('[CUSTOMER_CREATE] Successfully created customer:', {
       id: customer?.id,
       email: customer?.email,
-      phone: customer?.phone
+      phone: customer?.phone,
+      addresses_count: customer?.addresses?.length || 0
     });
     
+    // Fetch the final customer with addresses to return complete data
+    let finalCustomer = customer;
+    if (customer?.id) {
+      try {
+        const [customerWithAddresses] = await customerModuleService.listCustomers(
+          { id: customer.id },
+          { 
+            take: 1,
+            relations: ['addresses'] // Include addresses in the response
+          }
+        );
+        finalCustomer = customerWithAddresses || customer;
+        
+        console.log('[CUSTOMER_CREATE] Final customer with addresses:', {
+          id: finalCustomer.id,
+          addresses_count: finalCustomer.addresses?.length || 0
+        });
+      } catch (fetchError) {
+        console.warn('[CUSTOMER_CREATE] Failed to fetch customer with addresses, using original customer object');
+      }
+    }
+    
     return res.status(201).json({ 
-      customer,
+      customer: finalCustomer,
       consolidation_info: consolidationInfo
     });
   } catch (e: any) {
