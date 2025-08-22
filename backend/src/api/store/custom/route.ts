@@ -118,7 +118,8 @@ async function handleCustomerRequest(
       const updatePayload: Record<string, any> = {
         first_name: parsedFirstName || resultCustomer.first_name,
         last_name: parsedLastName || resultCustomer.last_name,
-        phone: phone || resultCustomer.phone
+        phone: phone || resultCustomer.phone,
+        has_account: true // Ensure WhatsApp authenticated customers are marked as registered accounts
       };
       
       // Include addresses directly in customer update payload
@@ -175,6 +176,7 @@ async function handleCustomerRequest(
           first_name: updatePayload.first_name,
           last_name: updatePayload.last_name,
           phone: updatePayload.phone,
+          has_account: updatePayload.has_account, // Log has_account value
           addressCount: updatePayload.addresses?.length || 0
         }
       });
@@ -197,6 +199,7 @@ async function handleCustomerRequest(
           first_name: finalCustomer.first_name,
           last_name: finalCustomer.last_name,
           phone: finalCustomer.phone,
+          has_account: finalCustomer.has_account, // Log final has_account status
           addresses_count: finalCustomer.addresses?.length || 0
         });
 
@@ -225,6 +228,7 @@ async function handleCustomerRequest(
     const customerCreateData = {
       ...resultCustomer, // This contains the enhanced metadata
       password: safePassword,
+      has_account: true, // Ensure WhatsApp authenticated customers are marked as registered accounts
       addresses: addresses?.length ? addresses.map((address: any) => ({
         first_name: address.first_name || parsedFirstName,
         last_name: address.last_name || parsedLastName || '',
@@ -249,6 +253,7 @@ async function handleCustomerRequest(
       last_name: customerCreateData.last_name,
       email: customerCreateData.email,
       phone: customerCreateData.phone,
+      has_account: customerCreateData.has_account, // Log has_account value
       addressCount: addresses?.length || 0,
       metadata: customerCreateData.metadata
     });
@@ -265,6 +270,7 @@ async function handleCustomerRequest(
       id: customer?.id,
       email: customer?.email,
       phone: customer?.phone,
+      has_account: customer?.has_account, // Log has_account status
       addresses_count: customer?.addresses?.length || 0
     });
     
