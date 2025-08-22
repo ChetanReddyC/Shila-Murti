@@ -238,6 +238,7 @@ export class EnhancedCustomerService {
       first_name: request.first_name || existingCustomer.first_name,
       last_name: request.last_name || existingCustomer.last_name,
       phone: request.phone || existingCustomer.phone,
+      has_account: request.whatsapp_authenticated || existingCustomer.has_account || false, // Ensure WhatsApp authenticated customers are marked as registered
       metadata: {
         ...(existingCustomer.metadata || {}),
         phone: request.phone,
@@ -272,6 +273,7 @@ export class EnhancedCustomerService {
       last_name: request.last_name || "",
       email: effectiveEmail,
       phone: request.phone,
+      has_account: request.whatsapp_authenticated, // Mark WhatsApp authenticated customers as registered accounts
       metadata: {
         phone: request.phone,
         phone_normalized: normalizedPhone,
