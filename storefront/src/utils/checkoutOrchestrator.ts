@@ -13,6 +13,21 @@ export interface CheckoutInput {
   selectedShippingKey?: 'standard' | 'expedited' | 'express'
   /** Exact shipping option ids chosen by the user (supports multi-profile carts). These take precedence when present. */
   selectedOptionIds?: string[]
+  // NEW: Customer sync data
+  customerId?: string
+  checkoutFormData?: {
+    first_name: string
+    last_name: string
+    phone: string
+    address: {
+      address_1: string
+      city: string
+      postal_code: string
+      province: string
+      country_code: string
+      phone?: string
+    }
+  }
 }
 
 export interface CheckoutProgressLog {
@@ -95,9 +110,30 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
   try {
     // 1) Update cart with email and shipping/billing addresses
     currentStep = 'update-cart'
-    console.log('[CheckoutOrchestrator] Updating cart with address/email', { cartId })
+    console.log('[CheckoutOrchestrator] Updating cart with address/email:', { 
+      cartId, 
+      hasEmail: !!cartUpdate.email,
+      hasShippingAddress: !!cartUpdate.shipping_address,
+      customerId: input.customerId // Log separately for customer sync
+    })
     const updatedCart = await client.updateCart(cartId, cartUpdate)
-    logs.push({ step: 'update-cart', details: { cartId: updatedCart.id } })
+    logs.push({ step: 'update-cart', details: { 
+      cartId: updatedCart.id,
+      hasCustomerForSync: !!input.customerId
+    } })
+    
+    // 1.5) Associate customer with cart if available (Medusa v2 optimization)
+    if (input.customerId) {
+      currentStep = 'associate-customer'
+      console.log('[CheckoutOrchestrator] Attempting customer-cart association:', { cartId, customerId: input.customerId })
+      try {
+        await client.associateCustomerWithCart(cartId, input.customerId)
+        logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: true } })
+      } catch (error: any) {
+        console.warn('[CheckoutOrchestrator] Customer association failed (non-blocking):', error.message)
+        logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: false, error: error.message } })
+      }
+    }
 
     // 2) Fetch shipping options and select one (per profile)
     currentStep = 'fetch-shipping-options'
@@ -213,6 +249,140 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
     const order = completion.order
     logs.push({ step: 'order-ready', details: { orderId: order.id, display_id: order.display_id } })
+
+    // NEW: Customer profile sync after successful order creation
+    if (order && input.customerId && input.checkoutFormData) {
+      try {
+        console.log('[CheckoutOrchestrator] Starting customer profile sync:', {
+          customerId: input.customerId,
+          cartId: input.cartId,
+          hasFormData: !!input.checkoutFormData
+        })
+        
+        // Enhanced sync with timeout and retry logic
+        const syncController = new AbortController()
+        const syncTimeout = setTimeout(() => syncController.abort(), 10000) // 10 second timeout
+        
+        const syncResult = await fetch('/api/checkout/customer/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerId: input.customerId,
+            cartId: input.cartId,
+            formData: input.checkoutFormData,
+            orderCreated: true,
+            whatsapp_authenticated: true, // Only customers with WhatsApp authentication should reach here
+          }),
+          signal: syncController.signal
+        })
+        
+        clearTimeout(syncTimeout)
+        
+        const syncResponse = await syncResult.text()
+        let parsedResponse = null
+        
+        try {
+          parsedResponse = JSON.parse(syncResponse)
+        } catch {
+          parsedResponse = { error: 'invalid_response', rawResponse: syncResponse }
+        }
+        
+        console.log('[CheckoutOrchestrator] Customer sync response:', {
+          ok: syncResult.ok,
+          status: syncResult.status,
+          response: parsedResponse
+        })
+        
+        if (syncResult.ok && parsedResponse?.ok) {
+          logs.push({ 
+            step: 'customer-profile-sync', 
+            details: { 
+              customerId: input.customerId, 
+              success: true,
+              attempts: parsedResponse.attempts || 1
+            } 
+          })
+          console.log('[CheckoutOrchestrator] Customer profile sync completed successfully')
+        } else {
+          // Enhanced error categorization
+          const errorType = parsedResponse?.error || 'unknown_error'
+          const errorMessage = parsedResponse?.message || syncResponse || 'Unknown sync error'
+          
+          console.warn('[CheckoutOrchestrator] Customer sync failed (non-blocking):', {
+            status: syncResult.status,
+            errorType,
+            errorMessage,
+            customerId: input.customerId
+          })
+          
+          logs.push({ 
+            step: 'customer-profile-sync-failed', 
+            details: { 
+              customerId: input.customerId,
+              status: syncResult.status,
+              errorType,
+              errorMessage,
+              recoverable: errorType !== 'customer_not_found' && errorType !== 'invalid_request'
+            } 
+          })
+          
+          // Log specific error metrics
+          if (errorType === 'timeout') {
+            console.info('[Metrics] customer_sync_timeout_total++')
+          } else if (errorType === 'customer_not_found') {
+            console.info('[Metrics] customer_sync_not_found_total++')
+          } else if (errorType === 'configuration_error') {
+            console.info('[Metrics] customer_sync_config_error_total++')
+          } else {
+            console.info('[Metrics] customer_sync_other_error_total++')
+          }
+        }
+        
+      } catch (error: any) {
+        // Handle network errors, timeouts, etc.
+        const isTimeout = error.name === 'AbortError' || error.message?.includes('timeout')
+        const errorType = isTimeout ? 'network_timeout' : 'network_error'
+        
+        console.error('[CheckoutOrchestrator] Customer sync error (non-blocking):', {
+          error: error.message || String(error),
+          type: errorType,
+          customerId: input.customerId
+        })
+        
+        logs.push({ 
+          step: 'customer-profile-sync-error', 
+          details: { 
+            customerId: input.customerId,
+            errorType,
+            errorMessage: error.message || String(error),
+            recoverable: true // Network errors are generally recoverable
+          } 
+        })
+        
+        if (isTimeout) {
+          console.info('[Metrics] customer_sync_network_timeout_total++')
+        } else {
+          console.info('[Metrics] customer_sync_network_error_total++')
+        }
+      }
+    } else {
+      // Log why sync was skipped
+      const skipReason = !order ? 'no_order' : 
+                        !input.customerId ? 'no_customer_id' : 
+                        !input.checkoutFormData ? 'no_form_data' : 'unknown'
+      
+      console.log('[CheckoutOrchestrator] Skipping customer sync:', {
+        reason: skipReason,
+        hasOrder: !!order,
+        hasCustomerId: !!input.customerId,
+        hasFormData: !!input.checkoutFormData
+      })
+      
+      logs.push({ 
+        step: 'customer-profile-sync-skipped', 
+        details: { reason: skipReason } 
+      })
+    }
 
     return { success: true, order, cartId, logs }
   } catch (err: any) {

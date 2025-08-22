@@ -762,12 +762,43 @@ export class MedusaApiClient {
   /** Update cart details: email, shipping/billing address */
   async updateCart(cartId: string, payload: UpdateCartPayload): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}`;
-    console.log('[MedusaApiClient] Updating cart:', cartId, payload);
+    console.log('[MedusaApiClient] Updating cart:', cartId, {
+      hasEmail: !!payload.email,
+      hasShippingAddress: !!payload.shipping_address,
+      hasBillingAddress: !!payload.billing_address
+    });
     const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
       method: 'POST',
       body: JSON.stringify(payload),
     });
     return response.cart;
+  }
+
+  /** Associate customer with cart using storefront API (Medusa v2 compatible) */
+  async associateCustomerWithCart(cartId: string, customerId: string): Promise<void> {
+    console.log('[MedusaApiClient] Associating customer with cart:', { cartId, customerId });
+    
+    try {
+      // Use the storefront customer sync API to ensure customer association before completion
+      const response = await fetch('/api/checkout/customer/associate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cartId, customerId }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Customer association failed: ${response.status} ${errorText}`);
+      }
+      
+      console.log('[MedusaApiClient] Customer successfully associated with cart');
+    } catch (error: any) {
+      console.error('[MedusaApiClient] Customer association error:', error);
+      // Don't throw - this is a best-effort optimization
+      // The customer sync after order creation will handle this
+    }
   }
 
   /** List eligible shipping options for a cart */
