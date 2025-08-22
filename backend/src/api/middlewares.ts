@@ -91,10 +91,15 @@ export default defineMiddlewares({
       middlewares: [authGuard],
     },
     {
+      // Enforce elevated session (mfaComplete=true) on custom customer update endpoint
+      matcher: "/store/custom/customer*",
+      middlewares: [authGuard],
+    },
+    {
       // Enforce elevated session (mfaComplete=true) on address book endpoints
       matcher: "/store/addresses*",
       middlewares: [authGuard],
-    },
+    }
   ],
 })
 

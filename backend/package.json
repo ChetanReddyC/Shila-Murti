@@ -32,9 +32,9 @@
     "@mikro-orm/migrations": "6.4.3",
     "@mikro-orm/postgresql": "6.4.3",
     "awilix": "^8.0.1",
+    "jose": "^5.9.3",
     "medusa-payment-manual": "^1.0.25",
-    "pg": "^8.13.0",
-    "jose": "^5.9.3"
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@medusajs/test-utils": "2.8.8",

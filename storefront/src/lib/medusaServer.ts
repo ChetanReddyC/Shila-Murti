@@ -15,6 +15,7 @@ export async function storeFetch(path: string, init: StoreFetchInit = {}): Promi
   const base = getStoreBaseUrl()
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || '',
     ...(init.headers || {}),
   }
   if (init.bearerToken) headers['Authorization'] = `Bearer ${init.bearerToken}`

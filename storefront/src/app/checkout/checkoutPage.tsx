@@ -21,6 +21,7 @@ export default function CheckoutPage() {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
+    lastName: '',
     address: '',
     city: '',
     state: '',
@@ -536,21 +537,85 @@ export default function CheckoutPage() {
         sessionStorage.setItem('order_checkout_snapshot', JSON.stringify(snapshot))
       } catch {}
 
+      // Derive placeholder email when using phone verification
+      const placeholderEmailForPhone = (identityMethod === 'phone' && phone.trim()) ? `${phone.replace(/\D/g, '')}@guest.local` : undefined;
+
+      // Debug: Log checkout data before processing
+      console.log('[Checkout] Processing checkout with data:', {
+        cartId: cart.id,
+        customerId: customerId,
+        hasFormData: !!(formData.name),
+        cartUpdate: {
+          hasEmail: !!(purchaseReady && identityMethod === 'email' && email.trim()),
+        },
+        formData: {
+          name: formData.name,
+          parsedNames: (() => {
+            const fullName = (formData.name || '').trim()
+            const nameParts = fullName.split(/\s+/).filter(Boolean)
+            return {
+              first_name: nameParts[0] || 'Customer',
+              last_name: nameParts.length > 1 ? nameParts.slice(1).join(' ') : '',
+            }
+          })(),
+          phone: formData.contactNumber,
+          address: formData.address,
+          city: formData.city
+        },
+        purchaseReady,
+        identityMethod
+      })
+
       const result = await processCheckout({
         cartId: cart.id,
+        // Pass customer ID for sync
+        customerId: customerId,
         cartUpdate: {
-          email: (purchaseReady && identityMethod === 'email' && email.trim()) ? email.trim().toLowerCase() : undefined,
+          email: (purchaseReady && identityMethod === 'email' && email.trim())
+            ? email.trim().toLowerCase()
+            : placeholderEmailForPhone,
           // Email is optional in the current form; if needed, add an email field later
-          shipping_address: {
-            first_name: formData.name || 'Customer',
-            address_1: formData.address,
-            city: formData.city,
-            postal_code: formData.postalCode,
-            province: formData.state,
-            country_code: 'in',
-            phone: formData.contactNumber || undefined,
-          },
+          shipping_address: (() => {
+            // Parse single name field into first_name and last_name
+            const fullName = (formData.name || '').trim()
+            const nameParts = fullName.split(/\s+/).filter(Boolean)
+            const firstName = nameParts[0] || 'Customer'
+            const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+            
+            return {
+              first_name: firstName,
+              last_name: lastName,
+              address_1: formData.address,
+              city: formData.city,
+              postal_code: formData.postalCode,
+              province: formData.state,
+              country_code: 'in',
+              phone: formData.contactNumber || undefined,
+            }
+          })(),
         },
+        // Checkout form data for customer sync
+        checkoutFormData: (() => {
+          // Parse single name field into first_name and last_name
+          const fullName = (formData.name || '').trim()
+          const nameParts = fullName.split(/\s+/).filter(Boolean)
+          const firstName = nameParts[0] || 'Customer'
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+          
+          return {
+            first_name: firstName,
+            last_name: lastName,
+            phone: formData.contactNumber || '',
+            address: {
+              address_1: formData.address,
+              city: formData.city,
+              postal_code: formData.postalCode,
+              province: formData.state,
+              country_code: 'in',
+              phone: formData.contactNumber,
+            },
+          }
+        })(),
         strategy: 'cheapest',
         useManualPayment: true,
         selectedShippingAmount: effectiveShippingAmount,
@@ -571,38 +636,8 @@ export default function CheckoutPage() {
 
         // Fire-and-forget post-purchase side effects without blocking navigation
         setTimeout(() => {
-          // 1) Profile update
-          try {
-            const payload: any = {
-              first_name: formData.name || 'Customer',
-              phone: formData.contactNumber || undefined,
-            }
-            if (identityMethod === 'email' && (email || '').trim()) {
-              payload.email = (email || '').trim().toLowerCase()
-            }
-            void fetch('/api/account/profile', {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            })
-              .then(async (res) => {
-                if (!res.ok) {
-                  const text = await res.text().catch(() => '')
-                  console.warn('[Checkout] Profile update failed (non-blocking):', res.status, text)
-                  if (res.status === 401 || res.status === 403) {
-                    try { console.info('[Metrics] account_profile_hardening_denied_total++') } catch {}
-                  }
-                  try { console.info('[Metrics] post_purchase_profile_update_failure_total++') } catch {}
-                }
-              })
-              .catch((e) => {
-                console.warn('[Checkout] Profile update error (non-blocking):', e)
-                try { console.info('[Metrics] post_purchase_profile_update_failure_total++') } catch {}
-              })
-          } catch (e) {
-            console.warn('[Checkout] Profile update threw (non-blocking):', e)
-            try { console.info('[Metrics] post_purchase_profile_update_failure_total++') } catch {}
-          }
+          // Customer sync is now handled by the checkout orchestrator
+          console.log('[Checkout] Customer profile sync handled by orchestrator')
 
           // 2) Programmatic sign-in
           try {
@@ -978,7 +1013,7 @@ export default function CheckoutPage() {
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>Identity Verification</h2>
                 {purchaseReady && (
-                  <div className="mb-3 text-green-600">Now you can purchase. {customerId ? `(Customer: ${customerId})` : ''}</div>
+                  <div className="mb-3 text-green-600">Identity verified​—you can now place your order.</div>
                 )}
                 {identityError && (
                   <div className="mb-3 text-red-600">{identityError}</div>

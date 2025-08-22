@@ -12,7 +12,21 @@ const BUTTON_URL_USE_OTP = process.env.WHATSAPP_TEMPLATE_BUTTON_URL_USE_OTP === 
 
 function normalizeTo(to: string): string {
   // Cloud API typically expects country code and number without '+' or symbols
-  return (to || '').replace(/\D/g, '')
+  // First remove all non-digit characters
+  let normalized = (to || '').replace(/\D/g, '');
+  
+  // If the number starts with 0 but isn't 000..., remove the leading 0
+  if (normalized.startsWith('0') && normalized.length > 1) {
+    normalized = normalized.substring(1);
+  }
+  
+  // If the number starts with 91 and is Indian number, keep the country code
+  // Otherwise, assume it's a local number and add 91 for India
+  if (!normalized.startsWith('91')) {
+    normalized = '91' + normalized;
+  }
+  
+  return normalized;
 }
 
 export async function sendWhatsAppLoginCode(toPhoneE164: string, otp: string): Promise<SendResult> {
@@ -20,6 +34,21 @@ export async function sendWhatsAppLoginCode(toPhoneE164: string, otp: string): P
     // Not configured → simulate success for local dev
     return { ok: true, messageId: `dev-${Date.now()}` }
   }
+
+  // Store WhatsApp authentication metadata
+  const authMetadata = {
+    phone: toPhoneE164,
+    phone_normalized: normalizeTo(toPhoneE164),
+    otp_sent: true,
+    timestamp: new Date().toISOString(),
+    expires_in: 300, // 5 minutes
+    status: 'pending'
+  };
+
+  // Store authentication metadata in session or database
+  // This is a placeholder for actual implementation
+  // In a real app, you would store this in a database or session store
+  console.log('[WhatsApp] Storing authentication metadata:', authMetadata);
 
   const url = `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`
   const template: any = {

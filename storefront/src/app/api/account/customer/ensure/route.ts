@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import type { NextRequest } from 'next/server'
 import { getCounter, getHistogram } from '@/lib/metrics'
+import { randomUUID } from 'crypto'
 
 type MedusaCustomer = {
   id: string
@@ -93,9 +94,12 @@ async function findCustomerByPhone(phone: string): Promise<MedusaCustomer | null
   return null
 }
 
-async function createCustomer(payload: { email?: string; phone?: string }): Promise<MedusaCustomer> {
+async function createCustomer(payload: { email: string; phone?: string }): Promise<MedusaCustomer> {
   const body: any = {}
-  if (payload.email) body.email = normalizeEmail(payload.email)
+  body.email = normalizeEmail(payload.email)
+  if (payload.phone) {
+    body.phone = payload.phone
+  }
   const meta: Record<string, any> = {}
   if (payload.phone) {
     meta.phone = payload.phone
@@ -146,8 +150,15 @@ export async function POST(req: NextRequest) {
     const rawEmail: string | undefined = body?.email
     const rawPhone: string | undefined = body?.phone
 
-    const email = normalizeEmail(rawEmail)
+    let email = normalizeEmail(rawEmail)
     const phone = typeof rawPhone === 'string' ? rawPhone.trim() : undefined
+    if (!email && phone) {
+      // Generate a deterministic placeholder email from the phone number that matches backend logic
+      const digits = phone.replace(/\D/g, '')
+      if (digits) {
+        email = `${digits}@guest.local`
+      }
+    }
     if (!email && !phone) {
       try { const c = await getCounter({ name: 'account_ensure_failure_total', help: 'Ensure customer failures' }); c.inc() } catch {}
       return new Response(JSON.stringify({ ok: false, error: 'identifier_required', message: 'Provide an email or phone to continue.' }), { status: 400 })
@@ -174,10 +185,31 @@ export async function POST(req: NextRequest) {
       // If admin token is missing, we cannot create; return deterministic id for passkey flows
       const fallback = email ? String(email).toLowerCase() : `+${String(phone).replace(/\D/g,'')}`
       if (!ADMIN_TOKEN) {
-        return new Response(JSON.stringify({ ok: true, customerId: fallback, created: false }), { status: 200 })
+        try {
+          const liteRes = await fetch(`${BASE_URL}/store/custom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              first_name: 'Customer',
+              last_name: 'User',
+              email: email!,
+              phone,
+              password: randomUUID(),
+            }),
+          })
+          if (liteRes.ok) {
+            const d = await liteRes.json().catch(() => ({}))
+            if (d?.customer?.id) {
+              customer = { id: d.customer.id, email }
+            }
+          }
+        } catch {}
+        if (!customer) {
+          return new Response(JSON.stringify({ ok: true, customerId: fallback, created: false }), { status: 200 })
+        }
       }
       try {
-        customer = await createCustomer({ email, phone })
+        customer = await createCustomer({ email: email!, phone })
       } catch (e: any) {
         // Graceful fallback on admin 401/Unauthorized or any admin failure
         return new Response(JSON.stringify({ ok: true, customerId: fallback, created: false, warning: 'admin_unavailable' }), { status: 200 })
