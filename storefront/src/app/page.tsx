@@ -4,7 +4,6 @@ import styles from './page.module.css';
 import Header from '../components/Header';
 import PasskeyNudge from '../components/PasskeyNudge';
 import GLSLCanvas from '../components/GLSLCanvas';
-import SVGShaderCanvas from '../components/SVGShaderCanvas';
 import { useState, useEffect, useRef } from 'react';
 
 export default function Home() {
@@ -90,24 +89,30 @@ export default function Home() {
       >
         {/* Removed debug indicator */}
 
-        {/* SVG Background shader overlay only */}
-        <div className={styles.decorativeBg}>
-          {/* Shader canvas overlay using simplified wrapper */}
-          <div className={styles.shaderWrapper}>
-            <SVGShaderCanvas
-              svgUrl="/svg-art1.svg"
-              width={501}
-              height={1115}
-              alwaysOn
-            />
-          </div>
-        </div>
+
 
         {/* Header component */}
         <Header />
 
         <div className="w-full flex justify-center bg-white pt-12">
           <div className="flex h-full grow flex-col w-full max-w-[1280px] px-4 sm:px-6 mx-auto">
+            {/* First decorative SVG - restored as plain image */}
+            <div className={styles.shaderWrapper} style={{ zIndex: 0 }}>
+              <img 
+                src="/svg-art1.svg" 
+                alt="Decorative art" 
+                style={{
+                  width: '501px',
+                  height: '1115px',
+                  position: 'absolute',
+                  top: 'clamp(-380px, -30vh, -200px)',
+                  left: 0,
+                  objectFit: 'contain',
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
+            
             {/* Main content */}
             <div className="flex flex-1 w-full">
               <div className="flex flex-col w-full">
@@ -195,13 +200,21 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Second SVG positioned relative to collections */}
+                {/* Second decorative SVG - restored as plain image */}
                 <div className={styles.shaderWrapperSecond}>
-                  <SVGShaderCanvas
-                    svgUrl="/svg-art2.svg"
-                    width={501}
-                    height={1115}
-                    alwaysOn
+                  <img 
+                    src="/svg-art2.svg" 
+                    alt="Decorative art" 
+                    style={{
+                      width: '501px',
+                      height: '1115px',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      objectFit: 'contain',
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }}
                   />
                 </div>
 
