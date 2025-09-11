@@ -4,6 +4,7 @@ import styles from './page.module.css';
 import Header from '../components/Header';
 import PasskeyNudge from '../components/PasskeyNudge';
 import GLSLCanvas from '../components/GLSLCanvas';
+import DynamicSvgEffect from '../components/DynamicSvgEffect';
 import { useState, useEffect, useRef } from 'react';
 
 export default function Home() {
@@ -97,20 +98,23 @@ export default function Home() {
         <div className="w-full flex justify-center bg-white pt-12">
           <div className="flex h-full grow flex-col w-full max-w-[1280px] px-4 sm:px-6 mx-auto">
             {/* First decorative SVG - restored as plain image */}
-            <div className={styles.shaderWrapper} style={{ zIndex: 0 }}>
-              <img 
-                src="/svg-art1.svg" 
-                alt="Decorative art" 
-                style={{
-                  width: '501px',
-                  height: '1115px',
-                  position: 'absolute',
-                  top: 'clamp(-380px, -30vh, -200px)',
-                  left: 0,
-                  objectFit: 'contain',
-                  pointerEvents: 'none'
-                }}
-              />
+            <div className={styles.shaderWrapper} style={{ zIndex: 5 }}>
+              <DynamicSvgEffect
+                spotlightSize={400}
+                lightColor="#FFFFFF"
+                specularConstant={0.75}
+                specularExponent={25}
+              >
+                <img 
+                  src="/svg-art1.svg" 
+                  alt="Decorative art" 
+                  style={{
+                    height: '100%',
+                    width: 'auto',
+                    objectFit: 'contain',
+                  }}
+                />
+              </DynamicSvgEffect>
             </div>
             
             {/* Main content */}
@@ -201,21 +205,23 @@ export default function Home() {
                 </div>
 
                 {/* Second decorative SVG - restored as plain image */}
-                <div className={styles.shaderWrapperSecond}>
-                  <img 
-                    src="/svg-art2.svg" 
-                    alt="Decorative art" 
-                    style={{
-                      width: '501px',
-                      height: '1115px',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      objectFit: 'contain',
-                      pointerEvents: 'none',
-                      zIndex: 0
-                    }}
-                  />
+                <div className={styles.shaderWrapperSecond} style={{ zIndex: 0, pointerEvents: 'auto' }}>
+                  <DynamicSvgEffect
+                    spotlightSize={400}
+                    lightColor="#FFFFFF"
+                    specularConstant={0.75}
+                    specularExponent={25}
+                  >
+                    <img 
+                      src="/svg-art2.svg" 
+                      alt="Decorative art" 
+                      style={{
+                        height: '100%',
+                        width: 'auto',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  </DynamicSvgEffect>
                 </div>
 
                 {/* Footer - responsive styles handled by CSS */}
