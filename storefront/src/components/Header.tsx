@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useCart } from '../contexts/CartContext';
 import { isOrderConfirmationProtectionActive } from '../utils/orderConfirmationProtection';
 import styles from './Header.module.css';
+import LogoutButton from './LogoutButton';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
@@ -126,8 +127,11 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
             </nav>
 
             {hydrated && session?.user && (
-              <div style={{ marginRight: 12, color: '#141414', fontSize: 14 }}>
-                {session.user.email || session.user.name || session.user.phone || 'Signed in'}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ marginRight: 12, color: '#141414', fontSize: 14 }}>
+                  {session.user.email || session.user.name || session.user.phone || 'Signed in'}
+                </div>
+                <LogoutButton />
               </div>
             )}
 
@@ -168,5 +172,3 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
 };
 
 export default Header;
-
-
