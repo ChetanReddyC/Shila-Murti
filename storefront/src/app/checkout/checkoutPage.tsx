@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
 import { processCheckout } from '../../utils/checkoutOrchestrator';
+import { useSession } from 'next-auth/react';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -94,6 +95,21 @@ export default function CheckoutPage() {
       sessionStorage.setItem('checkout_identity', JSON.stringify(blob))
     } catch {}
   }, [purchaseReady, customerId, identityMethod, phone, email])
+
+  // Detect authenticated users and bypass identity verification
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    // If user is already authenticated, bypass identity verification
+    if (status === 'authenticated') {
+      setPurchaseReady(true);
+      // Extract customerId from session if available
+      const sessionCustomerId = (session as any)?.customerId;
+      if (sessionCustomerId) {
+        setCustomerId(sessionCustomerId);
+      }
+    }
+  }, [status, session]);
 
   // Map backend error codes to user-friendly messages
   const mapIdentityError = (
@@ -500,7 +516,15 @@ export default function CheckoutPage() {
       goToOrderConfirmation()
       return
     }
-    if (!purchaseReady) {
+    // For authenticated users, we can set purchaseReady to true immediately
+    if (status === 'authenticated' && !purchaseReady) {
+      setPurchaseReady(true);
+      // Don't show alert for authenticated users
+      // Continue with checkout process
+    }
+    
+    // Update the check that prevents submission
+    if (status !== 'authenticated' && !purchaseReady) {
       alert('Please verify your identity to continue. Use phone OTP or email magic link in the Identity Verification section.')
       return
     }
@@ -1009,108 +1033,110 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
-              {/* Identity Verification Section (Task 2) */}
-              <div className={styles.section}>
-                <h2 className={styles.sectionTitle}>Identity Verification</h2>
-                {purchaseReady && (
-                  <div className="mb-3 text-green-600">Identity verified​—you can now place your order.</div>
-                )}
-                {identityError && (
-                  <div className="mb-3 text-red-600">{identityError}</div>
-                )}
-                <div className={styles.formRow}>
-                  <div className={styles.paymentOption}>
-                    <input
-                      type="radio"
-                      id="identity_phone"
-                      name="identityMethod"
-                      value="phone"
-                      checked={identityMethod === 'phone'}
-                      onChange={() => onIdentityMethodChange('phone')}
-                      className={styles.radioInput}
-                    />
-                    <label htmlFor="identity_phone" className={styles.radioLabel}>WhatsApp Phone</label>
-                  </div>
-                  <div className={styles.paymentOption}>
-                    <input
-                      type="radio"
-                      id="identity_email"
-                      name="identityMethod"
-                      value="email"
-                      checked={identityMethod === 'email'}
-                      onChange={() => onIdentityMethodChange('email')}
-                      className={styles.radioInput}
-                    />
-                    <label htmlFor="identity_email" className={styles.radioLabel}>Email</label>
-                  </div>
-                </div>
-                {identityMethod === 'phone' ? (
-                  <div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="phone" className={styles.label}>Phone Number (WhatsApp)</label>
+              {/* Identity Verification Section (Task 2) - Only show for unauthenticated users */}
+              {status !== 'authenticated' && (
+                <div className={styles.section}>
+                  <h2 className={styles.sectionTitle}>Identity Verification</h2>
+                  {purchaseReady && (
+                    <div className="mb-3 text-green-600">Identity verified​—you can now place your order.</div>
+                  )}
+                  {identityError && (
+                    <div className="mb-3 text-red-600">{identityError}</div>
+                  )}
+                  <div className={styles.formRow}>
+                    <div className={styles.paymentOption}>
                       <input
-                        type="text"
-                        id="phone"
-                        name="phone"
-                        className={styles.input}
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="e.g., +1 555 123 4567"
+                        type="radio"
+                        id="identity_phone"
+                        name="identityMethod"
+                        value="phone"
+                        checked={identityMethod === 'phone'}
+                        onChange={() => onIdentityMethodChange('phone')}
+                        className={styles.radioInput}
                       />
+                      <label htmlFor="identity_phone" className={styles.radioLabel}>WhatsApp Phone</label>
                     </div>
-                    <div className="flex gap-2 mb-2">
-                      <button type="button" className={styles.placeOrderButton} onClick={sendOtp} disabled={otpSending || !phone.trim()}>
-                        {otpSending ? 'Sending...' : (otpSent ? 'Resend OTP' : 'Send OTP')}
-                      </button>
+                    <div className={styles.paymentOption}>
+                      <input
+                        type="radio"
+                        id="identity_email"
+                        name="identityMethod"
+                        value="email"
+                        checked={identityMethod === 'email'}
+                        onChange={() => onIdentityMethodChange('email')}
+                        className={styles.radioInput}
+                      />
+                      <label htmlFor="identity_email" className={styles.radioLabel}>Email</label>
                     </div>
-                    {otpSent && (
+                  </div>
+                  {identityMethod === 'phone' ? (
+                    <div>
                       <div className={styles.formGroup}>
-                        <label htmlFor="otp" className={styles.label}>Enter OTP</label>
+                        <label htmlFor="phone" className={styles.label}>Phone Number (WhatsApp)</label>
                         <input
                           type="text"
-                          id="otp"
-                          name="otp"
+                          id="phone"
+                          name="phone"
                           className={styles.input}
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value)}
-                          placeholder="6-digit code"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="e.g., +1 555 123 4567"
                         />
-                        <div className="mt-2">
-                          <button type="button" className={styles.placeOrderButton} onClick={verifyOtp} disabled={otpVerifying || !otpCode}>
-                            {otpVerifying ? 'Verifying...' : 'Verify'}
-                          </button>
-                        </div>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="email" className={styles.label}>Email</label>
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        className={styles.input}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                      />
+                      <div className="flex gap-2 mb-2">
+                        <button type="button" className={styles.placeOrderButton} onClick={sendOtp} disabled={otpSending || !phone.trim()}>
+                          {otpSending ? 'Sending...' : (otpSent ? 'Resend OTP' : 'Send OTP')}
+                        </button>
+                      </div>
+                      {otpSent && (
+                        <div className={styles.formGroup}>
+                          <label htmlFor="otp" className={styles.label}>Enter OTP</label>
+                          <input
+                            type="text"
+                            id="otp"
+                            name="otp"
+                            className={styles.input}
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value)}
+                            placeholder="6-digit code"
+                          />
+                          <div className="mt-2">
+                            <button type="button" className={styles.placeOrderButton} onClick={verifyOtp} disabled={otpVerifying || !otpCode}>
+                              {otpVerifying ? 'Verifying...' : 'Verify'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-2 mb-2">
-                      <button type="button" className={styles.placeOrderButton} onClick={sendMagic} disabled={magicSending || !email.trim()}>
-                        {magicSending ? 'Sending...' : (magicSent ? 'Resend Magic Link' : 'Send Magic Link')}
-                      </button>
+                  ) : (
+                    <div>
+                      <div className={styles.formGroup}>
+                        <label htmlFor="email" className={styles.label}>Email</label>
+                        <input
+                          type="email"
+                          id="email"
+                          name="email"
+                          className={styles.input}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                      <div className="flex gap-2 mb-2">
+                        <button type="button" className={styles.placeOrderButton} onClick={sendMagic} disabled={magicSending || !email.trim()}>
+                          {magicSending ? 'Sending...' : (magicSent ? 'Resend Magic Link' : 'Send Magic Link')}
+                        </button>
+                      </div>
+                      {magicSent && !magicVerified && (
+                        <div className="text-gray-600">We sent a link to your email. Click it and return here; we are checking every few seconds...</div>
+                      )}
+                      {magicVerified && (
+                        <div className="text-green-600">Email verified.</div>
+                      )}
                     </div>
-                    {magicSent && !magicVerified && (
-                      <div className="text-gray-600">We sent a link to your email. Click it and return here; we are checking every few seconds...</div>
-                    )}
-                    {magicVerified && (
-                      <div className="text-green-600">Email verified.</div>
-                    )}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
               
               {/* Order Summary Section */}
               <div className={styles.section}>

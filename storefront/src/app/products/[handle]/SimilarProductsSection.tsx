@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import ProductCardWithShader from '../../../components/ProductCardWithShader/ProductCardWithShader';
+import HoverEffectOverlay, { HoverOverlayAPI } from '../../../components/HoverEffectOverlay/HoverEffectOverlay';
 import ErrorBoundary from '../../../components/ErrorBoundary';
 import { productsService, ProductsServiceError } from '../../../services/productsService';
 import { ProductCardData } from '../../../utils/productDataMapper';
@@ -59,6 +60,7 @@ const SimilarProductsSection: React.FC<SimilarProductsSectionProps> = ({ current
   });
 
   const isMountedRef = useRef(true);
+  const overlayRef = useRef<HoverOverlayAPI | null>(null);
 
   const updateState = useCallback((updates: Partial<SectionState>) => {
     if (!isMountedRef.current) return;
@@ -154,11 +156,12 @@ const SimilarProductsSection: React.FC<SimilarProductsSectionProps> = ({ current
             return (
               <div key={prod.id ?? handle} className={styles.cardWrapper}>
                 {/* Use the exact card used on /products to inherit the hover effect */}
-                <ProductCardWithShader product={prod} />
+                <ProductCardWithShader product={prod} overlayRef={overlayRef} />
               </div>
             );
           })}
         </div>
+        <HoverEffectOverlay ref={overlayRef} debug={process.env.NODE_ENV !== 'production'} />
       </section>
     </ErrorBoundary>
   );
