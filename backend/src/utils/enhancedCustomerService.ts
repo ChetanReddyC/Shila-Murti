@@ -11,6 +11,8 @@ export interface CustomerLookupRequest {
   phone: string;
   email?: string;
   whatsapp_authenticated: boolean;
+  email_authenticated?: boolean;
+  identity_method?: 'phone' | 'email';
   first_name: string;
   last_name?: string;
 }
@@ -266,21 +268,33 @@ export class EnhancedCustomerService {
 
   private async createNewCustomerWithMetadata(request: CustomerLookupRequest): Promise<any> {
     const normalizedPhone = normalizePhoneNumber(request.phone);
-    const effectiveEmail = request.email || generatePlaceholderEmail(request.phone);
+    
+    // Handle email based on authentication method
+    let effectiveEmail: string;
+    if (request.email_authenticated && request.identity_method === 'email') {
+      // For email authentication, use the provided email
+      effectiveEmail = request.email || '';
+    } else {
+      // For WhatsApp authentication, generate placeholder email from phone
+      effectiveEmail = request.email || generatePlaceholderEmail(request.phone);
+    }
     
     const customerData = {
       first_name: request.first_name || "Customer",
       last_name: request.last_name || "",
       email: effectiveEmail,
       phone: request.phone,
-      has_account: request.whatsapp_authenticated, // Mark WhatsApp authenticated customers as registered accounts
+      has_account: request.whatsapp_authenticated || request.email_authenticated, // Mark authenticated customers as registered accounts
       metadata: {
         phone: request.phone,
         phone_normalized: normalizedPhone,
         created_via: 'enhanced_customer_service',
         creation_timestamp: new Date().toISOString(),
-        profile_source: request.whatsapp_authenticated ? 'whatsapp_authenticated' : 'checkout',
-        whatsapp_authenticated: request.whatsapp_authenticated,
+        profile_source: request.whatsapp_authenticated ? 'whatsapp_authenticated' : 
+                       request.email_authenticated ? 'email_authenticated' : 'checkout',
+        whatsapp_authenticated: request.whatsapp_authenticated || false,
+        email_authenticated: request.email_authenticated || false,
+        identity_method: request.identity_method || 'phone',
         auth_timestamp: new Date().toISOString(),
         unified_phone_lookup: true,
         duplicate_prevention: true,
@@ -289,10 +303,14 @@ export class EnhancedCustomerService {
     };
 
     console.log('[EnhancedCustomerService] Creating new customer with enhanced metadata:', {
+      first_name: request.first_name,
+      last_name: request.last_name,
       email: effectiveEmail,
       phone: request.phone,
       normalizedPhone,
-      whatsappAuthenticated: request.whatsapp_authenticated
+      whatsappAuthenticated: request.whatsapp_authenticated,
+      emailAuthenticated: request.email_authenticated,
+      identityMethod: request.identity_method
     });
 
     // Note: This assumes the caller will handle the actual customer creation workflow

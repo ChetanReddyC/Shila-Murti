@@ -28,6 +28,8 @@ export interface CheckoutInput {
       phone?: string
     }
   }
+  // Authentication method used during checkout
+  identityMethod?: 'phone' | 'email'
 }
 
 export interface CheckoutProgressLog {
@@ -271,7 +273,9 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
             cartId: input.cartId,
             formData: input.checkoutFormData,
             orderCreated: true,
-            whatsapp_authenticated: true, // Only customers with WhatsApp authentication should reach here
+            whatsapp_authenticated: input.identityMethod === 'phone', // Only WhatsApp/phone authentication
+            email_authenticated: input.identityMethod === 'email', // Email authentication flag
+            identityMethod: input.identityMethod || 'phone', // Pass the actual authentication method
           }),
           signal: syncController.signal
         })

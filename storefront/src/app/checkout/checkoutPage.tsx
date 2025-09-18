@@ -594,6 +594,8 @@ export default function CheckoutPage() {
         cartId: cart.id,
         // Pass customer ID for sync
         customerId: customerId,
+        // Pass the identity method used for authentication
+        identityMethod: identityMethod,
         cartUpdate: {
           email: (purchaseReady && identityMethod === 'email' && email.trim())
             ? email.trim().toLowerCase()
