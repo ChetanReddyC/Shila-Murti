@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json().catch(() => ({}))
-    const { customerId, cartId, formData, orderCreated, whatsapp_authenticated = false } = body
+    const { customerId, cartId, formData, orderCreated, whatsapp_authenticated = false, email_authenticated = false, identityMethod = 'phone' } = body
     
     // Enhanced input validation
     if (!customerId || typeof customerId !== 'string') {
@@ -60,25 +60,44 @@ export async function POST(req: NextRequest) {
       }), { status: 400 })
     }
     
-    // CRITICAL FIX: Extract WhatsApp phone from customerId to ensure we update the correct customer
-    // customerId format: "919014711878@guest.local" 
-    const whatsappPhone = customerId.replace('@guest.local', '');
-    const whatsappPhoneNormalized = normalizePhoneNumber(whatsappPhone);
+    // Extract identifier from customerId based on authentication method
+    let primaryIdentifier: string;
+    let primaryPhone: string;
     
-    console.log('[CustomerSync] WhatsApp customer identification:', {
-      customerId,
-      whatsappPhone,
-      whatsappPhoneNormalized,
-      shippingPhone: formData.phone,
-      phoneConflictDetected: !arePhoneNumbersEquivalent(whatsappPhone, formData.phone)
-    });
+    if (identityMethod === 'email' || email_authenticated) {
+      // For email authentication, customerId is the email address
+      primaryIdentifier = customerId;
+      primaryPhone = normalizePhoneNumber(formData.phone); // Use form phone as primary
+      
+      console.log('[CustomerSync] Email customer identification:', {
+        customerId,
+        email: primaryIdentifier,
+        formPhone: formData.phone,
+        normalizedFormPhone: primaryPhone,
+        identityMethod
+      });
+    } else {
+      // For WhatsApp/phone authentication, extract phone from customerId
+      // customerId format: "919014711878@guest.local" 
+      const whatsappPhone = customerId.replace('@guest.local', '');
+      primaryIdentifier = whatsappPhone;
+      primaryPhone = normalizePhoneNumber(whatsappPhone);
+      
+      console.log('[CustomerSync] WhatsApp customer identification:', {
+        customerId,
+        whatsappPhone,
+        whatsappPhoneNormalized: primaryPhone,
+        shippingPhone: formData.phone,
+        phoneConflictDetected: !arePhoneNumbersEquivalent(whatsappPhone, formData.phone)
+      });
+    }
     
-    // Enhanced phone conflict detection using WhatsApp phone as primary
+    // Enhanced phone conflict detection based on authentication method
     const phoneConflictInfo: PhoneConflictInfo = {
-      whatsappPhone: whatsappPhoneNormalized,
+      whatsappPhone: identityMethod === 'phone' ? primaryPhone : '',
       shippingPhone: normalizePhoneNumber(formData.phone),
-      conflictDetected: !arePhoneNumbersEquivalent(whatsappPhone, formData.phone),
-      resolutionStrategy: 'use_whatsapp' // Always use WhatsApp phone for customer identification
+      conflictDetected: identityMethod === 'phone' ? !arePhoneNumbersEquivalent(primaryIdentifier, formData.phone) : false,
+      resolutionStrategy: identityMethod === 'phone' ? 'use_whatsapp' : 'use_shipping' // For email auth, use shipping phone
     };
     
     if (phoneConflictInfo.conflictDetected) {
@@ -92,8 +111,7 @@ export async function POST(req: NextRequest) {
       console.info('[Metrics] customer_sync_phone_conflict_detected++');
     }
     
-    // CRITICAL: Use WhatsApp phone for customer identification, NOT shipping phone
-    const primaryPhone = phoneConflictInfo.whatsappPhone;
+    // Use appropriate phone based on authentication method
     const normalizedPhone = primaryPhone;
     
     // Validate the resolved primary phone
@@ -137,13 +155,13 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Ensure customer is WhatsApp authenticated
-    if (!whatsapp_authenticated) {
+    // Ensure customer is properly authenticated (either WhatsApp or email)
+    if (!whatsapp_authenticated && !email_authenticated) {
       return new Response(JSON.stringify({ 
         ok: false, 
-        error: 'customer_not_whatsapp_authenticated',
-        message: 'Customer must be WhatsApp authenticated',
-        requires_whatsapp_auth: true 
+        error: 'customer_not_authenticated',
+        message: 'Customer must be authenticated via WhatsApp or email',
+        requires_authentication: true 
       }), { status: 400 })
     }
     
@@ -185,25 +203,34 @@ export async function POST(req: NextRequest) {
     const updatePayload: any = {
       first_name: formData.first_name,
       last_name: formData.last_name || '',
-      phone: primaryPhone, // Use WhatsApp phone for customer identification
-      whatsapp_authenticated: true, // Mark this as a WhatsApp authenticated customer
+      phone: normalizedPhone,
+      whatsapp_authenticated: whatsapp_authenticated,
+      email_authenticated: email_authenticated,
     }
     
-    // CRITICAL: Use WhatsApp phone for email generation to find existing customer
-    updatePayload.email = generatePlaceholderEmail(primaryPhone); // This will be 919014711878@guest.local
+    // Set email based on authentication method
+    if (identityMethod === 'email' || email_authenticated) {
+      // For email authentication, use the actual email from customerId
+      updatePayload.email = customerId; // customerId is the email address for email auth
+    } else {
+      // For WhatsApp authentication, use placeholder email based on phone
+      updatePayload.email = generatePlaceholderEmail(primaryPhone);
+    }
     updatePayload.metadata = {
       checkout_sync_timestamp: Date.now(),
       last_order_form_sync: cartId,
       profile_source: 'checkout',
-      phone: primaryPhone, // Store WhatsApp phone as primary
+      phone: normalizedPhone,
       phone_normalized: normalizedPhone,
-      whatsapp_authenticated: true,
+      whatsapp_authenticated: whatsapp_authenticated,
+      email_authenticated: email_authenticated,
+      identity_method: identityMethod,
       auth_timestamp: Date.now(),
       auth_source: 'customer_sync',
       sync_profile_source: 'checkout',
       sync_origin: 'order_completion',
       sync_attempts: 1,
-      // Store shipping phone separately if different
+      // Store shipping phone separately if different (for WhatsApp auth only)
       shipping_phone: phoneConflictInfo.conflictDetected ? formData.phone : undefined,
       shipping_phone_normalized: phoneConflictInfo.conflictDetected ? phoneConflictInfo.shippingPhone : undefined,
       // Enhanced conflict resolution metadata

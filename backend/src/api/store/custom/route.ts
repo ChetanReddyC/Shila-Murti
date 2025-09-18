@@ -27,7 +27,7 @@ async function handleCustomerRequest(
   req: MedusaRequest,
   res: MedusaResponse
 ) {
-  const { first_name, last_name, name, email, password, phone, addresses = [], whatsapp_authenticated = false } = (req.body as any) ?? {};
+  const { first_name, last_name, name, email, password, phone, addresses = [], whatsapp_authenticated = false, email_authenticated = false, identity_method = 'phone' } = (req.body as any) ?? {};
 
   // Log phone conflict detection results
   if (req.phoneConflictDetected) {
@@ -44,11 +44,11 @@ async function handleCustomerRequest(
     parsedLastName = parts.join(" "); // may be empty if only one token
   }
 
-  // Enhanced validation for WhatsApp authenticated customers
-  if (!whatsapp_authenticated) {
+  // Enhanced validation for authenticated customers
+  if (!whatsapp_authenticated && !email_authenticated) {
     return res.status(400).json({ 
-      message: "Customer must be WhatsApp authenticated",
-      requires_whatsapp_auth: true 
+      message: "Customer must be authenticated via WhatsApp or email",
+      requires_authentication: true 
     });
   }
   
@@ -73,10 +73,19 @@ async function handleCustomerRequest(
     });
   }
 
-  // When email is missing but phone is provided, synthesize a unique placeholder to satisfy Medusa's schema
+  // Handle email based on authentication method
   let effectiveEmail: string | undefined = email;
-  if (!effectiveEmail && phone) {
-    effectiveEmail = generatePlaceholderEmail(phone);
+  
+  if (email_authenticated && identity_method === 'email') {
+    // For email authentication, email should already be provided and valid
+    if (!effectiveEmail || typeof effectiveEmail !== 'string' || !effectiveEmail.includes('@')) {
+      return res.status(400).json({ message: "Valid email is required for email authentication" });
+    }
+  } else if (whatsapp_authenticated && identity_method === 'phone') {
+    // For WhatsApp authentication, generate placeholder email from phone if needed
+    if (!effectiveEmail && phone) {
+      effectiveEmail = generatePlaceholderEmail(phone);
+    }
   }
 
   if (!effectiveEmail) {
@@ -91,7 +100,9 @@ async function handleCustomerRequest(
     const lookupRequest: CustomerLookupRequest = {
       phone,
       email: effectiveEmail,
-      whatsapp_authenticated: true,
+      whatsapp_authenticated: whatsapp_authenticated,
+      email_authenticated: email_authenticated,
+      identity_method: identity_method,
       first_name: parsedFirstName,
       last_name: parsedLastName || ""
     };
@@ -119,7 +130,7 @@ async function handleCustomerRequest(
         first_name: parsedFirstName || resultCustomer.first_name,
         last_name: parsedLastName || resultCustomer.last_name,
         phone: phone || resultCustomer.phone,
-        has_account: true // Ensure WhatsApp authenticated customers are marked as registered accounts
+        has_account: true // Ensure authenticated customers are marked as registered accounts
       };
       
       // Include addresses directly in customer update payload
@@ -158,7 +169,9 @@ async function handleCustomerRequest(
         phone_normalized: normalizedPhone,
         last_updated: new Date().toISOString(),
         update_source: 'enhanced_store_custom',
-        whatsapp_authenticated: true,
+        whatsapp_authenticated: whatsapp_authenticated,
+        email_authenticated: email_authenticated,
+        identity_method: identity_method,
         auth_timestamp: (resultCustomer.metadata?.auth_timestamp) || new Date().toISOString(),
         auth_source: 'customer_update',
         unified_phone_lookup: true,
@@ -228,7 +241,7 @@ async function handleCustomerRequest(
     const customerCreateData = {
       ...resultCustomer, // This contains the enhanced metadata
       password: safePassword,
-      has_account: true, // Ensure WhatsApp authenticated customers are marked as registered accounts
+      has_account: true, // Ensure authenticated customers are marked as registered accounts
       addresses: addresses?.length ? addresses.map((address: any) => ({
         first_name: address.first_name || parsedFirstName,
         last_name: address.last_name || parsedLastName || '',
