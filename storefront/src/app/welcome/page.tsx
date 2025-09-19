@@ -29,7 +29,7 @@ export default function WelcomePage() {
           sessionStorage.setItem('mfa_phone', phone)
         }
       }
-    } catch {}
+    } catch { }
 
     // Countdown timer
     const timer = setInterval(() => {
@@ -49,7 +49,7 @@ export default function WelcomePage() {
   const attemptAutoClose = () => {
     if (autoCloseAttempted) return
     setAutoCloseAttempted(true)
-    
+
     try {
       window.close()
       // If window.close() doesn't work, redirect to home after a delay
@@ -74,17 +74,17 @@ export default function WelcomePage() {
             <span className={styles.brandName}>Shila Murthi</span>
           </div>
         </div>
-        
+
         <div className={styles.content}>
           <div className={styles.successIcon}>✅</div>
           <h1 className={styles.title}>Authentication Successful!</h1>
-          
+
           {email && (
             <p className={styles.subtitle}>
               Your email <strong>{email}</strong> has been verified.
             </p>
           )}
-          
+
           <div className={styles.instructions}>
             <p>Please return to your previous tab to continue.</p>
             <p className={styles.autoClose}>
@@ -95,15 +95,15 @@ export default function WelcomePage() {
               )}
             </p>
           </div>
-          
-          <button 
+
+          <button
             onClick={handleManualClose}
             className={styles.closeButton}
           >
             Close Window Manually
           </button>
         </div>
-        
+
         <div className={styles.footer}>
           <p>You can safely close this window and return to shopping.</p>
         </div>

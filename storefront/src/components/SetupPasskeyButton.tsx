@@ -56,19 +56,60 @@ export default function SetupPasskeyButton({ userId, username, onRegistered }: {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   return (
-    <div>
-      <button disabled={busy} onClick={async () => {
-        try {
-          setBusy(true); setStatus('Setting up passkey…')
-          await registerPasskey(userId, username)
-          setStatus('Passkey registered on this device.')
-          try { onRegistered && onRegistered() } catch {}
-        } catch (e: any) {
-          console.error('[Passkey Register] failed', e)
-          setStatus(`Failed to register passkey${e?.message ? `: ${e.message}` : ''}`)
-        } finally { setBusy(false) }
-      }}>Set up passkey on this device</button>
-      <div aria-live="polite" style={{ fontSize: 12, marginTop: 6 }}>{status}</div>
+    <div style={{ textAlign: 'center' }}>
+      <button 
+        disabled={busy} 
+        onClick={async () => {
+          try {
+            setBusy(true); setStatus('Setting up passkey…')
+            await registerPasskey(userId, username)
+            setStatus('Passkey registered on this device.')
+            try { onRegistered && onRegistered() } catch {}
+          } catch (e: any) {
+            console.error('[Passkey Register] failed', e)
+            setStatus(`Failed to register passkey${e?.message ? `: ${e.message}` : ''}`)
+          } finally { setBusy(false) }
+        }}
+        style={{
+          height: 44,
+          padding: '0 24px',
+          backgroundColor: '#141414',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: busy ? 'not-allowed' : 'pointer',
+          opacity: busy ? 0.7 : 1,
+          transition: 'all 0.2s ease',
+          minWidth: 200,
+        }}
+        onMouseOver={(e) => {
+          if (!busy) {
+            e.currentTarget.style.backgroundColor = '#2a2a2a'
+          }
+        }}
+        onMouseOut={(e) => {
+          if (!busy) {
+            e.currentTarget.style.backgroundColor = '#141414'
+          }
+        }}
+      >
+        {busy ? 'Setting up passkey…' : 'Set up passkey on this device'}
+      </button>
+      {status && (
+        <div 
+          aria-live="polite" 
+          style={{ 
+            fontSize: 12, 
+            marginTop: 8, 
+            color: status.includes('Failed') ? '#dc2626' : '#16a34a',
+            fontWeight: 500
+          }}
+        >
+          {status}
+        </div>
+      )}
     </div>
   )
 }

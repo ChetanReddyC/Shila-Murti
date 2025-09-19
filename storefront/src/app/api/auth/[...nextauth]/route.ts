@@ -116,7 +116,7 @@ export const authOptions: NextAuthOptions = {
       // Compute MFA completion
       ;(token as any).mfaComplete = (token as any).comboRequired ? Boolean((token as any).otpOK && (token as any).magicOK) : true
 
-      // PII minimization: mask identifier and avoid persisting raw phone/email
+      // PII minimization: mask identifier for display but keep original for passkey registration
       try {
         if ((user as any)?.email) {
           const email = String((user as any).email)
@@ -124,13 +124,17 @@ export const authOptions: NextAuthOptions = {
           const prefix = local.slice(0, Math.min(local.length, 2))
           const masked = `${prefix}${'*'.repeat(Math.max(0, local.length - prefix.length))}@${domain}`
           ;(token as any).maskedEmail = masked
+          // Keep original email for passkey registration (stored securely in JWT)
+          ;(token as any).originalEmail = email
         } else if ((user as any)?.phone) {
           const phone = String((user as any).phone)
           const last4 = phone.slice(-4)
           const masked = `${'*'.repeat(Math.max(0, phone.length - 4))}${last4}`
           ;(token as any).maskedPhone = masked
+          // Keep original phone for passkey registration (stored securely in JWT)
+          ;(token as any).originalPhone = phone
         }
-        // Explicitly avoid keeping raw values
+        // Explicitly avoid keeping raw values in user object
         delete (token as any).email
         delete (token as any).phone
       } catch {}
@@ -148,10 +152,15 @@ export const authOptions: NextAuthOptions = {
       // Overwrite user object with masked minimal PII for UX where needed
       const maskedEmail = (token as any).maskedEmail
       const maskedPhone = (token as any).maskedPhone
+      const originalEmail = (token as any).originalEmail
+      const originalPhone = (token as any).originalPhone
       ;(session as any).user = (session as any).user || {}
       if (maskedEmail) (session as any).user.email = maskedEmail
       if (maskedPhone) (session as any).user.phone = maskedPhone
-      // Ensure no raw email/phone leaked
+      // Provide original identifiers for passkey registration (secure context only)
+      if (originalEmail) (session as any).user.originalEmail = originalEmail
+      if (originalPhone) (session as any).user.originalPhone = originalPhone
+      // Ensure no raw email/phone leaked in main fields
       if (!maskedEmail) delete (session as any).user?.email
       if (!maskedPhone) delete (session as any).user?.phone
       

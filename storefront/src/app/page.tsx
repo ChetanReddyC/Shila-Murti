@@ -2,7 +2,6 @@
 
 import styles from './page.module.css';
 import Header from '../components/Header';
-import PasskeyNudge from '../components/PasskeyNudge';
 import GLSLCanvas from '../components/GLSLCanvas';
 import DynamicSvgEffect from '../components/DynamicSvgEffect';
 import { useState, useEffect, useRef } from 'react';
@@ -120,9 +119,6 @@ export default function Home() {
             {/* Main content */}
             <div className="flex flex-1 w-full">
               <div className="flex flex-col w-full">
-                <div className="px-4">
-                  <PasskeyNudge />
-                </div>
                 {/* Hero section */}
                 <div className="w-full mt-6">
                   <div className={styles.heroCarousel}

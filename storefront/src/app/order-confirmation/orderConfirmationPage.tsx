@@ -146,7 +146,7 @@ export default function OrderConfirmationPage() {
     };
   }, [clearCartSilently, setOrderConfirmationProtection]);
 
-  const PasskeyNudge = React.useMemo(() => dynamic(() => import('../../components/PasskeyNudge'), { ssr: false }), [])
+
 
   // Add a listener to prevent navigation away from this page
   useEffect(() => {
@@ -175,9 +175,6 @@ export default function OrderConfirmationPage() {
             <h1 className={styles.title}>Thank you for your order!</h1>
             <p className={styles.description}>Your order has been successfully placed. You will receive an email confirmation shortly with your order details.</p>
             <h2 className={styles.sectionTitle}>Order Summary</h2>
-            <div style={{ margin: '12px 0' }}>
-              <PasskeyNudge />
-            </div>
             <div className={styles.summaryContainer}>
               <div className={styles.summaryItem}>
                 <span className={styles.label}>Order Number</span>
