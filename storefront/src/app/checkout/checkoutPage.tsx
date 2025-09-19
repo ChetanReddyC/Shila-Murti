@@ -11,7 +11,7 @@ import { useSession } from 'next-auth/react';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, loading, refreshCart, clearCart, setOrderConfirmationProtection, clearCartSilently } = useCart();
+  const { cart, loading, refreshCart, loadSpecificCart, clearCart, setOrderConfirmationProtection, clearCartSilently } = useCart();
 
   // Ensure we have fresh cart data when entering checkout
   useEffect(() => {
@@ -58,43 +58,114 @@ export default function CheckoutPage() {
   const [magicSending, setMagicSending] = useState(false)
   const [magicSent, setMagicSent] = useState(false)
   const [magicVerified, setMagicVerified] = useState(false)
+  const [magicLinkProcessing, setMagicLinkProcessing] = useState(false)
   const magicPollTimerRef = useRef<any>(null)
+
+  // State for client-side URL detection to avoid hydration mismatch
+  const [isFromMagicLink, setIsFromMagicLink] = useState(false)
+  const [cartIdFromUrl, setCartIdFromUrl] = useState<string | null>(null)
 
   // Purchase readiness gate
   const [purchaseReady, setPurchaseReady] = useState(false)
   const [customerId, setCustomerId] = useState<string | null>(null)
-  // Persist readiness across refresh with a short TTL (5 minutes)
+  // Persist readiness and form data across refresh and tabs
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('checkout_identity')
-      if (raw) {
-        const data = JSON.parse(raw)
-        if (data && data.expiresAt && data.expiresAt > Date.now()) {
-          setPurchaseReady(Boolean(data.purchaseReady))
-          setCustomerId(data.customerId || null)
-          if (typeof data.identityMethod === 'string') setIdentityMethod(data.identityMethod)
-          if (typeof data.phone === 'string') setPhone(data.phone)
-          if (typeof data.email === 'string') setEmail(data.email)
-        } else {
-          sessionStorage.removeItem('checkout_identity')
+    // Only run on client side after hydration
+    const restoreData = () => {
+      try {
+        // Identity data stays in sessionStorage (tab-specific for security)
+        const raw = sessionStorage.getItem('checkout_identity')
+        if (raw) {
+          const data = JSON.parse(raw)
+          if (data && data.expiresAt && data.expiresAt > Date.now()) {
+            setPurchaseReady(Boolean(data.purchaseReady))
+            setCustomerId(data.customerId || null)
+            if (typeof data.identityMethod === 'string') setIdentityMethod(data.identityMethod)
+            if (typeof data.phone === 'string') setPhone(data.phone)
+            if (typeof data.email === 'string') setEmail(data.email)
+          } else {
+            sessionStorage.removeItem('checkout_identity')
+          }
         }
+        
+        // Form data uses localStorage for cross-tab sharing (magic links open in new tabs)
+        const formRaw = localStorage.getItem('checkout_form')
+        if (formRaw) {
+          const formData = JSON.parse(formRaw)
+          if (formData && formData.expiresAt && formData.expiresAt > Date.now()) {
+            // Only restore if it's for the same cart or no cart specified (backward compatibility)
+            const shouldRestore = !formData.cartId || !cart?.id || formData.cartId === cart.id
+            
+            if (shouldRestore) {
+              console.log('[Checkout] Restoring form data from localStorage (cross-tab):', formData.data)
+              setFormData(prev => ({ ...prev, ...formData.data }))
+              
+              // Show a brief notification that form data was restored
+              if (Object.keys(formData.data).some(key => formData.data[key])) {
+                setIdentityError('📋 Form data restored from previous session')
+                setTimeout(() => {
+                  setIdentityError(prev => prev === '📋 Form data restored from previous session' ? null : prev)
+                }, 3000)
+              }
+            } else {
+              console.log('[Checkout] Skipping form data restore - different cart ID')
+            }
+          } else {
+            localStorage.removeItem('checkout_form')
+          }
+        }
+      } catch (e) {
+        console.warn('[Checkout] Failed to restore session data:', e)
       }
-    } catch {}
+    };
+
+    // Use setTimeout to ensure this runs after hydration
+    const timer = setTimeout(restoreData, 0);
+    return () => clearTimeout(timer);
   }, [])
+  // Persist identity data (only after hydration)
   useEffect(() => {
-    try {
-      const ttlMs = 5 * 60 * 1000
-      const blob = {
-        purchaseReady,
-        customerId,
-        identityMethod,
-        phone,
-        email,
-        expiresAt: Date.now() + ttlMs,
-      }
-      sessionStorage.setItem('checkout_identity', JSON.stringify(blob))
-    } catch {}
+    const timer = setTimeout(() => {
+      try {
+        const ttlMs = 15 * 60 * 1000 // 15 minutes
+        const blob = {
+          purchaseReady,
+          customerId,
+          identityMethod,
+          phone,
+          email,
+          expiresAt: Date.now() + ttlMs,
+        }
+        sessionStorage.setItem('checkout_identity', JSON.stringify(blob))
+      } catch {}
+    }, 0);
+    
+    return () => clearTimeout(timer);
   }, [purchaseReady, customerId, identityMethod, phone, email])
+
+  // Persist form data to localStorage for cross-tab sharing (magic links open in new tabs)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const ttlMs = 60 * 60 * 1000 // 1 hour for form data (longer since it's just form fields)
+        const blob = {
+          data: formData,
+          expiresAt: Date.now() + ttlMs,
+        }
+        // Include cart ID to ensure form data matches current cart
+        const blobWithCart = {
+          ...blob,
+          cartId: cart?.id || null
+        }
+        console.log('[Checkout] Persisting form data to localStorage (cross-tab):', formData)
+        localStorage.setItem('checkout_form', JSON.stringify(blobWithCart))
+      } catch (e) {
+        console.warn('[Checkout] Failed to persist form data:', e)
+      }
+    }, 0);
+    
+    return () => clearTimeout(timer);
+  }, [formData])
 
   // Detect authenticated users and bypass identity verification
   const { data: session, status } = useSession();
@@ -110,6 +181,173 @@ export default function CheckoutPage() {
       }
     }
   }, [status, session]);
+
+  // Check URL parameters only after hydration to avoid hydration mismatch
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      setIsFromMagicLink(urlParams.get('verified') === 'true');
+      setCartIdFromUrl(urlParams.get('cartId'));
+    }
+  }, []);
+
+  // Handle magic link verification success from URL parameters
+  useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const verified = urlParams.get('verified');
+    const emailParam = urlParams.get('email');
+    const cartIdParam = urlParams.get('cartId');
+    const phoneParam = urlParams.get('phone');
+
+    if (verified === 'true' && emailParam) {
+      setMagicLinkProcessing(true);
+      
+      // Magic link verification successful
+      setEmail(emailParam);
+      setIdentityMethod('email');
+      setMagicSent(true);
+      setMagicVerified(true);
+      
+      // Set phone if provided (for dual verification scenarios)
+      if (phoneParam) {
+        setPhone(phoneParam);
+      }
+
+      // Process cart loading and verification
+      const processVerification = async () => {
+        try {
+          console.log('[Checkout] Processing magic link verification, preserving existing form data');
+          
+          // If cartId is provided, force load that specific cart (cross-device support)
+          if (cartIdParam && cartIdParam !== cart?.id) {
+            console.log('[Checkout] Magic link provided cart ID, force loading cart:', cartIdParam);
+            await loadSpecificCart(cartIdParam);
+          }
+
+          // Trigger the checkout verification process
+          const payload: any = { email: emailParam };
+          if (cartIdParam) payload.cartId = cartIdParam;
+          if (phoneParam) payload.phone = phoneParam;
+
+          const res = await fetch('/api/auth/session/checkout/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          const json = await res.json().catch(() => ({}));
+          
+          if (res.ok && json?.customerId) {
+            setPurchaseReady(true);
+            setCustomerId(json.customerId);
+            setIdentityError(null);
+            
+            // Show success message briefly
+            setIdentityError('✅ Email verification successful! You can now place your order.');
+            setTimeout(() => setIdentityError(null), 5000);
+            
+            console.log('[Checkout] Magic link verification successful, form data should be preserved');
+          } else {
+            throw new Error(json?.error || 'Verification failed');
+          }
+        } catch (e: any) {
+          console.error('[Checkout] Magic link processing failed:', e);
+          setIdentityError(e?.message || 'Failed to complete verification. Please try again.');
+          setMagicVerified(false);
+          setPurchaseReady(false);
+        } finally {
+          setMagicLinkProcessing(false);
+        }
+      };
+
+      processVerification();
+
+      // For cross-tab communication: store verification success in localStorage
+      // This helps when magic link opens in a new tab
+      try {
+        const verificationData = {
+          verified: true,
+          email: emailParam,
+          phone: phoneParam,
+          cartId: cartIdParam,
+          timestamp: Date.now(),
+          expiresAt: Date.now() + (5 * 60 * 1000) // 5 minutes
+        }
+        localStorage.setItem('magic_verification_success', JSON.stringify(verificationData))
+        console.log('[Checkout] Stored verification success for cross-tab communication')
+      } catch (e) {
+        console.warn('[Checkout] Failed to store verification data:', e)
+      }
+
+      // Clean up URL parameters to avoid confusion on refresh (but keep cartId briefly for recovery)
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      }, 3000); // Wait 3 seconds to allow cart loading to complete
+    }
+  }, [cart?.id, loadSpecificCart]);
+
+  // Listen for cross-tab verification success (when magic link opens in new tab)
+  useEffect(() => {
+    const checkCrossTabVerification = () => {
+      try {
+        const raw = localStorage.getItem('magic_verification_success')
+        if (raw) {
+          const data = JSON.parse(raw)
+          if (data && data.expiresAt && data.expiresAt > Date.now() && data.verified) {
+            console.log('[Checkout] Found cross-tab verification success:', data)
+            
+            // Apply the verification state
+            if (data.email) {
+              setEmail(data.email)
+              setIdentityMethod('email')
+              setMagicSent(true)
+              setMagicVerified(true)
+              setPurchaseReady(true)
+              setIdentityError('✅ Email verified in another tab! You can now place your order.')
+              
+              // Clear the verification data since we've used it
+              localStorage.removeItem('magic_verification_success')
+              
+              // Auto-hide success message after 5 seconds
+              setTimeout(() => setIdentityError(null), 5000)
+            }
+          } else if (data && data.expiresAt && data.expiresAt <= Date.now()) {
+            // Clean up expired data
+            localStorage.removeItem('magic_verification_success')
+          }
+        }
+      } catch (e) {
+        console.warn('[Checkout] Failed to check cross-tab verification:', e)
+      }
+    }
+
+    // Check immediately
+    checkCrossTabVerification()
+
+    // Also listen for storage events (when other tabs update localStorage)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'magic_verification_success' && e.newValue) {
+        console.log('[Checkout] Detected cross-tab verification via storage event')
+        checkCrossTabVerification()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    
+    // Also poll periodically in case storage events don't fire
+    const pollInterval = setInterval(checkCrossTabVerification, 2000)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(pollInterval)
+    }
+  }, [])
 
   // Map backend error codes to user-friendly messages
   const mapIdentityError = (
@@ -411,7 +649,7 @@ export default function CheckoutPage() {
       const state = `checkout-${cart.id}`
       const mr = await fetch('/api/auth/magic/send', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: em, state })
+        body: JSON.stringify({ email: em, state, cartId: cart.id })
       })
       const mj = await mr.json().catch(() => ({}))
       if (!mr.ok || mj?.ok !== true) {
@@ -458,15 +696,28 @@ export default function CheckoutPage() {
     }
   }
 
-  // Cleanup polling on unmount
+  // Cleanup polling on unmount and clean up localStorage on successful order
   useEffect(() => {
     return () => {
       if (magicPollTimerRef.current) clearInterval(magicPollTimerRef.current)
     }
   }, [])
 
+  // Clean up form data from localStorage when order is successfully placed
+  const cleanupFormData = () => {
+    try {
+      localStorage.removeItem('checkout_form')
+      localStorage.removeItem('magic_verification_success')
+      console.log('[Checkout] Cleaned up form data after successful order')
+    } catch (e) {
+      console.warn('[Checkout] Failed to cleanup form data:', e)
+    }
+  }
+
   const goToOrderConfirmation = React.useCallback((orderId?: string) => {
     try { setOrderConfirmationProtection(true) } catch {}
+    // Clean up form data since order was successful
+    cleanupFormData()
     router.push(orderId ? `/order-confirmation?order_id=${encodeURIComponent(orderId)}` : '/order-confirmation')
   }, [router, setOrderConfirmationProtection, clearCartSilently])
 
@@ -742,7 +993,7 @@ export default function CheckoutPage() {
   };
 
   // Loading or empty cart states - prevent proceeding with no items
-  if (loading) {
+  if (loading || magicLinkProcessing) {
     return (
       <div 
         className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
@@ -753,7 +1004,9 @@ export default function CheckoutPage() {
           <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
             <div className={styles.container}>
               <h1 className={styles.title}>Checkout</h1>
-              <div className="text-gray-600">Loading your cart...</div>
+              <div className="text-gray-600">
+                {magicLinkProcessing ? 'Processing magic link verification...' : 'Loading your cart...'}
+              </div>
             </div>
           </div>
         </div>
@@ -762,6 +1015,7 @@ export default function CheckoutPage() {
   }
 
   if (!cart || !cartItems || cartItems.length === 0) {
+    
     return (
       <div 
         className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
@@ -773,10 +1027,43 @@ export default function CheckoutPage() {
             <div className={styles.container}>
               <h1 className={styles.title}>Checkout</h1>
               <div className="flex flex-col items-center gap-4">
-                <div className="text-gray-600">Your cart is empty.</div>
-                <Link href="/products">
-                  <button className={styles.placeOrderButton}>Browse Products</button>
-                </Link>
+                {isFromMagicLink ? (
+                  <>
+                    <div className="text-amber-600 mb-2">⚠️ Cart Recovery in Progress</div>
+                    <div className="text-gray-600 text-center max-w-md">
+                      We're recovering your cart from your original session. 
+                      {cartIdFromUrl && <div className="text-sm mt-2">Cart ID: {cartIdFromUrl}</div>}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-2">
+                      If your cart doesn't appear in a few seconds, please return to your original tab or browse products below.
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <button 
+                        onClick={() => {
+                          if (cartIdFromUrl) {
+                            loadSpecificCart(cartIdFromUrl);
+                          } else {
+                            refreshCart();
+                          }
+                        }} 
+                        className={styles.placeOrderButton}
+                        style={{ backgroundColor: '#f59e0b' }}
+                      >
+                        Retry Cart Recovery
+                      </button>
+                      <Link href="/products">
+                        <button className={styles.placeOrderButton}>Browse Products</button>
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-gray-600">Your cart is empty.</div>
+                    <Link href="/products">
+                      <button className={styles.placeOrderButton}>Browse Products</button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1040,10 +1327,15 @@ export default function CheckoutPage() {
                 <div className={styles.section}>
                   <h2 className={styles.sectionTitle}>Identity Verification</h2>
                   {purchaseReady && (
-                    <div className="mb-3 text-green-600">Identity verified​—you can now place your order.</div>
+                    <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <div className="text-green-800 font-medium">✅ Identity verified successfully!</div>
+                      <div className="text-green-600 text-sm mt-1">You can now place your order.</div>
+                    </div>
                   )}
                   {identityError && (
-                    <div className="mb-3 text-red-600">{identityError}</div>
+                    <div className={`mb-3 p-3 rounded-md ${identityError.startsWith('✅') ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
+                      {identityError}
+                    </div>
                   )}
                   <div className={styles.formRow}>
                     <div className={styles.paymentOption}>

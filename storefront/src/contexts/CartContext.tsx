@@ -37,6 +37,7 @@ interface CartContextType {
   clearCartSilently: () => Promise<void>;
   getTotalItems: () => number;
   refreshCart: () => Promise<void>;
+  loadSpecificCart: (cartId: string) => Promise<void>;
   createCart: () => Promise<void>;
   clearError: () => void;
   retryLastOperation: () => Promise<void>;
@@ -116,7 +117,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   }
 }
 
-// Session storage keys
+// Storage keys - use localStorage for cross-tab cart sharing
 const CART_ID_KEY = 'medusa_cart_id';
 import {
   ORDER_CONFIRMATION_ACTIVE_KEY,
@@ -138,28 +139,28 @@ export function CartProvider({ children }: CartProviderProps) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const { errorState, handleApiError, clearError: clearErrorHandler, isRetryableError } = useErrorHandler();
 
-  
-  
+
+
   // Track the last failed operation for retry functionality
   const [lastOperation, setLastOperation] = useState<{
     type: 'addToCart' | 'removeFromCart' | 'updateQuantity' | 'refreshCart' | 'createCart';
     params: any[];
   } | null>(null);
 
-  // Session storage helpers with enhanced error handling
+  // Storage helpers with enhanced error handling - using localStorage for cross-tab sharing
   const saveCartIdToSession = (cartId: string) => {
     try {
-      sessionStorage.setItem(CART_ID_KEY, cartId);
-      console.log('[CartContext] Cart ID saved to session:', cartId);
+      localStorage.setItem(CART_ID_KEY, cartId);
+      console.log('[CartContext] Cart ID saved to localStorage:', cartId);
     } catch (error) {
-      console.warn('[CartContext] Failed to save cart ID to sessionStorage:', error);
-      
+      console.warn('[CartContext] Failed to save cart ID to localStorage:', error);
+
       // Handle quota exceeded error by clearing old data and retrying
       if (error instanceof Error && error.name === 'QuotaExceededError') {
         try {
           console.log('[CartContext] Storage quota exceeded, clearing and retrying...');
-          sessionStorage.clear();
-          sessionStorage.setItem(CART_ID_KEY, cartId);
+          localStorage.clear();
+          localStorage.setItem(CART_ID_KEY, cartId);
           console.log('[CartContext] Cart ID saved after clearing storage');
         } catch (retryError) {
           console.error('[CartContext] Failed to save cart ID even after clearing storage:', retryError);
@@ -173,26 +174,26 @@ export function CartProvider({ children }: CartProviderProps) {
 
   const getCartIdFromSession = (): string | null => {
     try {
-      const cartId = sessionStorage.getItem(CART_ID_KEY);
+      const cartId = localStorage.getItem(CART_ID_KEY);
       if (cartId) {
-        console.log('[CartContext] Retrieved cart ID from session:', cartId);
+        console.log('[CartContext] Retrieved cart ID from localStorage:', cartId);
       }
       return cartId;
     } catch (error) {
-      console.warn('[CartContext] Failed to get cart ID from sessionStorage:', error);
+      console.warn('[CartContext] Failed to get cart ID from localStorage:', error);
       return null;
     }
   };
 
   const removeCartIdFromSession = () => {
     try {
-      const existingCartId = sessionStorage.getItem(CART_ID_KEY);
-      sessionStorage.removeItem(CART_ID_KEY);
+      const existingCartId = localStorage.getItem(CART_ID_KEY);
+      localStorage.removeItem(CART_ID_KEY);
       if (existingCartId) {
-        console.log('[CartContext] Removed cart ID from session:', existingCartId);
+        console.log('[CartContext] Removed cart ID from localStorage:', existingCartId);
       }
     } catch (error) {
-      console.warn('[CartContext] Failed to remove cart ID from sessionStorage:', error);
+      console.warn('[CartContext] Failed to remove cart ID from localStorage:', error);
     }
   };
 
@@ -236,11 +237,11 @@ export function CartProvider({ children }: CartProviderProps) {
     try {
       console.log('[CartContext] Creating new cart...');
       const newCart = await medusaApiClient.createCart();
-      
+
       dispatch({ type: 'SET_CART', payload: newCart });
       saveCartIdToSession(newCart.id);
       setLastOperation(null); // Clear last operation on success
-      
+
       console.log('[CartContext] Cart created successfully:', newCart.id);
     } catch (error) {
       const errorMessage = handleApiError(error);
@@ -255,11 +256,48 @@ export function CartProvider({ children }: CartProviderProps) {
     console.log('[CartContext] Handling cart expiration - clearing session and preparing for new cart');
     removeCartIdFromSession();
     dispatch({ type: 'CLEAR_CART' });
-    
+
     // Optionally create a new cart immediately
     // For now, we'll wait for the next add operation to create a new cart
     console.log('[CartContext] Cart session cleared, new cart will be created on next operation');
   }, []);
+
+  // Load a specific cart by ID (for cross-device recovery)
+  const loadSpecificCart = React.useCallback(async (cartId: string): Promise<void> => {
+    if (isOrderConfirmationActive()) {
+      console.log('[CartContext] Order confirmation protection active; skipping loadSpecificCart');
+      return;
+    }
+
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+
+    try {
+      console.log('[CartContext] Loading specific cart:', cartId);
+      const cart = await medusaApiClient.getCart(cartId);
+
+      // If the cart is already completed, treat as expired
+      if ((cart as any)?.completed_at) {
+        console.log('[CartContext] Specific cart is completed; cannot load');
+        dispatch({ type: 'SET_ERROR', payload: 'This cart has already been completed' });
+        return;
+      }
+
+      // Update both state and storage
+      dispatch({ type: 'SET_CART', payload: cart });
+      saveCartIdToSession(cart.id);
+      console.log('[CartContext] Specific cart loaded successfully, items:', cart.items?.length || 0);
+    } catch (error) {
+      console.error('[CartContext] Failed to load specific cart:', error);
+
+      if (error instanceof ApiError && error.status === 404) {
+        dispatch({ type: 'SET_ERROR', payload: 'Cart not found or has expired' });
+      } else {
+        const errorMessage = handleApiError(error);
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      }
+    }
+  }, [handleApiError, isOrderConfirmationActive]);
 
   // Refresh cart from API with enhanced error handling
   const refreshCart = React.useCallback(async (): Promise<void> => {
@@ -268,7 +306,7 @@ export function CartProvider({ children }: CartProviderProps) {
       return;
     }
     const cartId = state.cartId || getCartIdFromSession();
-    
+
     if (!cartId) {
       console.log('[CartContext] No cart ID found, will create on first add');
       return;
@@ -293,7 +331,7 @@ export function CartProvider({ children }: CartProviderProps) {
       console.log('[CartContext] Cart refreshed successfully, items:', cart.items?.length || 0);
     } catch (error) {
       console.error('[CartContext] Failed to refresh cart:', error);
-      
+
       // Handle cart expiration or not found (404)
       if (error instanceof ApiError && error.status === 404) {
         console.log('[CartContext] Cart expired or not found, handling expiration');
@@ -320,7 +358,7 @@ export function CartProvider({ children }: CartProviderProps) {
       // Ensure we have a cart
       let currentCart = state.cart;
       let cartId = state.cartId || getCartIdFromSession();
-      
+
       // If we have a cart ID but no cart object, try to refresh first
       if (cartId && !currentCart) {
         try {
@@ -343,7 +381,7 @@ export function CartProvider({ children }: CartProviderProps) {
           cartId = null;
         }
       }
-      
+
       // If we still have a cart object but it's completed, discard it before creating a new one
       if (currentCart && (currentCart as any)?.completed_at) {
         console.log('[CartContext] Current cart is completed; discarding before add');
@@ -359,9 +397,9 @@ export function CartProvider({ children }: CartProviderProps) {
           dispatch({ type: 'SET_CART', payload: currentCart });
           saveCartIdToSession(currentCart.id);
         } catch (createError) {
-            const errorMessage = handleApiError(createError);
-            dispatch({ type: 'SET_ERROR', payload: errorMessage });
-            throw createError;
+          const errorMessage = handleApiError(createError);
+          dispatch({ type: 'SET_ERROR', payload: errorMessage });
+          throw createError;
         }
       }
 
@@ -370,14 +408,14 @@ export function CartProvider({ children }: CartProviderProps) {
         variant_id: variantId,
         quantity,
       });
-      
+
       dispatch({ type: 'SET_CART', payload: updatedCart });
       setLastOperation(null); // Clear last operation on success
       console.log('[CartContext] Item added to cart successfully, total items:', updatedCart.items?.length || 0);
     } catch (error) {
       const errorMessage = handleApiError(error);
       console.error('[CartContext] Failed to add item to cart:', error);
-      
+
       // Handle cart expiration during add operation
       if (error instanceof ApiError && error.status === 404) {
         console.log('[CartContext] Cart expired during add operation');
@@ -386,7 +424,7 @@ export function CartProvider({ children }: CartProviderProps) {
       } else {
         dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
-      
+
       throw error; // Re-throw so calling components can handle it
     }
   }, [state.cart, state.cartId, handleApiError, isOrderConfirmationActive]);
@@ -415,7 +453,7 @@ export function CartProvider({ children }: CartProviderProps) {
     try {
       console.log('[CartContext] Removing item from cart:', { cartId, lineItemId });
       const updatedCart = await medusaApiClient.removeLineItem(cartId, lineItemId);
-      
+
       // Normalize: only clear the cart if the backend explicitly indicates the cart no longer exists (missing id AND no items array).
       // Otherwise, if the response is missing id but has items, keep local cart state filtered as a fallback to avoid nuking other items.
       if (!updatedCart || (!updatedCart.id && (updatedCart as any)?.items == null)) {
@@ -477,7 +515,7 @@ export function CartProvider({ children }: CartProviderProps) {
       const updatedCart = await medusaApiClient.updateLineItem(cartId, lineItemId, {
         quantity,
       });
-      
+
       dispatch({ type: 'SET_CART', payload: updatedCart });
       setLastOperation(null); // Clear last operation on success
       console.log('[CartContext] Item quantity updated successfully');
@@ -515,7 +553,7 @@ export function CartProvider({ children }: CartProviderProps) {
       try {
         dispatch({ type: 'CLEAR_CART' });
         removeCartIdFromSession();
-      } catch {}
+      } catch { }
     } finally {
       silentClearInProgressRef.current = false;
     }
@@ -567,7 +605,7 @@ export function CartProvider({ children }: CartProviderProps) {
     if (!state.cart || !state.cart.items) {
       return 0;
     }
-    
+
     return state.cart.items.reduce((total, item) => total + item.quantity, 0);
   }, [state.cart]);
 
@@ -604,7 +642,7 @@ export function CartProvider({ children }: CartProviderProps) {
           return;
         }
       }
-      
+
       const path = typeof window !== 'undefined' ? window.location.pathname : ''
       const savedCartId = getCartIdFromSession();
 
@@ -650,19 +688,42 @@ export function CartProvider({ children }: CartProviderProps) {
     };
   }, [setOrderConfirmationProtection]);
 
+  // Handle cross-tab cart synchronization via localStorage events
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      // Only respond to cart ID changes from other tabs
+      if (e.key === CART_ID_KEY && e.newValue !== e.oldValue) {
+        const newCartId = e.newValue;
+        console.log('[CartContext] Cart ID changed in another tab:', { old: e.oldValue, new: newCartId });
+
+        if (newCartId && newCartId !== state.cartId) {
+          // Another tab updated the cart ID, refresh our cart
+          dispatch({ type: 'SET_CART_ID', payload: newCartId });
+          refreshCart();
+        } else if (!newCartId && state.cart) {
+          // Another tab cleared the cart
+          dispatch({ type: 'CLEAR_CART' });
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [state.cartId, state.cart, refreshCart]);
+
   // Handle browser session end - cleanup on beforeunload
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Note: sessionStorage automatically clears when the browser session ends
+      // Note: localStorage persists across browser sessions
       // This is just for logging purposes and any final cleanup if needed
-      console.log('[CartContext] Browser session ending, cart will be cleared automatically');
-      
-      // Optional: Perform any final cart state synchronization if needed
-      // The sessionStorage will be automatically cleared when the browser session ends
+      console.log('[CartContext] Browser session ending, cart ID will persist in localStorage');
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
+
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
@@ -682,7 +743,7 @@ export function CartProvider({ children }: CartProviderProps) {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -692,7 +753,7 @@ export function CartProvider({ children }: CartProviderProps) {
   useEffect(() => {
     const handleOnline = async () => {
       console.log('[CartContext] Network connection restored');
-      
+
       // If we have a cart ID but no cart data, try to refresh
       if (state.cartId && !state.cart) {
         if (isOrderConfirmationActive()) return
@@ -708,7 +769,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -727,7 +788,7 @@ export function CartProvider({ children }: CartProviderProps) {
     // Validate cart session every 5 minutes to ensure it's still active
     const validationInterval = setInterval(async () => {
       console.log('[CartContext] Performing periodic cart session validation');
-      
+
       try {
         await medusaApiClient.getCart(state.cartId!);
         console.log('[CartContext] Cart session validation successful');
@@ -754,13 +815,14 @@ export function CartProvider({ children }: CartProviderProps) {
     clearCartSilently,
     getTotalItems,
     refreshCart,
+    loadSpecificCart,
     createCart,
     clearError,
     retryLastOperation,
     isRetryable: errorState.isRetryable || (lastOperation !== null && isRetryableError(errorState.originalError)),
     isOrderConfirmationActive,
     setOrderConfirmationProtection,
-  }), [state.cart, state.loading, state.error, errorState.error, addToCart, removeFromCart, updateQuantity, clearCart, clearCartSilently, getTotalItems, refreshCart, createCart, clearError, retryLastOperation, errorState.isRetryable, lastOperation, isRetryableError, errorState.originalError, isOrderConfirmationActive, setOrderConfirmationProtection]);
+  }), [state.cart, state.loading, state.error, errorState.error, addToCart, removeFromCart, updateQuantity, clearCart, clearCartSilently, getTotalItems, refreshCart, loadSpecificCart, createCart, clearError, retryLastOperation, errorState.isRetryable, lastOperation, isRetryableError, errorState.originalError, isOrderConfirmationActive, setOrderConfirmationProtection]);
 
   return (
     <CartContext.Provider value={contextValue}>
@@ -772,11 +834,11 @@ export function CartProvider({ children }: CartProviderProps) {
 // Custom hook to use cart context
 export function useCart(): CartContextType {
   const context = useContext(CartContext);
-  
+
   if (context === undefined) {
     throw new Error('useCart must be used within a CartProvider');
   }
-  
+
   return context;
 }
 

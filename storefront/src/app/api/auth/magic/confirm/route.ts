@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     return new Response(JSON.stringify({ ok: false, error: 'missing_params' }), { status: 400 })
   }
 
-  const record = await kvGet<{ tokenHash: string; phonePrimary?: string }>(`magic:${email}`)
+  const record = await kvGet<{ tokenHash: string; phonePrimary?: string; cartId?: string }>(`magic:${email}`)
   if (!record?.tokenHash) return new Response(JSON.stringify({ ok: false, error: 'expired_or_missing' }), { status: 400 })
   const ok = await bcrypt.compare(token, record.tokenHash)
   if (!ok) return new Response(JSON.stringify({ ok: false, error: 'invalid_token' }), { status: 400 })
@@ -24,10 +24,20 @@ export async function GET(req: NextRequest) {
   try { await kafkaEmit('auth.combo_mfa_passed', { identifier: email, factor: 'magic', timestamp: Date.now() }) } catch {}
   try { const c = await getCounter({ name: 'auth_magic_confirm_success_total', help: 'Magic confirm success total' }); c.inc() } catch {}
 
-  // Redirect the user back into the app so the original tab can react via storage events
+  // Smart redirect based on context
   const base = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
-  const doneUrl = `${base}/auth/magic/done?email=${encodeURIComponent(email)}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}${state ? `&state=${encodeURIComponent(state)}` : ''}`
-  return new Response(null, { status: 302, headers: { Location: doneUrl } })
+  
+  // If this is a checkout flow, redirect directly to checkout page
+  if (state?.startsWith('checkout-')) {
+    // Use cart ID from record (more reliable) or fallback to state
+    const cartId = record?.cartId || state.replace('checkout-', '')
+    const checkoutUrl = `${base}/checkout?verified=true&email=${encodeURIComponent(email)}${cartId ? `&cartId=${encodeURIComponent(cartId)}` : ''}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}`
+    return new Response(null, { status: 302, headers: { Location: checkoutUrl } })
+  }
+  
+  // For regular login flows, redirect to the new welcome page
+  const welcomeUrl = `${base}/welcome?email=${encodeURIComponent(email)}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}${state ? `&state=${encodeURIComponent(state)}` : ''}`
+  return new Response(null, { status: 302, headers: { Location: welcomeUrl } })
 }
 
 
