@@ -6,7 +6,6 @@ import ComboMfaModal from '@/components/ComboMfaModal'
 import { signIn } from 'next-auth/react'
 import styles from './loginPage.module.css'
 import SetupPasskeyButton from '@/components/SetupPasskeyButton'
-import PasskeyNudge from '@/components/PasskeyNudge'
 
 type Identifier = {
   email?: string
@@ -154,10 +153,6 @@ export default function LoginPage() {
         </form>
         <p aria-live="polite" className={styles.status}>{status}</p>
         <p className={styles.helperRow}>Having trouble? <a className={styles.link} href="/contact">Contact support</a></p>
-        <div style={{ marginTop: 16 }}>
-          {/* Post-elevation prompt uses PasskeyNudge in authenticated contexts; keep demo button for initial UX if needed */}
-          <PasskeyNudge />
-        </div>
       </div>
       <ComboMfaModal
         open={comboRequired}
