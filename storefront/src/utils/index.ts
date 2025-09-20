@@ -12,3 +12,7 @@ export * from './webglErrorHandling';
 export * from './httpClient';
 export * from './medusaApiClient';
 export * from './productDataMapper';
+
+// Export authentication and session utilities
+export * from './authEventStorage';
+export * from './sessionStateTracking';

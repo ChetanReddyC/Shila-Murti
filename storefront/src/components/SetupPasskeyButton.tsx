@@ -64,6 +64,18 @@ export default function SetupPasskeyButton({ userId, username, onRegistered }: {
             setBusy(true); setStatus('Setting up passkey…')
             await registerPasskey(userId, username)
             setStatus('Passkey registered on this device.')
+            
+            // Update session storage to indicate passkey registration
+            try {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('hasPasskey', 'true')
+                // Store the user ID for future reference
+                sessionStorage.setItem('passkeyUserId', userId)
+              }
+            } catch (sessionError) {
+              console.warn('[SetupPasskeyButton] Failed to update session storage:', sessionError)
+            }
+            
             try { onRegistered && onRegistered() } catch {}
           } catch (e: any) {
             console.error('[Passkey Register] failed', e)

@@ -243,7 +243,32 @@ export default function CheckoutPage() {
           if (res.ok && json?.customerId) {
             setPurchaseReady(true);
             setCustomerId(json.customerId);
+            // Store customerId in sessionStorage for passkey detection
+            try {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('customerId', json.customerId);
+              }
+            } catch (storageError) {
+              console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
+            }
             setIdentityError(null);
+            
+            // Update NextAuth session with the customerId to trigger passkey nudge
+            try {
+              const identifierValue = (identityMethod === 'email')
+                ? (emailParam || '').trim().toLowerCase()
+                : (phoneParam || '').trim();
+              if (identifierValue) {
+                import('next-auth/react').then(({ signIn }) => {
+                  signIn('session', { identifier: identifierValue, customerId: json.customerId, redirect: false })
+                    .catch((e) => { 
+                      console.warn('[Checkout] Failed to update session after magic link verification:', e);
+                    });
+                }).catch(() => {});
+              }
+            } catch (sessionError) {
+              console.warn('[Checkout] Error updating session after magic link verification:', sessionError);
+            }
             
             // Show success message briefly
             setIdentityError('✅ Email verification successful! You can now place your order.');
@@ -273,6 +298,7 @@ export default function CheckoutPage() {
           email: emailParam,
           phone: phoneParam,
           cartId: cartIdParam,
+          customerId: json?.customerId, // Include customerId for cross-tab passkey detection
           timestamp: Date.now(),
           expiresAt: Date.now() + (5 * 60 * 1000) // 5 minutes
         }
@@ -309,6 +335,18 @@ export default function CheckoutPage() {
               setMagicSent(true)
               setMagicVerified(true)
               setPurchaseReady(true)
+              // Set customerId if available in cross-tab data
+              if (data.customerId) {
+                setCustomerId(data.customerId);
+                // Store customerId in sessionStorage for passkey detection
+                try {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('customerId', data.customerId);
+                  }
+                } catch (storageError) {
+                  console.warn('[Checkout] Failed to store customerId in sessionStorage (cross-tab):', storageError);
+                }
+              }
               setIdentityError('✅ Email verified in another tab! You can now place your order.')
               
               // Clear the verification data since we've used it
@@ -617,12 +655,38 @@ export default function CheckoutPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, cartId: cart.id })
       })
-      const cj = await cr.json().catch(() => ({}))
+      const cj = await cr.json().catch(() => ({}));
       if (!cr.ok || cj?.ok !== true) {
-        throw new Error(mapIdentityError('checkout-verify', cj?.error, cr.status))
+        throw new Error(mapIdentityError('checkout-verify', cj?.error, cr.status));
       }
-      setCustomerId(String(cj.customerId || ''))
-      setPurchaseReady(true)
+      const customerIdValue = String(cj.customerId || '');
+      setCustomerId(customerIdValue);
+      // Store customerId in sessionStorage for passkey detection
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('customerId', customerIdValue);
+        }
+      } catch (storageError) {
+        console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
+      }
+      setPurchaseReady(true);
+      
+      // Update NextAuth session with the customerId to trigger passkey nudge
+      try {
+        const identifierValue = (identityMethod === 'email')
+          ? (email || '').trim().toLowerCase()
+          : (phone || '').trim();
+        if (identifierValue) {
+          import('next-auth/react').then(({ signIn }) => {
+            signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
+              .catch((e) => { 
+                console.warn('[Checkout] Failed to update session after OTP verification:', e);
+              });
+          }).catch(() => {});
+        }
+      } catch (sessionError) {
+        console.warn('[Checkout] Error updating session after OTP verification:', sessionError);
+      }
     } catch (e: any) {
       setIdentityError(e?.message || mapIdentityError('otp-verify'))
       setPurchaseReady(false)
@@ -676,8 +740,34 @@ export default function CheckoutPage() {
             })
             const cj = await cr.json().catch(() => ({}))
             if (cr.ok && cj?.ok === true) {
-              setCustomerId(String(cj.customerId || ''))
+              const customerIdValue = String(cj.customerId || '');
+              setCustomerId(customerIdValue)
+              // Store customerId in sessionStorage for passkey detection
+              try {
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('customerId', customerIdValue);
+                }
+              } catch (storageError) {
+                console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
+              }
               setPurchaseReady(true)
+              
+              // Update NextAuth session with the customerId to trigger passkey nudge
+              try {
+                const identifierValue = (identityMethod === 'email')
+                  ? (em || '').trim().toLowerCase()
+                  : (phoneParam || '').trim();
+                if (identifierValue) {
+                  import('next-auth/react').then(({ signIn }) => {
+                    signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
+                      .catch((e) => { 
+                        console.warn('[Checkout] Failed to update session after magic link verification:', e);
+                      });
+                  }).catch(() => {});
+                }
+              } catch (sessionError) {
+                console.warn('[Checkout] Error updating session after magic link verification:', sessionError);
+              }
             } else {
               setIdentityError(mapIdentityError('checkout-verify', cj?.error, cr.status))
             }
@@ -921,6 +1011,18 @@ export default function CheckoutPage() {
             const identifierValue = (identityMethod === 'email')
               ? (email || '').trim().toLowerCase()
               : (phone || '').trim()
+            
+            // Store customerId in sessionStorage for passkey detection
+            if (customerId) {
+              try {
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('customerId', customerId);
+                }
+              } catch (storageError) {
+                console.warn('[Checkout] Failed to store customerId in sessionStorage (post-purchase):', storageError);
+              }
+            }
+            
             import('next-auth/react').then(({ signIn }) => {
               signIn('session', { identifier: identifierValue, customerId: customerId || undefined, redirect: false })
                 .then(() => { try { console.info('[Metrics] post_purchase_login_success_total++') } catch {} })

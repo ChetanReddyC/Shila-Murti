@@ -26,18 +26,20 @@ async function fetchPasskeyRequestOptions(identifier: Identifier): Promise<{ opt
   }
 }
 
-async function verifyPasskey(assertion: unknown, identifier: Identifier): Promise<{ comboRequired?: boolean; token?: string }> {
+async function verifyPasskey(assertion: unknown, identifier: Identifier, canonicalUserId: string): Promise<{ comboRequired?: boolean; token?: string }> {
   const res = await fetch('/api/auth/passkey/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       ...(typeof assertion === 'object' && assertion ? (assertion as Record<string, unknown>) : {}),
-      userId: identifier.email || identifier.phone,
+      userId: canonicalUserId,  // Use the canonical user ID (customerId) for verification
       ...identifier,
     }),
   })
   if (!res.ok) throw new Error('Passkey verification failed')
-  return res.json()
+  const result = await res.json()
+  // Ensure comboRequired is explicitly set to false for successful passkey auth
+  return { ...result, comboRequired: false }
 }
 
 export default function LoginPage() {
@@ -58,72 +60,99 @@ export default function LoginPage() {
     setComboRequired(false)
 
     const id: Identifier = identifier.includes('@') ? { email: identifier } : { phone: identifier }
-    // Policy gate: ask server if passkey should be attempted for this identifier
+    
+    // Check if user already has a passkey registered
     try {
-      const policyRes = await fetch('/api/auth/passkey/policy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(id) })
+      const policyRes = await fetch('/api/auth/passkey/policy', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(id) 
+      })
       const policy = await policyRes.json().catch(() => ({}))
-      if (!policyRes.ok || !policy?.hasPasskey) {
-        setStatus('Passkey not available; requiring combo‑MFA.')
-        setComboRequired(true)
-        return
-      }
-      // Before attempting, check if platform authenticator is available; if not, skip to combo-MFA
-      const isAvailable = (window as any).PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable
-      if (typeof isAvailable === 'function') {
-        const available = await isAvailable()
-        if (!available) {
-          setStatus('Passkey not available on this device; requiring combo‑MFA.')
-          setComboRequired(true)
-          return
+      
+      // If user has a passkey, attempt passkey authentication first
+      if (policyRes.ok && policy?.hasPasskey) {
+        // Before attempting, check if platform authenticator is available
+        const isAvailable = (window as any).PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable
+        if (typeof isAvailable === 'function') {
+          const available = await isAvailable()
+          if (available) {
+            setStatus('Attempting passkey authentication…')
+            const fetched = await fetchPasskeyRequestOptions(id)
+            if (fetched) {
+              const { options, userId: canonicalUserId } = fetched
+              const { data, error } = await authenticate(options)
+              
+              if (!error && data) {
+                try {
+                  // Always send the canonical userId (customerId) back for verification lookup
+                  const result = await verifyPasskey({ ...data, userId: canonicalUserId }, id, canonicalUserId)
+                  if (!result.comboRequired) {
+                    setStatus('Authenticated with passkey.')
+                    // If we got a credential id back, trigger a background refresh of passkey list later
+                    try { 
+                      if (result?.credentialId && typeof window !== 'undefined') {
+                        window.sessionStorage.setItem('lastPasskeyCredential', result.credentialId) 
+                      }
+                    } catch {}
+                    // Ensure we have a Medusa customer and persist its id for account features
+                    try {
+                      const ensure = await fetch('/api/account/customer/ensure', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify(id) 
+                      })
+                      const ej = await ensure.json().catch(() => ({}))
+                      if (ej?.customerId && typeof window !== 'undefined') {
+                        window.sessionStorage.setItem('customerId', String(ej.customerId))
+                      }
+                    } catch {}
+                    // Bind session to the identifier, include customerId when available in sessionStorage
+                    let customerId: string | undefined
+                    try { 
+                      if (typeof window !== 'undefined') {
+                        customerId = sessionStorage.getItem('customerId') || undefined 
+                      }
+                    } catch {}
+                    
+                    console.log('[Login] Attempting signIn with:', { identifier: (id.email || id.phone) as string, customerId })
+                    const signInResult = await signIn('session', { 
+                      identifier: (id.email || id.phone) as string, 
+                      customerId, 
+                      hasPasskey: true, 
+                      redirect: true, 
+                      callbackUrl: '/account' 
+                    })
+                    console.log('[Login] signIn result:', signInResult)
+                    return
+                  }
+                } catch (err) {
+                  console.error('[Login] Passkey verification error:', err)
+                  setStatus('Passkey verification failed. Falling back to MFA.')
+                }
+              } else {
+                setStatus('Passkey authentication failed. Falling back to MFA.')
+              }
+            } else {
+              setStatus('Could not retrieve passkey options. Falling back to MFA.')
+            }
+          } else {
+            setStatus('Passkey not available on this device. Falling back to MFA.')
+          }
+        } else {
+          setStatus('Platform authenticator not available. Falling back to MFA.')
         }
+      } else {
+        setStatus('No passkey registered for this account. Proceeding with MFA.')
       }
-    } catch {
-      // If checks fail, continue with optimistic passkey attempt
-    }
-
-    setStatus('Attempting passkey…')
-    const fetched = await fetchPasskeyRequestOptions(id)
-    if (!fetched) {
-      setStatus('Passkey not available; requiring combo‑MFA.')
-      setComboRequired(true)
-      return
-    }
-    const { options, userId: canonicalUserId } = fetched
-
-    const { data, error } = await authenticate(options)
-    if (error || !data) {
-      setStatus('Passkey failed; requiring combo‑MFA.')
-      setComboRequired(true)
-      return
-    }
-
-    try {
-      // Always send the canonical userId (customerId) back for verification lookup
-      const result = await verifyPasskey({ ...data, userId: canonicalUserId }, id)
-      if (result.comboRequired) {
-        setStatus('Device not recognized; requiring combo‑MFA.')
-        setComboRequired(true)
-        return
-      }
-      setStatus('Authenticated with passkey.')
-      // If we got a credential id back, trigger a background refresh of passkey list later
-      try { if (result?.token && typeof window !== 'undefined') window.sessionStorage.setItem('lastPasskeyCredential', result.token) } catch {}
-      // Ensure we have a Medusa customer and persist its id for account features
-      try {
-        const ensure = await fetch('/api/account/customer/ensure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(id) })
-        const ej = await ensure.json().catch(() => ({}))
-        if (ej?.customerId && typeof window !== 'undefined') {
-          window.sessionStorage.setItem('customerId', String(ej.customerId))
-        }
-      } catch {}
-      // Bind session to the identifier, include customerId when available in sessionStorage
-      let customerId: string | undefined
-      try { if (typeof window !== 'undefined') customerId = sessionStorage.getItem('customerId') || undefined } catch {}
-      await signIn('session', { identifier: (id.email || id.phone) as string, customerId, redirect: true, callbackUrl: '/account' })
     } catch (err) {
-      setStatus('Passkey verification error; requiring combo‑MFA.')
-      setComboRequired(true)
+      console.error('[Login] Policy check error:', err)
+      setStatus('Error checking passkey status. Proceeding with MFA.')
     }
+
+    // Fallback to combo-MFA
+    setStatus('Requiring combo‑MFA for authentication.')
+    setComboRequired(true)
   }, [authenticate, identifier])
 
   return (

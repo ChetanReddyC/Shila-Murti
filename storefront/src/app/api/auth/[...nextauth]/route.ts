@@ -50,10 +50,15 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         identifier: { label: 'identifier', type: 'text' },
         customerId: { label: 'customerId', type: 'text' },
+        hasPasskey: { label: 'hasPasskey', type: 'text' },
       },
       async authorize(credentials) {
+        console.log('[Session Provider] Authorize called with:', credentials)
         const identifier = (credentials?.identifier || '').toString()
-        if (!identifier) return null
+        if (!identifier) {
+          console.log('[Session Provider] No identifier provided')
+          return null
+        }
         const isEmail = identifier.includes('@')
         const user: any = { id: identifier }
         if (isEmail) user.email = identifier
@@ -61,6 +66,9 @@ export const authOptions: NextAuthOptions = {
         // comboRequired resolved when we call this after MFA
         user.comboRequired = false
         if (credentials?.customerId) user.customerId = String(credentials.customerId)
+        // Set hasPasskey flag if provided
+        if (credentials?.hasPasskey) user.hasPasskey = Boolean(credentials.hasPasskey)
+        console.log('[Session Provider] Returning user:', user)
         return user
       },
     }),
@@ -99,6 +107,8 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, account, user }) {
+      console.log('[NextAuth JWT] Input:', { token: Object.keys(token), account, user })
+      
       // Rotate jti on sign-in
       if (user) {
         const jti = (globalThis as any)?.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
@@ -108,13 +118,27 @@ export const authOptions: NextAuthOptions = {
       // Factor flags
       if (account?.provider === 'otp') (token as any).otpOK = true
       if (account?.provider === 'magic') (token as any).magicOK = true
+      // Add passkey flag when using passkey provider
+      if (account?.provider === 'passkey') (token as any).hasPasskey = true
 
       // Session composition
       if (user && (user as any).comboRequired !== undefined) (token as any).comboRequired = (user as any).comboRequired
       if (user && (user as any)?.customerId) (token as any).customerId = (user as any).customerId
+      // Set hasPasskey flag when comboRequired is false (passkey auth)
+      if (user && (user as any).comboRequired === false) (token as any).hasPasskey = true
 
       // Compute MFA completion
-      ;(token as any).mfaComplete = (token as any).comboRequired ? Boolean((token as any).otpOK && (token as any).magicOK) : true
+      // If comboRequired is false (passkey auth), then MFA is complete
+      // If comboRequired is true, then MFA is complete only when both OTP and Magic are OK
+      const currentComboRequired = (token as any).comboRequired ?? false
+      ;(token as any).mfaComplete = currentComboRequired ? Boolean((token as any).otpOK && (token as any).magicOK) : true
+      
+      console.log('[NextAuth JWT] Output:', { 
+        comboRequired: (token as any).comboRequired, 
+        mfaComplete: (token as any).mfaComplete,
+        customerId: (token as any).customerId,
+        hasPasskey: (token as any).hasPasskey
+      })
 
       // PII minimization: mask identifier for display but keep original for passkey registration
       try {
@@ -142,12 +166,20 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
+      console.log('[NextAuth Session] Input token:', { 
+        comboRequired: (token as any).comboRequired, 
+        mfaComplete: (token as any).mfaComplete,
+        customerId: (token as any).customerId,
+        hasPasskey: (token as any).hasPasskey
+      })
+      
       Object.assign(session, {
         comboRequired: (token as any).comboRequired ?? false,
         otpOK: (token as any).otpOK ?? false,
         magicOK: (token as any).magicOK ?? false,
         mfaComplete: (token as any).mfaComplete,
         customerId: (token as any).customerId,
+        hasPasskey: (token as any).hasPasskey ?? false,
       })
       // Overwrite user object with masked minimal PII for UX where needed
       const maskedEmail = (token as any).maskedEmail
@@ -163,6 +195,13 @@ export const authOptions: NextAuthOptions = {
       // Ensure no raw email/phone leaked in main fields
       if (!maskedEmail) delete (session as any).user?.email
       if (!maskedPhone) delete (session as any).user?.phone
+      
+      console.log('[NextAuth Session] Output:', { 
+        comboRequired: (session as any).comboRequired, 
+        mfaComplete: (session as any).mfaComplete,
+        customerId: (session as any).customerId,
+        hasPasskey: (session as any).hasPasskey
+      })
       
       return session
     },

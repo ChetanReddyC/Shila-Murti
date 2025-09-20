@@ -36,6 +36,7 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
 
   const [active, setActive] = useState<boolean>(false);
   const [canvasRect, setCanvasRect] = useState<CanvasRect | null>(null);
+  const [webglSupported, setWebglSupported] = useState<boolean>(true);
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const devicePixelRatioRef = useRef<number>(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
   const isDebug = debug;
@@ -167,9 +168,10 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
         powerPreference: 'high-performance',
       });
       if (!gl) {
+        setWebglSupported(false);
         if (isDebug) {
           // eslint-disable-next-line no-console
-          console.error('[HoverEffectOverlay] WebGL not supported');
+          console.warn('[HoverEffectOverlay] WebGL not supported, falling back to no effects');
         }
         return;
       }
@@ -184,7 +186,7 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
       if (!positionBuffer) {
         if (isDebug) {
           // eslint-disable-next-line no-console
-          console.error('[HoverEffectOverlay] Failed to create position buffer');
+          console.warn('[HoverEffectOverlay] Failed to create position buffer');
         }
         return;
       }
@@ -501,7 +503,9 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
 
   return (
     <div ref={rootRef} className={styles.overlayRoot} aria-hidden>
-      <canvas ref={canvasRef} className={styles.overlayCanvas} style={style} />
+      {webglSupported && (
+        <canvas ref={canvasRef} className={styles.overlayCanvas} style={style} />
+      )}
     </div>
   );
 });
