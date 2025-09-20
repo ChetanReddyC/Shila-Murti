@@ -172,16 +172,34 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
                   transports: (cred as any).response.getTransports?.() || [],
                 },
               }
-              await fetch('/api/auth/passkey/register/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, credential: payload }) })
+              const verifyRes = await fetch('/api/auth/passkey/register/verify', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ userId, credential: payload }) 
+              })
+              
+              // If passkey registration was successful, update session storage
+              if (verifyRes.ok) {
+                try {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('hasPasskey', 'true')
+                    sessionStorage.setItem('passkeyUserId', userId)
+                    sessionStorage.setItem('lastPasskeyCredential', cred.id)
+                  }
+                } catch (sessionError) {
+                  console.warn('[ComboMfaModal] Failed to update session storage after passkey registration:', sessionError)
+                }
+              }
             }
           }
-        } catch {
+        } catch (passkeyError) {
           // If browser blocks automatic WebAuthn due to user activation policy, ignore; user can add from Security tab
+          console.warn('[ComboMfaModal] Automatic passkey registration failed:', passkeyError)
         }
         // Bind a session using the identifier and include customerId for caching
         try {
           const customerIdForSession = json?.customerId ? String(json.customerId) : undefined
-          await signIn('session', { identifier: identifierValue, customerId: customerIdForSession, redirect: true, callbackUrl: '/' })
+          await signIn('session', { identifier: identifierValue, customerId: customerIdForSession, hasPasskey: true, redirect: true, callbackUrl: '/' })
         } catch {
           // fallback no-op; user is redirected anyway
         }
