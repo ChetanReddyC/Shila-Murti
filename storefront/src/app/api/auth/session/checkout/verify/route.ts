@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     const rawPhone: string | undefined = body?.phone
     const rawEmail: string | undefined = body?.email
     const cartId: string | undefined = body?.cartId
+    const isPasskeyAuth: boolean | undefined = body?.isPasskeyAuth
 
     const email = normalizeEmail(rawEmail)
     const phoneKey = normalizePhoneDigits(rawPhone)
@@ -40,7 +41,32 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ ok: false, error: 'identifier_required' }), { status: 400 })
     }
 
-    // Determine verification markers
+    // For passkey authentication, we don't need to check verification markers
+    // The passkey verification already confirmed the user's identity
+    if (isPasskeyAuth) {
+      // Ensure/create Medusa customer
+      const base = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
+      const ensureRes = await fetch(`${base}/api/account/customer/ensure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone: rawPhone }),
+      })
+      const ej = await ensureRes.json().catch(() => ({}))
+
+      if (!ensureRes.ok || !ej?.customerId) {
+        try { failureCounter?.labels?.('passkey', String(cartId || 'none')).inc() } catch {}
+        try { latencyHistogram?.labels?.('passkey', String(cartId || 'none'))?.observe?.(Date.now() - startedAt) } catch {}
+        const code = ensureRes.status || 500
+        return new Response(JSON.stringify({ ok: false, error: ej?.error || 'ensure_failed' }), { status: code })
+      }
+
+      try { successCounter?.labels?.('passkey', String(cartId || 'none')).inc() } catch {}
+      try { latencyHistogram?.labels?.('passkey', String(cartId || 'none'))?.observe?.(Date.now() - startedAt) } catch {}
+      // Indicate to the client that no redirect is needed; client performs signIn with redirect: false
+      return new Response(JSON.stringify({ ok: true, customerId: ej.customerId, redirect: false }), { status: 200 })
+    }
+
+    // Determine verification markers for OTP/magic link flows
     let verified = false
     let channel: 'whatsapp' | 'email' = 'whatsapp'
 
@@ -98,5 +124,3 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ ok: false, error: 'internal_error' }), { status: 500 })
   }
 }
-
-

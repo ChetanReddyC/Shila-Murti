@@ -1653,7 +1653,7 @@ export default function PasskeyNudge() {
                 e.currentTarget.style.backgroundColor = '#fff'
               }}
             >
-              Not now
+              Already setuped
             </button>
           </div>
         </div>
