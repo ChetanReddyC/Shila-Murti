@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Script from 'next/script';
 import Header from '../../components/Header';
 import styles from './checkoutPage.module.css';
 import Link from 'next/link';
@@ -35,7 +36,7 @@ export default function CheckoutPage() {
   // Shipping method selection is driven by backend option ids
 
   // Payment method state
-  const [paymentMethod, setPaymentMethod] = useState('creditCard');
+  const [paymentMethod, setPaymentMethod] = useState('cashfree');
   
   // Payment details
   const [paymentDetails, setPaymentDetails] = useState({
@@ -43,6 +44,10 @@ export default function CheckoutPage() {
     expiryDate: '',
     cvv: ''
   });
+
+  // Cashfree SDK state
+  const [cashfreeSdkLoaded, setCashfreeSdkLoaded] = useState(false)
+  const [cashfreeLoading, setCashfreeLoading] = useState(false)
 
   // Identity method and state (Task 2)
   const [identityMethod, setIdentityMethod] = useState<'login' | 'phone' | 'email'>('phone')
@@ -175,6 +180,8 @@ export default function CheckoutPage() {
 
   // Detect authenticated users and bypass identity verification
   const { data: session, status } = useSession();
+  const isAuthenticated = status === 'authenticated'
+  const isReadyToPay = isAuthenticated || purchaseReady
 
   useEffect(() => {
     // If user is already authenticated, bypass identity verification
@@ -811,7 +818,117 @@ export default function CheckoutPage() {
     }
   }
 
+  // Cashfree payment handler
+  const handleCashfreePay = async () => {
+    try {
+      if (!cart || !cart.id || cartItems.length === 0) {
+        alert('Your cart is empty.');
+        return;
+      }
+      if (!(window as any).Cashfree) {
+        alert('Cashfree SDK not loaded');
+        return;
+      }
+      setCashfreeLoading(true)
+
+      // 0) Prepare Medusa cart: update addresses/email, add shipping, initiate payment collection
+      try {
+        const { medusaApiClient } = await import('../../utils/medusaApiClient')
+
+        // Derive shipping address and email (same logic as manual flow)
+        const fullName = (formData.name || '').trim()
+        const nameParts = fullName.split(/\s+/).filter(Boolean)
+        const firstName = nameParts[0] || 'Customer'
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+
+        const digitsPhone = (formData.contactNumber || phone || '').toString().replace(/\D/g, '')
+        const emailForCart = (purchaseReady && identityMethod === 'email' && (email || '').trim())
+          ? (email || '').trim().toLowerCase()
+          : undefined
+
+        await medusaApiClient.updateCart(cart.id, {
+          ...(emailForCart ? { email: emailForCart } : {}),
+          shipping_address: {
+            first_name: firstName,
+            last_name: lastName,
+            address_1: formData.address,
+            city: formData.city,
+            postal_code: formData.postalCode,
+            province: formData.state,
+            country_code: 'in',
+            phone: digitsPhone || undefined,
+          },
+        })
+
+        // Ensure at least one shipping method is attached
+        let optionIdToUse = selectedShippingOptionId || null
+        if (!optionIdToUse) {
+          try {
+            const options = await medusaApiClient.getShippingOptionsForCart(cart.id)
+            const cheapest = (options || []).slice().sort((a: any, b: any) => Number(a.amount ?? 0) - Number(b.amount ?? 0))[0]
+            if (cheapest) optionIdToUse = cheapest.id
+          } catch {}
+        }
+        if (optionIdToUse) {
+          try { await medusaApiClient.addShippingMethod(cart.id, optionIdToUse) } catch {}
+        }
+
+        // Initiate payment collection/sessions (v2 requirement)
+        try { await medusaApiClient.createPaymentSessions(cart.id) } catch {}
+      } catch (prepError) {
+        console.warn('[Cashfree] Pre-init cart preparation failed (will still attempt payment):', prepError)
+      }
+
+      const orderId = `order_${Date.now()}`
+      // Ensure two decimals for INR
+      const orderAmount = Number(Number(total || 0).toFixed(2))
+
+      const digitsPhone = (phone || '').replace(/\D/g, '')
+      const emailToSend = (purchaseReady && identityMethod === 'email' && (email || '').trim())
+        ? (email || '').trim().toLowerCase()
+        : ''
+
+      const resp = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          orderAmount,
+          cartId: cart.id,
+          customer: {
+            id: customerId || undefined,
+            name: formData.name || 'Customer',
+            email: emailToSend,
+            phone: (formData.contactNumber || digitsPhone || '').toString()
+          }
+        })
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        console.error('[Cashfree] create-order failed', data)
+        alert('Failed to create Cashfree order. Please try again.')
+        return
+      }
+
+      const paymentSessionId = (data as any)?.payment_session_id
+      if (!paymentSessionId) {
+        alert('No payment_session_id returned from server')
+        return
+      }
+
+      const cashfree = (window as any).Cashfree({ mode: (process.env.NEXT_PUBLIC_CASHFREE_ENV as any) || 'sandbox' })
+      cashfree.checkout({ paymentSessionId, redirectTarget: '_self' })
+      console.log('[Cashfree][handleCashfreePay] paymentSessionId:', paymentSessionId, 'cashfree object:', cashfree);
+    } catch (e: any) {
+      console.error('[Cashfree] exception', e)
+      alert(e?.message || 'Cashfree payment failed to start')
+    } finally {
+      setCashfreeLoading(false)
+    }
+  }
+
   const goToOrderConfirmation = React.useCallback((orderId?: string) => {
+    console.log('[Checkout] goToOrderConfirmation called with orderId:', orderId);
     try { setOrderConfirmationProtection(true) } catch {}
     // Clean up form data since order was successful
     cleanupFormData()
@@ -872,8 +989,14 @@ export default function CheckoutPage() {
     }
     
     // Update the check that prevents submission
-    if (status !== 'authenticated' && !purchaseReady) {
+    if (!isReadyToPay) {
       alert('Please verify your identity to continue. Use phone OTP or email magic link in the Identity Verification section.')
+      return
+    }
+
+    // If Cashfree is selected, redirect to hosted checkout instead of manual payment
+    if (paymentMethod === 'cashfree') {
+      await handleCashfreePay()
       return
     }
 
@@ -1326,6 +1449,11 @@ export default function CheckoutPage() {
       className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
     >
+      <Script
+        src="https://sdk.cashfree.com/js/v3/cashfree.js"
+        strategy="afterInteractive"
+        onLoad={() => setCashfreeSdkLoaded(true)}
+      />
       <div className="layout-container flex h-full grow flex-col">
         {/* Using the Header component */}
         <Header showProgress={isProgressBarSticky} progress={formProgress} />
@@ -1508,7 +1636,7 @@ export default function CheckoutPage() {
                       PayPal
                     </label>
                   </div>
-                  <div className={styles.paymentOption}>
+                <div className={styles.paymentOption}>
                     <input
                       type="radio"
                       id="upi"
@@ -1522,6 +1650,35 @@ export default function CheckoutPage() {
                       UPI
                     </label>
                   </div>
+                <div className={styles.paymentOption}>
+                  <input
+                    type="radio"
+                    id="cashfree"
+                    name="paymentMethod"
+                    value="cashfree"
+                    checked={paymentMethod === 'cashfree'}
+                    onChange={handlePaymentMethodChange}
+                    className={styles.radioInput}
+                  />
+                  <label htmlFor="cashfree" className={styles.radioLabel}>
+                    Cashfree (Hosted Checkout)
+                  </label>
+                </div>
+                {paymentMethod === 'cashfree' && (
+                  <div>
+                    <button
+                      type="button"
+                      className={styles.placeOrderButton}
+                      onClick={handleCashfreePay}
+                      disabled={!cashfreeSdkLoaded || cashfreeLoading}
+                    >
+                      Secure Payment – {formatCurrency(total)}
+                    </button>
+                    <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '0.5rem' }}>
+                      SDK: {cashfreeSdkLoaded ? 'Loaded' : 'Not Loaded'} | Auth: {status} | Env: {process.env.NEXT_PUBLIC_CASHFREE_ENV || 'sandbox'}
+                    </div>
+                  </div>
+                )}
                 </div>
                 
                 {paymentMethod === 'creditCard' && (
@@ -1765,9 +1922,29 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 
-                <button type="submit" className={styles.placeOrderButton} disabled={!purchaseReady}>
-                  Place Order
-                </button>
+                {paymentMethod === 'cashfree' ? (
+                  <button
+                    type="button"
+                    className={styles.placeOrderButton}
+                    onClick={handleCashfreePay}
+                    disabled={!cashfreeSdkLoaded || cashfreeLoading}
+                  >
+                    Secure Payment – {formatCurrency(total)}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className={styles.placeOrderButton}
+                    disabled={!isReadyToPay}
+                  >
+                    Place Order
+                  </button>
+                )}
+                {paymentMethod === 'cashfree' && (
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '0.5rem' }}>
+                    SDK: {cashfreeSdkLoaded ? 'Loaded' : 'Not Loaded'} | Auth: {status} | Env: {process.env.NEXT_PUBLIC_CASHFREE_ENV || 'sandbox'}
+                  </div>
+                )}
               </div>
             </form>
           </div>

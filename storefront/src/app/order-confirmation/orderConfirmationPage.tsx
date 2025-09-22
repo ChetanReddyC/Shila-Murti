@@ -50,13 +50,22 @@ export default function OrderConfirmationPage() {
     // Try to read order result from session as set by checkout
     try {
       const rawResult = sessionStorage.getItem('order_result');
+      console.log('[OrderConfirmation] sessionStorage order_result raw:', rawResult);
       if (rawResult) {
-        const parsed = JSON.parse(rawResult);
-        if (parsed?.orderId) {
-          setOrderId(parsed.orderId);
-          if (typeof parsed.displayId === 'number') {
-            setOrderNumber(`#${String(parsed.displayId).padStart(6, '0')}`);
+        try {
+          const parsed = JSON.parse(rawResult);
+          console.log('[OrderConfirmation] parsed order_result JSON:', parsed);
+          if (parsed?.orderId) {
+            console.log('[OrderConfirmation] setting orderId to:', parsed.orderId);
+            setOrderId(parsed.orderId);
+            if (typeof parsed.displayId === 'number') {
+              console.log('[OrderConfirmation] setting orderNumber to displayId:', parsed.displayId);
+              setOrderNumber(`#${String(parsed.displayId).padStart(6, '0')}`);
+            }
           }
+        } catch (parseErr) {
+          console.warn('[OrderConfirmation] Corrupted order_result in sessionStorage, clearing.', parseErr)
+          try { sessionStorage.removeItem('order_result') } catch {}
         }
       }
     } catch {}
@@ -69,12 +78,17 @@ export default function OrderConfirmationPage() {
     try {
       const raw = sessionStorage.getItem('order_checkout_snapshot');
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.expiresAt && parsed?.expiresAt > Date.now()) {
-          setSnapshot(parsed);
-        } else {
-          // Expired, remove it
-          sessionStorage.removeItem('order_checkout_snapshot');
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.expiresAt && parsed?.expiresAt > Date.now()) {
+            setSnapshot(parsed);
+          } else {
+            // Expired, remove it
+            sessionStorage.removeItem('order_checkout_snapshot');
+          }
+        } catch (parseErr) {
+          console.warn('[OrderConfirmation] Corrupted order_checkout_snapshot, clearing.', parseErr)
+          try { sessionStorage.removeItem('order_checkout_snapshot') } catch {}
         }
       }
     } catch (e) {
