@@ -9,6 +9,7 @@ import CartFeedback from '../../components/CartFeedback/CartFeedback';
 import NetworkStatus from '../../components/NetworkStatus/NetworkStatus';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import CartErrorBoundary from '../../components/CartErrorBoundary/CartErrorBoundary';
+import { PriceCalculationService } from '../../services/PriceCalculationService';
 
 export default function CartPage() {
   const {
@@ -34,18 +35,8 @@ export default function CartPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Format currency to INR
-  // NOTE: Our backend amounts are already stored in rupees (not cents). 
-  // The earlier division by 100 caused ₹8000 to show as ₹80, etc.
-  // Use the raw amount without dividing.
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
+  // Use centralized currency formatting
+  // NOTE: Our backend amounts are already stored in rupees (not cents).
 
   // Clear operation feedback after delay
   // Removed popup feedback; keep a no-op to avoid refactoring handlers extensively
@@ -201,6 +192,9 @@ export default function CartPage() {
     );
   }
 
+  // Calculate subtotal from actual item prices to ensure consistency
+  const calculatedSubtotal = cart.items.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
+
   // Cart with items - display real cart data
   return (
     <div
@@ -258,7 +252,7 @@ export default function CartPage() {
                             </div>
                           </div>
                         </td>
-                        <td className={styles.priceCell}>{formatCurrency(Number(item.unit_price))}</td>
+                        <td className={styles.priceCell}>{PriceCalculationService.formatCurrency(Number(item.unit_price), cart?.currency_code)}</td>
                         <td className={styles.quantityCell}>
                           <div className={styles.quantityControls}>
                             <button
@@ -303,10 +297,11 @@ export default function CartPage() {
                         </td>
                         <td className={styles.priceCell}>
                           <strong>
-                            {formatCurrency(
+                            {PriceCalculationService.formatCurrency(
                               typeof item?.subtotal === 'number' && !Number.isNaN(item.subtotal)
                                 ? Number(item.subtotal)
-                                : (Number(item?.unit_price ?? 0) * Number(item?.quantity ?? 0))
+                                : (Number(item?.unit_price ?? 0) * Number(item?.quantity ?? 0)),
+                              cart?.currency_code
                             )}
                           </strong>
                         </td>
@@ -322,33 +317,31 @@ export default function CartPage() {
 
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Subtotal</span>
-                  <span className={styles.summaryValue}>{formatCurrency(Number(cart.subtotal))}</span>
+                  <span className={styles.summaryValue}>
+                    {PriceCalculationService.formatCurrency(calculatedSubtotal, cart?.currency_code)}
+                  </span>
                 </div>
 
-                {cart.tax_total > 0 && (
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Tax</span>
-                    <span className={styles.summaryValue}>{formatCurrency(cart.tax_total)}</span>
-                  </div>
-                )}
-
                 <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Shipping</span>
-                  <span className={styles.summaryValue}>
-                    {cart.shipping_total > 0 ? formatCurrency(Number(cart.shipping_total)) : 'Free'}
-                  </span>
+                  <span className={styles.summaryLabel}>Taxes</span>
+                  <span className={styles.summaryValue}>{PriceCalculationService.formatCurrency(0, cart?.currency_code)}</span>
                 </div>
 
                 {cart.discount_total > 0 && (
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>Discount</span>
-                    <span className={styles.summaryValue}>-{formatCurrency(Number(cart.discount_total))}</span>
+                    <span className={styles.summaryValue}>-{PriceCalculationService.formatCurrency(Number(cart.discount_total), cart?.currency_code)}</span>
                   </div>
                 )}
 
                 <div className={styles.totalRow}>
                   <span className={styles.totalLabel}>Total</span>
-                  <span className={styles.totalValue}>{formatCurrency(Number(cart.total))}</span>
+                  <span className={styles.totalValue}>
+                    {PriceCalculationService.formatCurrency(
+                      calculatedSubtotal + 0 - Number(cart.discount_total || 0),
+                      cart?.currency_code
+                    )}
+                  </span>
                 </div>
               </div>
 

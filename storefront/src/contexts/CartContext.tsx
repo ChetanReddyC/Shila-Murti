@@ -4,6 +4,8 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode, use
 import { MedusaCart } from '../types/medusa';
 import { medusaApiClient, ApiError } from '../utils/medusaApiClient';
 import { useErrorHandler } from '../hooks/useErrorHandler';
+import { PriceCalculationService, CartTotals, ValidationResult } from '../services/PriceCalculationService';
+import { PriceValidator, PriceConsistencyResult } from '../services/PriceValidator';
 
 // Cart state interface
 interface CartState {
@@ -12,6 +14,8 @@ interface CartState {
   error: string | null;
   cartId: string | null;
   orderConfirmationProtection: boolean;
+  calculatedTotals: CartTotals | null;
+  priceValidation: PriceConsistencyResult | null;
 }
 
 // Cart actions
@@ -23,6 +27,8 @@ type CartAction =
   | { type: 'CLEAR_CART' }
   | { type: 'CLEAR_CART_SILENTLY' }
   | { type: 'SET_ORDER_CONFIRMATION_PROTECTION'; payload: boolean }
+  | { type: 'SET_CALCULATED_TOTALS'; payload: CartTotals | null }
+  | { type: 'SET_PRICE_VALIDATION'; payload: PriceConsistencyResult | null }
   | { type: 'RESET_STATE' };
 
 // Cart context interface
@@ -30,6 +36,8 @@ interface CartContextType {
   cart: MedusaCart | null;
   loading: boolean;
   error: string | null;
+  calculatedTotals: CartTotals | null;
+  priceValidation: PriceConsistencyResult | null;
   addToCart: (variantId: string, quantity: number) => Promise<void>;
   removeFromCart: (lineItemId: string) => Promise<void>;
   updateQuantity: (lineItemId: string, quantity: number) => Promise<void>;
@@ -44,6 +52,13 @@ interface CartContextType {
   isRetryable: boolean;
   isOrderConfirmationActive: () => boolean;
   setOrderConfirmationProtection: (active: boolean) => void;
+  // Price calculation methods
+  formatCurrency: (amount: number, currency?: string) => string;
+  getFormattedTotal: () => string;
+  getFormattedSubtotal: () => string;
+  getFormattedShipping: () => string;
+  validatePrices: () => PriceConsistencyResult | null;
+  recalculatePrices: (selectedShippingOptionId?: string) => void;
 }
 
 // Initial state
@@ -53,6 +68,8 @@ const initialState: CartState = {
   error: null,
   cartId: null,
   orderConfirmationProtection: false,
+  calculatedTotals: null,
+  priceValidation: null,
 };
 
 // Cart reducer
@@ -98,17 +115,31 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         cart: null,
         cartId: null,
         error: null,
+        calculatedTotals: null,
+        priceValidation: null,
       };
     case 'CLEAR_CART_SILENTLY':
       return {
         ...state,
         cart: null,
         cartId: null,
+        calculatedTotals: null,
+        priceValidation: null,
       };
     case 'SET_ORDER_CONFIRMATION_PROTECTION':
       return {
         ...state,
         orderConfirmationProtection: action.payload,
+      };
+    case 'SET_CALCULATED_TOTALS':
+      return {
+        ...state,
+        calculatedTotals: action.payload,
+      };
+    case 'SET_PRICE_VALIDATION':
+      return {
+        ...state,
+        priceValidation: action.payload,
       };
     case 'RESET_STATE':
       return initialState;
@@ -211,6 +242,90 @@ export function CartProvider({ children }: CartProviderProps) {
     dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: active });
   }, []);
 
+  // Price calculation and validation functions
+  const recalculatePrices = React.useCallback((selectedShippingOptionId?: string): void => {
+    if (!state.cart) {
+      dispatch({ type: 'SET_CALCULATED_TOTALS', payload: null });
+      dispatch({ type: 'SET_PRICE_VALIDATION', payload: null });
+      return;
+    }
+
+    try {
+      console.log('[CartContext] Recalculating prices for cart:', state.cart.id);
+      
+      // Calculate totals using centralized service
+      const calculatedTotals = PriceCalculationService.calculateCartTotals(
+        state.cart,
+        selectedShippingOptionId
+      );
+
+      // Validate price consistency
+      const validation = PriceValidator.validatePriceConsistency(
+        state.cart,
+        calculatedTotals,
+        { strictMode: false, toleranceAmount: 0.01 }
+      );
+
+      // Log validation warnings/errors
+      if (validation.warnings.length > 0) {
+        console.warn('[CartContext] Price validation warnings:', validation.warnings);
+      }
+      if (validation.errors.length > 0) {
+        console.error('[CartContext] Price validation errors:', validation.errors);
+      }
+
+      dispatch({ type: 'SET_CALCULATED_TOTALS', payload: calculatedTotals });
+      dispatch({ type: 'SET_PRICE_VALIDATION', payload: validation });
+
+      console.log('[CartContext] Price calculation completed:', {
+        total: calculatedTotals.total,
+        isValid: validation.isValid,
+        warnings: validation.warnings.length,
+        errors: validation.errors.length
+      });
+    } catch (error) {
+      console.error('[CartContext] Failed to calculate prices:', error);
+      dispatch({ type: 'SET_CALCULATED_TOTALS', payload: null });
+      dispatch({ type: 'SET_PRICE_VALIDATION', payload: {
+        isValid: false,
+        errors: [`Price calculation failed: ${error}`],
+        warnings: []
+      }});
+    }
+  }, [state.cart]);
+
+  const formatCurrency = React.useCallback((amount: number, currency?: string): string => {
+    const currencyCode = currency || state.cart?.currency_code || 'INR';
+    return PriceCalculationService.formatCurrency(amount, currencyCode);
+  }, [state.cart?.currency_code]);
+
+  const getFormattedTotal = React.useCallback((): string => {
+    if (!state.calculatedTotals) {
+      return formatCurrency(0);
+    }
+    return formatCurrency(state.calculatedTotals.total, state.calculatedTotals.currency);
+  }, [state.calculatedTotals, formatCurrency]);
+
+  const getFormattedSubtotal = React.useCallback((): string => {
+    if (!state.calculatedTotals) {
+      return formatCurrency(0);
+    }
+    return formatCurrency(state.calculatedTotals.subtotal, state.calculatedTotals.currency);
+  }, [state.calculatedTotals, formatCurrency]);
+
+  const getFormattedShipping = React.useCallback((): string => {
+    if (!state.calculatedTotals) {
+      return 'Free';
+    }
+    return state.calculatedTotals.shipping > 0 
+      ? formatCurrency(state.calculatedTotals.shipping, state.calculatedTotals.currency)
+      : 'Free';
+  }, [state.calculatedTotals, formatCurrency]);
+
+  const validatePrices = React.useCallback((): PriceConsistencyResult | null => {
+    return state.priceValidation;
+  }, [state.priceValidation]);
+
   const isOrderConfirmationActive = React.useCallback((): boolean => {
     const expiry = getOrderConfirmationProtectionExpiry();
     return typeof expiry === 'number' ? expiry > Date.now() : false;
@@ -223,6 +338,11 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: derivedActive });
     }
   }, [isOrderConfirmationActive, state.orderConfirmationProtection]);
+
+  // Recalculate prices whenever cart changes
+  useEffect(() => {
+    recalculatePrices();
+  }, [state.cart, recalculatePrices]);
 
   // Create a new cart
   const createCart = React.useCallback(async (): Promise<void> => {
@@ -808,6 +928,8 @@ export function CartProvider({ children }: CartProviderProps) {
     cart: state.cart,
     loading: state.loading,
     error: state.error || errorState.error,
+    calculatedTotals: state.calculatedTotals,
+    priceValidation: state.priceValidation,
     addToCart,
     removeFromCart,
     updateQuantity,
@@ -822,7 +944,44 @@ export function CartProvider({ children }: CartProviderProps) {
     isRetryable: errorState.isRetryable || (lastOperation !== null && isRetryableError(errorState.originalError)),
     isOrderConfirmationActive,
     setOrderConfirmationProtection,
-  }), [state.cart, state.loading, state.error, errorState.error, addToCart, removeFromCart, updateQuantity, clearCart, clearCartSilently, getTotalItems, refreshCart, loadSpecificCart, createCart, clearError, retryLastOperation, errorState.isRetryable, lastOperation, isRetryableError, errorState.originalError, isOrderConfirmationActive, setOrderConfirmationProtection]);
+    // Price calculation methods
+    formatCurrency,
+    getFormattedTotal,
+    getFormattedSubtotal,
+    getFormattedShipping,
+    validatePrices,
+    recalculatePrices,
+  }), [
+    state.cart, 
+    state.loading, 
+    state.error, 
+    state.calculatedTotals,
+    state.priceValidation,
+    errorState.error, 
+    addToCart, 
+    removeFromCart, 
+    updateQuantity, 
+    clearCart, 
+    clearCartSilently, 
+    getTotalItems, 
+    refreshCart, 
+    loadSpecificCart, 
+    createCart, 
+    clearError, 
+    retryLastOperation, 
+    errorState.isRetryable, 
+    lastOperation, 
+    isRetryableError, 
+    errorState.originalError, 
+    isOrderConfirmationActive, 
+    setOrderConfirmationProtection,
+    formatCurrency,
+    getFormattedTotal,
+    getFormattedSubtotal,
+    getFormattedShipping,
+    validatePrices,
+    recalculatePrices
+  ]);
 
   return (
     <CartContext.Provider value={contextValue}>
