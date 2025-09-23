@@ -10,6 +10,7 @@ import { useCart } from '../../contexts/CartContext';
 import { processCheckout } from '../../utils/checkoutOrchestrator';
 import { useSession } from 'next-auth/react';
 import { usePasskey } from '../../hooks/usePasskey';
+import { PriceCalculationService } from '../../services/PriceCalculationService';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export default function CheckoutPage() {
 
   // Payment method state
   const [paymentMethod, setPaymentMethod] = useState('cashfree');
-  
+
   // Payment details
   const [paymentDetails, setPaymentDetails] = useState({
     cardNumber: '',
@@ -54,11 +55,11 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [identityError, setIdentityError] = useState<string | null>(null)
-  
+
   // Login state
   const [loginIdentifier, setLoginIdentifier] = useState('')
   const [loginProcessing, setLoginProcessing] = useState(false)
-  
+
   // OTP flow state
   const [otpSending, setOtpSending] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
@@ -98,7 +99,7 @@ export default function CheckoutPage() {
             sessionStorage.removeItem('checkout_identity')
           }
         }
-        
+
         // Form data uses localStorage for cross-tab sharing (magic links open in new tabs)
         const formRaw = localStorage.getItem('checkout_form')
         if (formRaw) {
@@ -106,11 +107,11 @@ export default function CheckoutPage() {
           if (formData && formData.expiresAt && formData.expiresAt > Date.now()) {
             // Only restore if it's for the same cart or no cart specified (backward compatibility)
             const shouldRestore = !formData.cartId || !cart?.id || formData.cartId === cart.id
-            
+
             if (shouldRestore) {
               console.log('[Checkout] Restoring form data from localStorage (cross-tab):', formData.data)
               setFormData(prev => ({ ...prev, ...formData.data }))
-              
+
               // Show a brief notification that form data was restored
               if (Object.keys(formData.data).some(key => formData.data[key])) {
                 setIdentityError('📋 Form data restored from previous session')
@@ -148,9 +149,9 @@ export default function CheckoutPage() {
           expiresAt: Date.now() + ttlMs,
         }
         sessionStorage.setItem('checkout_identity', JSON.stringify(blob))
-      } catch {}
+      } catch { }
     }, 0);
-    
+
     return () => clearTimeout(timer);
   }, [purchaseReady, customerId, identityMethod, phone, email])
 
@@ -174,7 +175,7 @@ export default function CheckoutPage() {
         console.warn('[Checkout] Failed to persist form data:', e)
       }
     }, 0);
-    
+
     return () => clearTimeout(timer);
   }, [formData])
 
@@ -208,7 +209,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return;
-    
+
     const urlParams = new URLSearchParams(window.location.search);
     const verified = urlParams.get('verified');
     const emailParam = urlParams.get('email');
@@ -217,13 +218,13 @@ export default function CheckoutPage() {
 
     if (verified === 'true' && emailParam) {
       setMagicLinkProcessing(true);
-      
+
       // Magic link verification successful
       setEmail(emailParam);
       setIdentityMethod('email');
       setMagicSent(true);
       setMagicVerified(true);
-      
+
       // Set phone if provided (for dual verification scenarios)
       if (phoneParam) {
         setPhone(phoneParam);
@@ -233,7 +234,7 @@ export default function CheckoutPage() {
       const processVerification = async () => {
         try {
           console.log('[Checkout] Processing magic link verification, preserving existing form data');
-          
+
           // If cartId is provided, force load that specific cart (cross-device support)
           if (cartIdParam && cartIdParam !== cart?.id) {
             console.log('[Checkout] Magic link provided cart ID, force loading cart:', cartIdParam);
@@ -252,7 +253,7 @@ export default function CheckoutPage() {
           });
 
           const json = await res.json().catch(() => ({}));
-          
+
           if (res.ok && json?.customerId) {
             setPurchaseReady(true);
             setCustomerId(json.customerId);
@@ -265,7 +266,7 @@ export default function CheckoutPage() {
               console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
             }
             setIdentityError(null);
-            
+
             // Update NextAuth session with the customerId to trigger passkey nudge
             try {
               const identifierValue = (identityMethod === 'email')
@@ -274,19 +275,19 @@ export default function CheckoutPage() {
               if (identifierValue) {
                 import('next-auth/react').then(({ signIn }) => {
                   signIn('session', { identifier: identifierValue, customerId: json.customerId, redirect: false })
-                    .catch((e) => { 
+                    .catch((e) => {
                       console.warn('[Checkout] Failed to update session after magic link verification:', e);
                     });
-                }).catch(() => {});
+                }).catch(() => { });
               }
             } catch (sessionError) {
               console.warn('[Checkout] Error updating session after magic link verification:', sessionError);
             }
-            
+
             // Show success message briefly
             setIdentityError('✅ Email verification successful! You can now place your order.');
             setTimeout(() => setIdentityError(null), 5000);
-            
+
             console.log('[Checkout] Magic link verification successful, form data should be preserved');
           } else {
             throw new Error(json?.error || 'Verification failed');
@@ -340,7 +341,7 @@ export default function CheckoutPage() {
           const data = JSON.parse(raw)
           if (data && data.expiresAt && data.expiresAt > Date.now() && data.verified) {
             console.log('[Checkout] Found cross-tab verification success:', data)
-            
+
             // Apply the verification state
             if (data.email) {
               setEmail(data.email)
@@ -361,10 +362,10 @@ export default function CheckoutPage() {
                 }
               }
               setIdentityError('✅ Email verified in another tab! You can now place your order.')
-              
+
               // Clear the verification data since we've used it
               localStorage.removeItem('magic_verification_success')
-              
+
               // Auto-hide success message after 5 seconds
               setTimeout(() => setIdentityError(null), 5000)
             }
@@ -390,7 +391,7 @@ export default function CheckoutPage() {
     }
 
     window.addEventListener('storage', handleStorageChange)
-    
+
     // Also poll periodically in case storage events don't fire
     const pollInterval = setInterval(checkCrossTabVerification, 2000)
 
@@ -436,17 +437,8 @@ export default function CheckoutPage() {
   // Derive cart-based values
   const cartItems = cart?.items ?? [];
 
-  // Helpers for currency formatting (INR as per cart page)
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    }).format(Number(amount || 0));
-  };
-
-  const subtotal = Number(cart?.subtotal ?? 0);
+  // Calculate subtotal from actual item prices to ensure consistency
+  const subtotal = cart?.items?.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0) ?? 0;
   const backendShippingAmount = Number(cart?.shipping_total ?? 0);
 
   // Shipping options and dynamic amounts sourced from backend at runtime
@@ -502,18 +494,13 @@ export default function CheckoutPage() {
     load()
   }, [cart?.id])
 
-  // Use the backend option amount when we have a selected option; fallback to backend shipping_total
-  const selectedOptionAmount = (() => {
-    const found = shippingOptions.find((o) => o.id === selectedShippingOptionId)
-    return typeof found?.amount === 'number' ? Number(found.amount) : undefined
-  })()
-  const effectiveShippingAmount = typeof selectedOptionAmount === 'number' ? selectedOptionAmount : backendShippingAmount
-
-  const shipping = effectiveShippingAmount > 0 ? formatCurrency(effectiveShippingAmount) : 'Free';
-  const taxes = Number(cart?.tax_total ?? 0);
-
-  // Always compute total on the client to reflect selected shipping immediately
-  const total = subtotal + effectiveShippingAmount + taxes;
+  // Use centralized price calculation service for all price calculations
+  const cartTotals = cart ? PriceCalculationService.calculateCartTotals(cart, selectedShippingOptionId || undefined, shippingOptions) : null;
+  
+  const effectiveShippingAmount = cartTotals?.shipping ?? backendShippingAmount;
+  const shipping = PriceCalculationService.getFormattedShipping(cart, selectedShippingOptionId || undefined, shippingOptions);
+  const taxes = cartTotals?.tax ?? 0;
+  const total = cartTotals?.total ?? (subtotal + effectiveShippingAmount + taxes);
 
   // Progress state for entire checkout form
   const [formProgress, setFormProgress] = useState(0);
@@ -521,12 +508,12 @@ export default function CheckoutPage() {
   const [isProgressBarSticky, setIsProgressBarSticky] = useState(false);
   // Reference to the original progress bar
   const progressBarRef = useRef<HTMLDivElement>(null);
-  
+
   // Calculate form completion progress for the entire checkout
   useEffect(() => {
     let filledFields = 0;
     let totalFields = 0;
-    
+
     // Shipping fields (6 fields)
     totalFields += 6;
     if (formData.name) filledFields++;
@@ -535,15 +522,15 @@ export default function CheckoutPage() {
     if (formData.state) filledFields++;
     if (formData.postalCode) filledFields++;
     if (formData.contactNumber) filledFields++;
-    
+
     // Shipping option selection (1 field)
     totalFields += 1;
     if (selectedShippingOptionId) filledFields++;
-    
+
     // Payment method selection (1 field)
     totalFields += 1;
     if (paymentMethod) filledFields++; // Always filled since we have a default
-    
+
     // Payment details (only counted if credit card is selected)
     if (paymentMethod === 'creditCard') {
       totalFields += 3; // cardNumber, expiryDate, cvv
@@ -551,7 +538,7 @@ export default function CheckoutPage() {
       if (paymentDetails.expiryDate) filledFields++;
       if (paymentDetails.cvv) filledFields++;
     }
-    
+
     const progress = (filledFields / totalFields) * 100;
     setFormProgress(progress);
   }, [formData, selectedShippingOptionId, paymentMethod, paymentDetails]);
@@ -684,7 +671,7 @@ export default function CheckoutPage() {
         console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
       }
       setPurchaseReady(true);
-      
+
       // Update NextAuth session with the customerId to trigger passkey nudge
       try {
         const identifierValue = (identityMethod === 'email')
@@ -693,10 +680,10 @@ export default function CheckoutPage() {
         if (identifierValue) {
           import('next-auth/react').then(({ signIn }) => {
             signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
-              .catch((e) => { 
+              .catch((e) => {
                 console.warn('[Checkout] Failed to update session after OTP verification:', e);
               });
-          }).catch(() => {});
+          }).catch(() => { });
         }
       } catch (sessionError) {
         console.warn('[Checkout] Error updating session after OTP verification:', sessionError);
@@ -765,7 +752,7 @@ export default function CheckoutPage() {
                 console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
               }
               setPurchaseReady(true)
-              
+
               // Update NextAuth session with the customerId to trigger passkey nudge
               try {
                 const identifierValue = (identityMethod === 'email')
@@ -774,10 +761,10 @@ export default function CheckoutPage() {
                 if (identifierValue) {
                   import('next-auth/react').then(({ signIn }) => {
                     signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
-                      .catch((e) => { 
+                      .catch((e) => {
                         console.warn('[Checkout] Failed to update session after magic link verification:', e);
                       });
-                  }).catch(() => {});
+                  }).catch(() => { });
                 }
               } catch (sessionError) {
                 console.warn('[Checkout] Error updating session after magic link verification:', sessionError);
@@ -786,7 +773,7 @@ export default function CheckoutPage() {
               setIdentityError(mapIdentityError('checkout-verify', cj?.error, cr.status))
             }
           }
-        } catch {}
+        } catch { }
         // Stop after ~5 minutes or 150 attempts at 2s
         if (attempts >= 150) {
           clearInterval(magicPollTimerRef.current)
@@ -867,14 +854,14 @@ export default function CheckoutPage() {
             const options = await medusaApiClient.getShippingOptionsForCart(cart.id)
             const cheapest = (options || []).slice().sort((a: any, b: any) => Number(a.amount ?? 0) - Number(b.amount ?? 0))[0]
             if (cheapest) optionIdToUse = cheapest.id
-          } catch {}
+          } catch { }
         }
         if (optionIdToUse) {
-          try { await medusaApiClient.addShippingMethod(cart.id, optionIdToUse) } catch {}
+          try { await medusaApiClient.addShippingMethod(cart.id, optionIdToUse) } catch { }
         }
 
         // Initiate payment collection/sessions (v2 requirement)
-        try { await medusaApiClient.createPaymentSessions(cart.id) } catch {}
+        try { await medusaApiClient.createPaymentSessions(cart.id) } catch { }
       } catch (prepError) {
         console.warn('[Cashfree] Pre-init cart preparation failed (will still attempt payment):', prepError)
       }
@@ -929,7 +916,7 @@ export default function CheckoutPage() {
 
   const goToOrderConfirmation = React.useCallback((orderId?: string) => {
     console.log('[Checkout] goToOrderConfirmation called with orderId:', orderId);
-    try { setOrderConfirmationProtection(true) } catch {}
+    try { setOrderConfirmationProtection(true) } catch { }
     // Clean up form data since order was successful
     cleanupFormData()
     router.push(orderId ? `/order-confirmation?order_id=${encodeURIComponent(orderId)}` : '/order-confirmation')
@@ -954,7 +941,7 @@ export default function CheckoutPage() {
             return
           }
         }
-      } catch {}
+      } catch { }
 
       // If we have a verified customer, fetch their latest order and route there
       try {
@@ -969,13 +956,13 @@ export default function CheckoutPage() {
             if (latest?.id) {
               try {
                 sessionStorage.setItem('order_result', JSON.stringify({ orderId: latest.id, displayId: latest.display_id, timestamp: Date.now() }))
-              } catch {}
+              } catch { }
               goToOrderConfirmation(latest.id)
               return
             }
           }
         }
-      } catch {}
+      } catch { }
 
       // Fallback: route without id and let the page use snapshot/cart
       goToOrderConfirmation()
@@ -987,7 +974,7 @@ export default function CheckoutPage() {
       // Don't show alert for authenticated users
       // Continue with checkout process
     }
-    
+
     // Update the check that prevents submission
     if (!isReadyToPay) {
       alert('Please verify your identity to continue. Use phone OTP or email magic link in the Identity Verification section.')
@@ -1030,7 +1017,7 @@ export default function CheckoutPage() {
           expiresAt: Date.now() + ttlMs,
         }
         sessionStorage.setItem('order_checkout_snapshot', JSON.stringify(snapshot))
-      } catch {}
+      } catch { }
 
       // Derive placeholder email when using phone verification
       const placeholderEmailForPhone = (identityMethod === 'phone' && phone.trim()) ? `${phone.replace(/\D/g, '')}@guest.local` : undefined;
@@ -1078,7 +1065,7 @@ export default function CheckoutPage() {
             const nameParts = fullName.split(/\s+/).filter(Boolean)
             const firstName = nameParts[0] || 'Customer'
             const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
-            
+
             return {
               first_name: firstName,
               last_name: lastName,
@@ -1098,7 +1085,7 @@ export default function CheckoutPage() {
           const nameParts = fullName.split(/\s+/).filter(Boolean)
           const firstName = nameParts[0] || 'Customer'
           const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
-          
+
           return {
             first_name: firstName,
             last_name: lastName,
@@ -1127,7 +1114,7 @@ export default function CheckoutPage() {
             displayId: result.order.display_id,
             timestamp: Date.now(),
           }));
-        } catch {}
+        } catch { }
         // Set protection first to prevent races, then navigate
         goToOrderConfirmation(result.order.id);
 
@@ -1141,7 +1128,7 @@ export default function CheckoutPage() {
             const identifierValue = (identityMethod === 'email')
               ? (email || '').trim().toLowerCase()
               : (phone || '').trim()
-            
+
             // Store customerId in sessionStorage for passkey detection
             if (customerId) {
               try {
@@ -1152,13 +1139,13 @@ export default function CheckoutPage() {
                 console.warn('[Checkout] Failed to store customerId in sessionStorage (post-purchase):', storageError);
               }
             }
-            
+
             import('next-auth/react').then(({ signIn }) => {
               signIn('session', { identifier: identifierValue, customerId: customerId || undefined, redirect: false })
-                .then(() => { try { console.info('[Metrics] post_purchase_login_success_total++') } catch {} })
-                .catch((e) => { console.warn('[Checkout] signIn failed (non-blocking):', e); try { console.info('[Metrics] post_purchase_login_failure_total++') } catch {} })
-            }).catch(() => {})
-          } catch {}
+                .then(() => { try { console.info('[Metrics] post_purchase_login_success_total++') } catch { } })
+                .catch((e) => { console.warn('[Checkout] signIn failed (non-blocking):', e); try { console.info('[Metrics] post_purchase_login_failure_total++') } catch { } })
+            }).catch(() => { })
+          } catch { }
         }, 0)
 
         return;
@@ -1179,13 +1166,13 @@ export default function CheckoutPage() {
               if (latest?.id) {
                 try {
                   sessionStorage.setItem('order_result', JSON.stringify({ orderId: latest.id, displayId: latest.display_id, timestamp: Date.now() }))
-                } catch {}
+                } catch { }
                 goToOrderConfirmation(latest.id)
                 return
               }
             }
           }
-        } catch {}
+        } catch { }
         // As a last resort, route without id so the page uses the snapshot/cart
         goToOrderConfirmation()
         return
@@ -1193,7 +1180,7 @@ export default function CheckoutPage() {
       try {
         const msg = String(result.error?.message || '').toLowerCase()
         if (msg.includes('idempotency')) console.info('[Metrics] idempotency_replay_total++')
-      } catch {}
+      } catch { }
 
       // General recovery attempt: try to locate a recent order for this verified customer and navigate
       try {
@@ -1207,13 +1194,13 @@ export default function CheckoutPage() {
             if (latest?.id) {
               try {
                 sessionStorage.setItem('order_result', JSON.stringify({ orderId: latest.id, displayId: latest.display_id, timestamp: Date.now() }))
-              } catch {}
+              } catch { }
               goToOrderConfirmation(latest.id)
               return
             }
           }
         }
-      } catch {}
+      } catch { }
 
       // As a final fallback, route to thank-you without id so snapshot renders
       goToOrderConfirmation()
@@ -1229,24 +1216,24 @@ export default function CheckoutPage() {
     try {
       setIdentityError(null)
       setLoginProcessing(true)
-      
+
       if (!loginIdentifier.trim()) {
         setIdentityError('Please enter your email or phone number')
         return
       }
-      
+
       const identifier = loginIdentifier.trim()
       const isEmail = identifier.includes('@')
-      
+
       // Check if user has a passkey registered
       const policyRes = await fetch('/api/auth/passkey/policy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(isEmail ? { email: identifier } : { phone: identifier })
       })
-      
+
       const policy = await policyRes.json().catch(() => ({}))
-      
+
       // If user has a passkey, attempt passkey authentication first
       if (policyRes.ok && policy?.hasPasskey) {
         // Check if platform authenticator is available
@@ -1260,13 +1247,13 @@ export default function CheckoutPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(isEmail ? { email: identifier } : { phone: identifier })
             })
-            
+
             if (optionsRes.ok) {
               const { options, userId: canonicalUserId } = await optionsRes.json()
-              
+
               // Use the authenticate function from the hook
               const { data, error } = await authenticate(options)
-              
+
               if (!error && data) {
                 // Verify passkey assertion
                 const verifyRes = await fetch('/api/auth/passkey/verify', {
@@ -1278,9 +1265,9 @@ export default function CheckoutPage() {
                     ...(isEmail ? { email: identifier } : { phone: identifier })
                   })
                 })
-                
+
                 const verifyResult = await verifyRes.json().catch(() => ({}))
-                
+
                 if (verifyRes.ok && !verifyResult.comboRequired) {
                   // Successful passkey authentication
                   // Checkout verify with passkey auth flag
@@ -1294,9 +1281,9 @@ export default function CheckoutPage() {
                       isPasskeyAuth: true // Add this flag to indicate passkey authentication
                     })
                   })
-                  
+
                   const checkoutVerifyResult = await checkoutVerifyRes.json().catch(() => ({}))
-                  
+
                   if (checkoutVerifyRes.ok && checkoutVerifyResult?.ok === true) {
                     const customerIdValue = String(checkoutVerifyResult.customerId || '')
                     setCustomerId(customerIdValue)
@@ -1309,22 +1296,22 @@ export default function CheckoutPage() {
                       console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError)
                     }
                     setPurchaseReady(true)
-                    
+
                     // Update NextAuth session
                     try {
                       import('next-auth/react').then(({ signIn }) => {
-                        signIn('session', { 
-                          identifier: identifier, 
-                          customerId: customerIdValue, 
-                          redirect: false 
+                        signIn('session', {
+                          identifier: identifier,
+                          customerId: customerIdValue,
+                          redirect: false
                         }).catch((e) => {
                           console.warn('[Checkout] Failed to update session after passkey verification:', e)
                         })
-                      }).catch(() => {})
+                      }).catch(() => { })
                     } catch (sessionError) {
                       console.warn('[Checkout] Error updating session after passkey verification:', sessionError)
                     }
-                    
+
                     setIdentityError('✅ Login successful with passkey!')
                     return
                   } else {
@@ -1336,7 +1323,7 @@ export default function CheckoutPage() {
           }
         }
       }
-      
+
       // Fallback to OTP/magic link if passkey is not available or fails
       if (isEmail) {
         setEmail(identifier)
@@ -1357,8 +1344,8 @@ export default function CheckoutPage() {
   // Loading or empty cart states - prevent proceeding with no items
   if (loading || magicLinkProcessing) {
     return (
-      <div 
-        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
+      <div
+        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
         style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
@@ -1379,8 +1366,8 @@ export default function CheckoutPage() {
   // Check if cart is empty
   if (!cart || cartItems.length === 0) {
     return (
-      <div 
-        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
+      <div
+        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
         style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
@@ -1393,7 +1380,7 @@ export default function CheckoutPage() {
                   <>
                     <div className="text-gray-600 mb-4">This cart has already been processed.</div>
                     <div className="flex gap-2">
-                      <button 
+                      <button
                         className={styles.placeOrderButton}
                         onClick={() => {
                           // Attempt to recover by finding the latest order for this customer
@@ -1404,7 +1391,7 @@ export default function CheckoutPage() {
                                 const orders = Array.isArray(data?.orders) ? data.orders : []
                                 if (orders.length > 0) {
                                   // Sort by created_at descending
-                                  orders.sort((a: any, b: any) => 
+                                  orders.sort((a: any, b: any) =>
                                     new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
                                   )
                                   const latest = orders[0]
@@ -1445,8 +1432,8 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div 
-      className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
+    <div
+      className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
     >
       <Script
@@ -1457,7 +1444,7 @@ export default function CheckoutPage() {
       <div className="layout-container flex h-full grow flex-col">
         {/* Using the Header component */}
         <Header showProgress={isProgressBarSticky} progress={formProgress} />
-        
+
         <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
           <div className={styles.container}>
             {/* Breadcrumb Navigation */}
@@ -1466,113 +1453,113 @@ export default function CheckoutPage() {
               <span> / </span>
               <span>Checkout</span>
             </div>
-            
+
             <h1 className={styles.title}>Checkout</h1>
-            
+
             <form onSubmit={handleSubmit}>
-              
+
               {/* Shipping Information Section */}
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>Shipping Information</h2>
                 {/* Original progress bar that will be replaced by sticky one when scrolled */}
                 <div className={styles.formDivider} ref={progressBarRef}>
-                  <div 
-                    className={styles.formDividerProgress} 
+                  <div
+                    className={styles.formDividerProgress}
                     style={{ width: `${formProgress}%` }}
                   ></div>
                 </div>
-                
+
                 <div className={styles.formGroup}>
                   <label htmlFor="name" className={styles.label}>Name</label>
-                  <input 
-                    type="text" 
-                    id="name" 
-                    name="name" 
-                    className={styles.input} 
-                    value={formData.name} 
-                    onChange={handleInputChange} 
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    className={styles.input}
+                    value={formData.name}
+                    onChange={handleInputChange}
                     placeholder="Enter your name"
-                    required 
+                    required
                   />
                 </div>
-                
+
                 <div className={styles.formGroup}>
                   <label htmlFor="address" className={styles.label}>Address</label>
-                  <input 
-                    type="text" 
-                    id="address" 
-                    name="address" 
-                    className={styles.input} 
-                    value={formData.address} 
-                    onChange={handleInputChange} 
+                  <input
+                    type="text"
+                    id="address"
+                    name="address"
+                    className={styles.input}
+                    value={formData.address}
+                    onChange={handleInputChange}
                     placeholder="Enter your address"
-                    required 
+                    required
                   />
                 </div>
-                
+
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
                     <label htmlFor="city" className={styles.label}>City</label>
-                    <input 
-                      type="text" 
-                      id="city" 
-                      name="city" 
-                      className={styles.input} 
-                      value={formData.city} 
-                      onChange={handleInputChange} 
+                    <input
+                      type="text"
+                      id="city"
+                      name="city"
+                      className={styles.input}
+                      value={formData.city}
+                      onChange={handleInputChange}
                       placeholder="Enter your city"
-                      required 
+                      required
                     />
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="state" className={styles.label}>State</label>
-                    <input 
-                      type="text" 
-                      id="state" 
-                      name="state" 
-                      className={styles.input} 
-                      value={formData.state} 
-                      onChange={handleInputChange} 
+                    <input
+                      type="text"
+                      id="state"
+                      name="state"
+                      className={styles.input}
+                      value={formData.state}
+                      onChange={handleInputChange}
                       placeholder="Enter your state"
-                      required 
+                      required
                     />
                   </div>
                 </div>
-                
+
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
                     <label htmlFor="postalCode" className={styles.label}>Postal Code</label>
-                    <input 
-                      type="text" 
-                      id="postalCode" 
-                      name="postalCode" 
-                      className={styles.input} 
-                      value={formData.postalCode} 
-                      onChange={handleInputChange} 
+                    <input
+                      type="text"
+                      id="postalCode"
+                      name="postalCode"
+                      className={styles.input}
+                      value={formData.postalCode}
+                      onChange={handleInputChange}
                       placeholder="Enter your postal code"
-                      required 
+                      required
                     />
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="contactNumber" className={styles.label}>Contact Number</label>
-                    <input 
-                      type="text" 
-                      id="contactNumber" 
-                      name="contactNumber" 
-                      className={styles.input} 
-                      value={formData.contactNumber} 
-                      onChange={handleInputChange} 
+                    <input
+                      type="text"
+                      id="contactNumber"
+                      name="contactNumber"
+                      className={styles.input}
+                      value={formData.contactNumber}
+                      onChange={handleInputChange}
                       placeholder="Enter your contact number"
-                      required 
+                      required
                     />
                   </div>
                 </div>
               </div>
-              
+
               {/* Shipping Method Section */}
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>Shipping Method</h2>
-                
+
                 <div className={styles.shippingOptions}>
                   {(shippingOptions || []).map((opt) => (
                     <div key={opt.id} className={styles.shippingOption}>
@@ -1601,42 +1588,42 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               </div>
-              
+
               {/* Payment Information Section */}
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>Payment Information</h2>
-                
+
                 <div className={styles.paymentOptions}>
                   <div className={styles.paymentOption}>
-                    <input 
-                      type="radio" 
-                      id="creditCard" 
-                      name="paymentMethod" 
-                      value="creditCard" 
-                      checked={paymentMethod === 'creditCard'} 
-                      onChange={handlePaymentMethodChange} 
-                      className={styles.radioInput} 
+                    <input
+                      type="radio"
+                      id="creditCard"
+                      name="paymentMethod"
+                      value="creditCard"
+                      checked={paymentMethod === 'creditCard'}
+                      onChange={handlePaymentMethodChange}
+                      className={styles.radioInput}
                     />
                     <label htmlFor="creditCard" className={styles.radioLabel}>
                       Credit Card
                     </label>
                   </div>
-                  
+
                   <div className={styles.paymentOption}>
-                    <input 
-                      type="radio" 
-                      id="paypal" 
-                      name="paymentMethod" 
-                      value="paypal" 
-                      checked={paymentMethod === 'paypal'} 
-                      onChange={handlePaymentMethodChange} 
-                      className={styles.radioInput} 
+                    <input
+                      type="radio"
+                      id="paypal"
+                      name="paymentMethod"
+                      value="paypal"
+                      checked={paymentMethod === 'paypal'}
+                      onChange={handlePaymentMethodChange}
+                      className={styles.radioInput}
                     />
                     <label htmlFor="paypal" className={styles.radioLabel}>
                       PayPal
                     </label>
                   </div>
-                <div className={styles.paymentOption}>
+                  <div className={styles.paymentOption}>
                     <input
                       type="radio"
                       id="upi"
@@ -1650,78 +1637,63 @@ export default function CheckoutPage() {
                       UPI
                     </label>
                   </div>
-                <div className={styles.paymentOption}>
-                  <input
-                    type="radio"
-                    id="cashfree"
-                    name="paymentMethod"
-                    value="cashfree"
-                    checked={paymentMethod === 'cashfree'}
-                    onChange={handlePaymentMethodChange}
-                    className={styles.radioInput}
-                  />
-                  <label htmlFor="cashfree" className={styles.radioLabel}>
-                    Cashfree (Hosted Checkout)
-                  </label>
-                </div>
-                {paymentMethod === 'cashfree' && (
-                  <div>
-                    <button
-                      type="button"
-                      className={styles.placeOrderButton}
-                      onClick={handleCashfreePay}
-                      disabled={!cashfreeSdkLoaded || cashfreeLoading}
-                    >
-                      Secure Payment – {formatCurrency(total)}
-                    </button>
-                    <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '0.5rem' }}>
-                      SDK: {cashfreeSdkLoaded ? 'Loaded' : 'Not Loaded'} | Auth: {status} | Env: {process.env.NEXT_PUBLIC_CASHFREE_ENV || 'sandbox'}
-                    </div>
+                  <div className={styles.paymentOption}>
+                    <input
+                      type="radio"
+                      id="cashfree"
+                      name="paymentMethod"
+                      value="cashfree"
+                      checked={paymentMethod === 'cashfree'}
+                      onChange={handlePaymentMethodChange}
+                      className={styles.radioInput}
+                    />
+                    <label htmlFor="cashfree" className={styles.radioLabel}>
+                      Cashfree (Hosted Checkout)
+                    </label>
                   </div>
-                )}
                 </div>
-                
+
                 {paymentMethod === 'creditCard' && (
                   <div className={styles.paymentDetails}>
                     <div className={styles.formGroup}>
                       <label htmlFor="cardNumber" className={styles.label}>Card Number</label>
-                      <input 
-                        type="text" 
-                        id="cardNumber" 
-                        name="cardNumber" 
-                        className={styles.input} 
-                        value={paymentDetails.cardNumber} 
-                        onChange={handlePaymentDetailsChange} 
-                        placeholder="Enter card number" 
-                        required 
+                      <input
+                        type="text"
+                        id="cardNumber"
+                        name="cardNumber"
+                        className={styles.input}
+                        value={paymentDetails.cardNumber}
+                        onChange={handlePaymentDetailsChange}
+                        placeholder="Enter card number"
+                        required
                       />
                     </div>
-                    
+
                     <div className={styles.formRow}>
                       <div className={styles.formGroup}>
                         <label htmlFor="expiryDate" className={styles.label}>Expiration Date</label>
-                        <input 
-                          type="text" 
-                          id="expiryDate" 
-                          name="expiryDate" 
-                          className={styles.input} 
-                          value={paymentDetails.expiryDate} 
-                          onChange={handlePaymentDetailsChange} 
-                          placeholder="MM/YY" 
-                          required 
+                        <input
+                          type="text"
+                          id="expiryDate"
+                          name="expiryDate"
+                          className={styles.input}
+                          value={paymentDetails.expiryDate}
+                          onChange={handlePaymentDetailsChange}
+                          placeholder="MM/YY"
+                          required
                         />
                       </div>
                       <div className={styles.formGroup}>
                         <label htmlFor="cvv" className={styles.label}>CVV</label>
-                        <input 
-                          type="text" 
-                          id="cvv" 
-                          name="cvv" 
-                          className={styles.input} 
-                          value={paymentDetails.cvv} 
-                          onChange={handlePaymentDetailsChange} 
-                          placeholder="Enter CVV" 
-                          required 
+                        <input
+                          type="text"
+                          id="cvv"
+                          name="cvv"
+                          className={styles.input}
+                          value={paymentDetails.cvv}
+                          onChange={handlePaymentDetailsChange}
+                          placeholder="Enter CVV"
+                          required
                         />
                       </div>
                     </div>
@@ -1781,7 +1753,7 @@ export default function CheckoutPage() {
                       <label htmlFor="identity_email" className={styles.radioLabel}>Email</label>
                     </div>
                   </div>
-                  
+
                   {identityMethod === 'login' ? (
                     <div>
                       <div className={styles.formGroup}>
@@ -1797,10 +1769,10 @@ export default function CheckoutPage() {
                         />
                       </div>
                       <div className="flex gap-2 mb-2">
-                        <button 
-                          type="button" 
-                          className={styles.placeOrderButton} 
-                          onClick={handleLoginSubmit} 
+                        <button
+                          type="button"
+                          className={styles.placeOrderButton}
+                          onClick={handleLoginSubmit}
                           disabled={loginProcessing || !loginIdentifier.trim()}
                         >
                           {loginProcessing ? 'Processing...' : 'Login'}
@@ -1875,20 +1847,20 @@ export default function CheckoutPage() {
                   )}
                 </div>
               )}
-              
+
               {/* Order Summary Section */}
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>Order Summary</h2>
-                
+
                 {/* Order items */}
                 <div className={styles.orderItems}>
                   {cartItems.map(item => (
                     <div key={item.id} className={styles.orderItem}>
                       <div className={styles.orderItemDetails}>
-                        <img 
+                        <img
                           src={(item?.thumbnail ?? item?.variant?.product?.thumbnail ?? '/placeholder-image.jpg')}
-                          alt={(item?.title ?? 'Cart item')} 
-                          className={styles.orderItemImage} 
+                          alt={(item?.title ?? 'Cart item')}
+                          className={styles.orderItemImage}
                         />
                         <div>
                           <p className={styles.orderItemName}>{item?.title ?? 'Item'}</p>
@@ -1898,30 +1870,30 @@ export default function CheckoutPage() {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Price summary */}
                 <div className={styles.priceSummary}>
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>Subtotal</span>
-                    <span className={styles.summaryValue}>{formatCurrency(subtotal)}</span>
+                    <span className={styles.summaryValue}>{PriceCalculationService.formatCurrency(subtotal, cart?.currency_code)}</span>
                   </div>
-                  
+
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>Shipping</span>
                     <span className={styles.summaryValue}>{shipping}</span>
                   </div>
-                  
+
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>Taxes</span>
-                    <span className={styles.summaryValue}>{formatCurrency(taxes)}</span>
+                    <span className={styles.summaryValue}>{PriceCalculationService.formatCurrency(taxes, cart?.currency_code)}</span>
                   </div>
-                  
+
                   <div className={styles.totalRow}>
                     <span className={styles.totalLabel}>Total</span>
-                    <span className={styles.totalValue}>{formatCurrency(total)}</span>
+                    <span className={styles.totalValue}>{PriceCalculationService.formatCurrency(total, cart?.currency_code)}</span>
                   </div>
                 </div>
-                
+
                 {paymentMethod === 'cashfree' ? (
                   <button
                     type="button"
@@ -1929,7 +1901,7 @@ export default function CheckoutPage() {
                     onClick={handleCashfreePay}
                     disabled={!cashfreeSdkLoaded || cashfreeLoading}
                   >
-                    Secure Payment – {formatCurrency(total)}
+                    Secure Payment – {PriceCalculationService.formatCurrency(total, cart?.currency_code)}
                   </button>
                 ) : (
                   <button
@@ -1939,11 +1911,6 @@ export default function CheckoutPage() {
                   >
                     Place Order
                   </button>
-                )}
-                {paymentMethod === 'cashfree' && (
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '0.5rem' }}>
-                    SDK: {cashfreeSdkLoaded ? 'Loaded' : 'Not Loaded'} | Auth: {status} | Env: {process.env.NEXT_PUBLIC_CASHFREE_ENV || 'sandbox'}
-                  </div>
                 )}
               </div>
             </form>
