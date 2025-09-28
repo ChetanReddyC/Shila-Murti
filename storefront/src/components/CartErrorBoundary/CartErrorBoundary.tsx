@@ -40,7 +40,6 @@ export default class CartErrorBoundary extends Component<Props, State> {
     });
 
     // Log error for debugging
-    console.error('[CartErrorBoundary] Caught error:', error, errorInfo);
 
     // Call optional error handler
     this.props.onError?.(error, errorInfo);

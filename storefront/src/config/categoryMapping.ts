@@ -102,7 +102,6 @@ export async function resolveCategoryIdsByUiKeys(
     } catch (err) {
       // Non-fatal: leave unresolved; caller can decide behavior
       // eslint-disable-next-line no-console
-      console.warn('[categoryMapping] Failed to resolve category handle', handle, err);
     }
   }
 

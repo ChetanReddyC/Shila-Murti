@@ -16,7 +16,6 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({ isHovering }) => {
   try {
     shaderHook = useShaderEffect(canvasRef, vertexShaderSource, fragmentShaderSource);
   } catch (error) {
-    console.error('Shader initialization failed:', error);
     setShaderError(true);
   }
 

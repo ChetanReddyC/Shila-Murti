@@ -115,7 +115,6 @@ export default function LoginPage() {
                       }
                     } catch {}
                     
-                    console.log('[Login] Attempting signIn with:', { identifier: (id.email || id.phone) as string, customerId })
                     const signInResult = await signIn('session', { 
                       identifier: (id.email || id.phone) as string, 
                       customerId, 
@@ -123,11 +122,9 @@ export default function LoginPage() {
                       redirect: true, 
                       callbackUrl: '/account' 
                     })
-                    console.log('[Login] signIn result:', signInResult)
                     return
                   }
                 } catch (err) {
-                  console.error('[Login] Passkey verification error:', err)
                   setStatus('Passkey verification failed. Falling back to MFA.')
                 }
               } else {
@@ -146,7 +143,6 @@ export default function LoginPage() {
         setStatus('No passkey registered for this account. Proceeding with MFA.')
       }
     } catch (err) {
-      console.error('[Login] Policy check error:', err)
       setStatus('Error checking passkey status. Proceeding with MFA.')
     }
 

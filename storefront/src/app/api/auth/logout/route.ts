@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Logout error:', error)
     return new Response(
       JSON.stringify({ ok: false, error: 'logout_failed' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

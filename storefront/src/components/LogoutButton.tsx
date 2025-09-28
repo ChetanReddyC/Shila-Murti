@@ -20,7 +20,6 @@ const LogoutButton = () => {
       // Terminate session and redirect to login
       await signOut({ callbackUrl: '/login', redirect: true })
     } catch (error) {
-      console.error('Logout error:', error)
       // Even if server cleanup fails, still redirect to login
       router.push('/login')
     }

@@ -40,7 +40,6 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
       try { body = await res.json() } catch {}
       const dbg = { at: new Date().toISOString(), request: { identifier }, response: { status: res.status, body } }
       setOtpSendDebug(JSON.stringify(dbg, null, 2))
-      console.info('[ComboMFA] OTP send result', dbg)
       setOtpStatus('OTP sent via WhatsApp')
     } catch {
       setOtpStatus('Unable to send OTP')
@@ -60,7 +59,6 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
           try { body = await res.json() } catch {}
         const dbg = { at: new Date().toISOString(), request: { email: identifier.email }, response: { status: res.status, body } }
         setMagicSendDebug(JSON.stringify(dbg, null, 2))
-        console.info('[ComboMFA] Magic send result', dbg)
         setMagicStatus('Check your email for a login link')
       } catch {
         setMagicStatus('Unable to send magic link')
@@ -110,7 +108,6 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
       try { json = await res.json() } catch {}
       const dbg = { at: new Date().toISOString(), request: { ...identifier, code: otp }, response: { status: res.status, body: json } }
       setOtpVerifyDebug(JSON.stringify(dbg, null, 2))
-      console.info('[ComboMFA] OTP verify result', dbg)
       if (!res.ok) throw new Error(json?.error || 'Invalid')
       setOtpOK(true)
       setOtpStatus('OTP verified')
@@ -187,14 +184,12 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
                     sessionStorage.setItem('lastPasskeyCredential', cred.id)
                   }
                 } catch (sessionError) {
-                  console.warn('[ComboMfaModal] Failed to update session storage after passkey registration:', sessionError)
                 }
               }
             }
           }
         } catch (passkeyError) {
           // If browser blocks automatic WebAuthn due to user activation policy, ignore; user can add from Security tab
-          console.warn('[ComboMfaModal] Automatic passkey registration failed:', passkeyError)
         }
         // Bind a session using the identifier and include customerId for caching
         try {

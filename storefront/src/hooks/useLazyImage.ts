@@ -75,7 +75,6 @@ export const useLazyImage = (options: UseLazyImageOptions): UseLazyImageResult =
       onLoad?.(optimizedSrc);
       
     } catch (loadError) {
-      console.warn(`Failed to load image: ${imageSrc}`, loadError);
       
       // Determine error type
       let errorType = ImageErrorType.UNKNOWN;
@@ -101,7 +100,6 @@ export const useLazyImage = (options: UseLazyImageOptions): UseLazyImageResult =
 
       // Try fallback image if available and we haven't tried it yet
       if (fallbackSrc && imageSrc !== fallbackSrc && retryCount === 0) {
-        console.log(`Trying fallback image: ${fallbackSrc}`);
         setRetryCount(1);
         await loadImage(fallbackSrc);
         return;

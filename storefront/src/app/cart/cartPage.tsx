@@ -48,7 +48,6 @@ export default function CartPage() {
     try {
       await updateQuantity(lineItemId, currentQuantity + 1);
     } catch (error) {
-      console.error('Failed to increase quantity:', error);
     } finally {
       setOperationLoading(null);
     }
@@ -64,7 +63,6 @@ export default function CartPage() {
         await updateQuantity(lineItemId, currentQuantity - 1);
       }
     } catch (error) {
-      console.error('Failed to decrease quantity:', error);
     } finally {
       setOperationLoading(null);
     }
@@ -80,7 +78,6 @@ export default function CartPage() {
         await updateQuantity(lineItemId, newQuantity);
       }
     } catch (error) {
-      console.error('Failed to update quantity:', error);
     } finally {
       setOperationLoading(null);
     }
@@ -91,7 +88,6 @@ export default function CartPage() {
     try {
       await refreshCart();
     } catch (error) {
-      console.error('Retry refresh failed:', error);
     }
   };
 

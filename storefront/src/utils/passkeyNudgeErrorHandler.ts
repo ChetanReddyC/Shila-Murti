@@ -63,7 +63,6 @@ class PasskeyNudgeErrorHandler {
       this.lastErrorTime = Date.now()
 
       if (this.config.enableLogging) {
-        console.error(`[PasskeyNudgeErrorHandler] Error in ${context.component}.${context.operation}:`, error)
       }
 
       // Create error report
@@ -95,13 +94,11 @@ class PasskeyNudgeErrorHandler {
           this.errorReports.push(report)
 
           if (this.config.enableLogging) {
-            console.log(`[PasskeyNudgeErrorHandler] Used fallback for ${context.component}.${context.operation}`)
           }
 
           return { success: true, result: fallbackResult, usedFallback: true }
         } catch (fallbackError) {
           if (this.config.enableLogging) {
-            console.error(`[PasskeyNudgeErrorHandler] Fallback failed for ${context.component}.${context.operation}:`, fallbackError)
           }
         }
       }
@@ -114,7 +111,6 @@ class PasskeyNudgeErrorHandler {
       this.errorReports.push(report)
       return { success: false, usedFallback: false }
     } catch (handlerError) {
-      console.error('[PasskeyNudgeErrorHandler] Error in error handler:', handlerError)
       return { success: false, usedFallback: false }
     }
   }
@@ -146,7 +142,6 @@ class PasskeyNudgeErrorHandler {
       return await this.performGenericRecovery(error, context)
     } catch (recoveryError) {
       if (this.config.enableLogging) {
-        console.error('[PasskeyNudgeErrorHandler] Recovery attempt failed:', recoveryError)
       }
       return { success: false }
     }
@@ -161,7 +156,6 @@ class PasskeyNudgeErrorHandler {
   ): Promise<{ success: boolean; result?: any }> {
     try {
       if (this.config.enableLogging) {
-        console.log('[PasskeyNudgeErrorHandler] Attempting storage error recovery')
       }
 
       // Check if it's a quota exceeded error
@@ -181,7 +175,6 @@ class PasskeyNudgeErrorHandler {
       // Check if it's an access denied error
       if (error.name === 'SecurityError' || error.message.includes('access denied')) {
         if (this.config.enableLogging) {
-          console.warn('[PasskeyNudgeErrorHandler] Storage access denied, using memory fallback')
         }
         
         // Return success with memory-only mode
@@ -191,7 +184,6 @@ class PasskeyNudgeErrorHandler {
       return { success: false }
     } catch (storageRecoveryError) {
       if (this.config.enableLogging) {
-        console.error('[PasskeyNudgeErrorHandler] Storage recovery failed:', storageRecoveryError)
       }
       return { success: false }
     }
@@ -206,7 +198,6 @@ class PasskeyNudgeErrorHandler {
   ): Promise<{ success: boolean; result?: any }> {
     try {
       if (this.config.enableLogging) {
-        console.log('[PasskeyNudgeErrorHandler] Attempting session error recovery')
       }
 
       // Perform session state recovery
@@ -220,7 +211,6 @@ class PasskeyNudgeErrorHandler {
       return { success: true, result: 'minimal-mode' }
     } catch (sessionRecoveryError) {
       if (this.config.enableLogging) {
-        console.error('[PasskeyNudgeErrorHandler] Session recovery failed:', sessionRecoveryError)
       }
       return { success: false }
     }
@@ -235,7 +225,6 @@ class PasskeyNudgeErrorHandler {
   ): Promise<{ success: boolean; result?: any }> {
     try {
       if (this.config.enableLogging) {
-        console.log('[PasskeyNudgeErrorHandler] Attempting timer error recovery')
       }
 
       // Clear any existing timers
@@ -253,7 +242,6 @@ class PasskeyNudgeErrorHandler {
       return { success: true, result: 'timers-cleared' }
     } catch (timerRecoveryError) {
       if (this.config.enableLogging) {
-        console.error('[PasskeyNudgeErrorHandler] Timer recovery failed:', timerRecoveryError)
       }
       return { success: false }
     }
@@ -268,7 +256,6 @@ class PasskeyNudgeErrorHandler {
   ): Promise<{ success: boolean; result?: any }> {
     try {
       if (this.config.enableLogging) {
-        console.log('[PasskeyNudgeErrorHandler] Attempting generic recovery')
       }
 
       // Wait a bit and retry
@@ -286,7 +273,6 @@ class PasskeyNudgeErrorHandler {
       }
     } catch (genericRecoveryError) {
       if (this.config.enableLogging) {
-        console.error('[PasskeyNudgeErrorHandler] Generic recovery failed:', genericRecoveryError)
       }
       return { success: false }
     }
@@ -298,7 +284,6 @@ class PasskeyNudgeErrorHandler {
   private async performEmergencyCleanup(): Promise<void> {
     try {
       if (this.config.enableLogging) {
-        console.warn('[PasskeyNudgeErrorHandler] Performing emergency cleanup due to error threshold')
       }
 
       // Perform comprehensive cleanup
@@ -309,10 +294,8 @@ class PasskeyNudgeErrorHandler {
       this.errorReports = []
 
       if (this.config.enableLogging) {
-        console.log('[PasskeyNudgeErrorHandler] Emergency cleanup completed')
       }
     } catch (cleanupError) {
-      console.error('[PasskeyNudgeErrorHandler] Emergency cleanup failed:', cleanupError)
     }
   }
 

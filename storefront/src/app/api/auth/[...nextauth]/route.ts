@@ -53,10 +53,8 @@ export const authOptions: NextAuthOptions = {
         hasPasskey: { label: 'hasPasskey', type: 'text' },
       },
       async authorize(credentials) {
-        console.log('[Session Provider] Authorize called with:', credentials)
         const identifier = (credentials?.identifier || '').toString()
         if (!identifier) {
-          console.log('[Session Provider] No identifier provided')
           return null
         }
         const isEmail = identifier.includes('@')
@@ -68,7 +66,6 @@ export const authOptions: NextAuthOptions = {
         if (credentials?.customerId) user.customerId = String(credentials.customerId)
         // Set hasPasskey flag if provided
         if (credentials?.hasPasskey) user.hasPasskey = Boolean(credentials.hasPasskey)
-        console.log('[Session Provider] Returning user:', user)
         return user
       },
     }),
@@ -107,7 +104,6 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, account, user }) {
-      console.log('[NextAuth JWT] Input:', { token: Object.keys(token), account, user })
       
       // Rotate jti on sign-in
       if (user) {
@@ -133,12 +129,6 @@ export const authOptions: NextAuthOptions = {
       const currentComboRequired = (token as any).comboRequired ?? false
       ;(token as any).mfaComplete = currentComboRequired ? Boolean((token as any).otpOK && (token as any).magicOK) : true
       
-      console.log('[NextAuth JWT] Output:', { 
-        comboRequired: (token as any).comboRequired, 
-        mfaComplete: (token as any).mfaComplete,
-        customerId: (token as any).customerId,
-        hasPasskey: (token as any).hasPasskey
-      })
 
       // PII minimization: mask identifier for display but keep original for passkey registration
       try {
@@ -166,12 +156,6 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
-      console.log('[NextAuth Session] Input token:', { 
-        comboRequired: (token as any).comboRequired, 
-        mfaComplete: (token as any).mfaComplete,
-        customerId: (token as any).customerId,
-        hasPasskey: (token as any).hasPasskey
-      })
       
       Object.assign(session, {
         comboRequired: (token as any).comboRequired ?? false,
@@ -196,12 +180,6 @@ export const authOptions: NextAuthOptions = {
       if (!maskedEmail) delete (session as any).user?.email
       if (!maskedPhone) delete (session as any).user?.phone
       
-      console.log('[NextAuth Session] Output:', { 
-        comboRequired: (session as any).comboRequired, 
-        mfaComplete: (session as any).mfaComplete,
-        customerId: (session as any).customerId,
-        hasPasskey: (session as any).hasPasskey
-      })
       
       return session
     },

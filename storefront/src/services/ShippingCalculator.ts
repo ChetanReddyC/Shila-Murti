@@ -81,7 +81,6 @@ export class ShippingCalculator {
 
       return mockOptions;
     } catch (error) {
-      console.error('Failed to fetch shipping options:', error);
       return [];
     }
   }

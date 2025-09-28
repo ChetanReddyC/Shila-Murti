@@ -103,7 +103,6 @@ export default function CheckoutPage() {
             const shouldRestore = !formData.cartId || !cart?.id || formData.cartId === cart.id
             
             if (shouldRestore) {
-              console.log('[Checkout] Restoring form data from localStorage (cross-tab):', formData.data)
               setFormData(prev => ({ ...prev, ...formData.data }))
               
               // Show a brief notification that form data was restored
@@ -114,14 +113,12 @@ export default function CheckoutPage() {
                 }, 3000)
               }
             } else {
-              console.log('[Checkout] Skipping form data restore - different cart ID')
             }
           } else {
             localStorage.removeItem('checkout_form')
           }
         }
       } catch (e) {
-        console.warn('[Checkout] Failed to restore session data:', e)
       }
     };
 
@@ -163,10 +160,8 @@ export default function CheckoutPage() {
           ...blob,
           cartId: cart?.id || null
         }
-        console.log('[Checkout] Persisting form data to localStorage (cross-tab):', formData)
         localStorage.setItem('checkout_form', JSON.stringify(blobWithCart))
       } catch (e) {
-        console.warn('[Checkout] Failed to persist form data:', e)
       }
     }, 0);
     
@@ -225,11 +220,9 @@ export default function CheckoutPage() {
       // Process cart loading and verification
       const processVerification = async () => {
         try {
-          console.log('[Checkout] Processing magic link verification, preserving existing form data');
           
           // If cartId is provided, force load that specific cart (cross-device support)
           if (cartIdParam && cartIdParam !== cart?.id) {
-            console.log('[Checkout] Magic link provided cart ID, force loading cart:', cartIdParam);
             await loadSpecificCart(cartIdParam);
           }
 
@@ -255,7 +248,6 @@ export default function CheckoutPage() {
                 sessionStorage.setItem('customerId', json.customerId);
               }
             } catch (storageError) {
-              console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
             }
             setIdentityError(null);
             
@@ -268,24 +260,20 @@ export default function CheckoutPage() {
                 import('next-auth/react').then(({ signIn }) => {
                   signIn('session', { identifier: identifierValue, customerId: json.customerId, redirect: false })
                     .catch((e) => { 
-                      console.warn('[Checkout] Failed to update session after magic link verification:', e);
                     });
                 }).catch(() => {});
               }
             } catch (sessionError) {
-              console.warn('[Checkout] Error updating session after magic link verification:', sessionError);
             }
             
             // Show success message briefly
             setIdentityError('✅ Email verification successful! You can now place your order.');
             setTimeout(() => setIdentityError(null), 5000);
             
-            console.log('[Checkout] Magic link verification successful, form data should be preserved');
           } else {
             throw new Error(json?.error || 'Verification failed');
           }
         } catch (e: any) {
-          console.error('[Checkout] Magic link processing failed:', e);
           setIdentityError(e?.message || 'Failed to complete verification. Please try again.');
           setMagicVerified(false);
           setPurchaseReady(false);
@@ -309,9 +297,7 @@ export default function CheckoutPage() {
           expiresAt: Date.now() + (5 * 60 * 1000) // 5 minutes
         }
         localStorage.setItem('magic_verification_success', JSON.stringify(verificationData))
-        console.log('[Checkout] Stored verification success for cross-tab communication')
       } catch (e) {
-        console.warn('[Checkout] Failed to store verification data:', e)
       }
 
       // Clean up URL parameters to avoid confusion on refresh (but keep cartId briefly for recovery)
@@ -332,7 +318,6 @@ export default function CheckoutPage() {
         if (raw) {
           const data = JSON.parse(raw)
           if (data && data.expiresAt && data.expiresAt > Date.now() && data.verified) {
-            console.log('[Checkout] Found cross-tab verification success:', data)
             
             // Apply the verification state
             if (data.email) {
@@ -350,7 +335,6 @@ export default function CheckoutPage() {
                     sessionStorage.setItem('customerId', data.customerId);
                   }
                 } catch (storageError) {
-                  console.warn('[Checkout] Failed to store customerId in sessionStorage (cross-tab):', storageError);
                 }
               }
               setIdentityError('✅ Email verified in another tab! You can now place your order.')
@@ -367,7 +351,6 @@ export default function CheckoutPage() {
           }
         }
       } catch (e) {
-        console.warn('[Checkout] Failed to check cross-tab verification:', e)
       }
     }
 
@@ -377,7 +360,6 @@ export default function CheckoutPage() {
     // Also listen for storage events (when other tabs update localStorage)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'magic_verification_success' && e.newValue) {
-        console.log('[Checkout] Detected cross-tab verification via storage event')
         checkCrossTabVerification()
       }
     }
@@ -489,7 +471,6 @@ export default function CheckoutPage() {
         // Default to the first option if none selected yet
         setSelectedShippingOptionId((prev) => prev ?? (normalized[0]?.id || null))
       } catch (e) {
-        console.warn('[Checkout] Failed to load shipping options', e)
       }
     }
     load()
@@ -674,7 +655,6 @@ export default function CheckoutPage() {
           sessionStorage.setItem('customerId', customerIdValue);
         }
       } catch (storageError) {
-        console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
       }
       setPurchaseReady(true);
       
@@ -687,12 +667,10 @@ export default function CheckoutPage() {
           import('next-auth/react').then(({ signIn }) => {
             signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
               .catch((e) => { 
-                console.warn('[Checkout] Failed to update session after OTP verification:', e);
               });
           }).catch(() => {});
         }
       } catch (sessionError) {
-        console.warn('[Checkout] Error updating session after OTP verification:', sessionError);
       }
     } catch (e: any) {
       setIdentityError(e?.message || mapIdentityError('otp-verify'))
@@ -755,7 +733,6 @@ export default function CheckoutPage() {
                   sessionStorage.setItem('customerId', customerIdValue);
                 }
               } catch (storageError) {
-                console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError);
               }
               setPurchaseReady(true)
               
@@ -768,12 +745,10 @@ export default function CheckoutPage() {
                   import('next-auth/react').then(({ signIn }) => {
                     signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
                       .catch((e) => { 
-                        console.warn('[Checkout] Failed to update session after magic link verification:', e);
                       });
                   }).catch(() => {});
                 }
               } catch (sessionError) {
-                console.warn('[Checkout] Error updating session after magic link verification:', sessionError);
               }
             } else {
               setIdentityError(mapIdentityError('checkout-verify', cj?.error, cr.status))
@@ -805,9 +780,7 @@ export default function CheckoutPage() {
     try {
       localStorage.removeItem('checkout_form')
       localStorage.removeItem('magic_verification_success')
-      console.log('[Checkout] Cleaned up form data after successful order')
     } catch (e) {
-      console.warn('[Checkout] Failed to cleanup form data:', e)
     }
   }
 
@@ -822,7 +795,6 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cart || !cart.id || cartItems.length === 0) {
-      console.warn('[Checkout] Cannot submit without a valid cart and items');
       return;
     }
     if ((cart as any)?.completed_at) {
@@ -913,30 +885,6 @@ export default function CheckoutPage() {
       const placeholderEmailForPhone = (identityMethod === 'phone' && phone.trim()) ? `${phone.replace(/\D/g, '')}@guest.local` : undefined;
 
       // Debug: Log checkout data before processing
-      console.log('[Checkout] Processing checkout with data:', {
-        cartId: cart.id,
-        customerId: customerId,
-        hasFormData: !!(formData.name),
-        cartUpdate: {
-          hasEmail: !!(purchaseReady && identityMethod === 'email' && email.trim()),
-        },
-        formData: {
-          name: formData.name,
-          parsedNames: (() => {
-            const fullName = (formData.name || '').trim()
-            const nameParts = fullName.split(/\s+/).filter(Boolean)
-            return {
-              first_name: nameParts[0] || 'Customer',
-              last_name: nameParts.length > 1 ? nameParts.slice(1).join(' ') : '',
-            }
-          })(),
-          phone: formData.contactNumber,
-          address: formData.address,
-          city: formData.city
-        },
-        purchaseReady,
-        identityMethod
-      })
 
       const result = await processCheckout({
         cartId: cart.id,
@@ -1011,7 +959,6 @@ export default function CheckoutPage() {
         // Fire-and-forget post-purchase side effects without blocking navigation
         setTimeout(() => {
           // Customer sync is now handled by the checkout orchestrator
-          console.log('[Checkout] Customer profile sync handled by orchestrator')
 
           // 2) Programmatic sign-in
           try {
@@ -1026,14 +973,13 @@ export default function CheckoutPage() {
                   sessionStorage.setItem('customerId', customerId);
                 }
               } catch (storageError) {
-                console.warn('[Checkout] Failed to store customerId in sessionStorage (post-purchase):', storageError);
               }
             }
             
             import('next-auth/react').then(({ signIn }) => {
               signIn('session', { identifier: identifierValue, customerId: customerId || undefined, redirect: false })
-                .then(() => { try { console.info('[Metrics] post_purchase_login_success_total++') } catch {} })
-                .catch((e) => { console.warn('[Checkout] signIn failed (non-blocking):', e); try { console.info('[Metrics] post_purchase_login_failure_total++') } catch {} })
+                .then(() => { })
+                .catch(() => { })
             }).catch(() => {})
           } catch {}
         }, 0)
@@ -1042,7 +988,6 @@ export default function CheckoutPage() {
       }
 
       // Fallbacks when checkout fails
-      console.warn('[Checkout] Checkout failed at step:', result.error?.step, result);
       if (result.error?.step === 'cart-completed') {
         // Attempt to recover latest order and route to thank-you
         try {
@@ -1069,7 +1014,7 @@ export default function CheckoutPage() {
       }
       try {
         const msg = String(result.error?.message || '').toLowerCase()
-        if (msg.includes('idempotency')) console.info('[Metrics] idempotency_replay_total++')
+        if (msg.includes('idempotency')) { }
       } catch {}
 
       // General recovery attempt: try to locate a recent order for this verified customer and navigate
@@ -1096,7 +1041,6 @@ export default function CheckoutPage() {
       goToOrderConfirmation()
       return
     } catch (error: any) {
-      console.error('[Checkout] Unexpected error during checkout:', error);
       alert(error?.message || 'Unexpected error during checkout');
     }
   };
@@ -1183,7 +1127,6 @@ export default function CheckoutPage() {
                         sessionStorage.setItem('customerId', customerIdValue)
                       }
                     } catch (storageError) {
-                      console.warn('[Checkout] Failed to store customerId in sessionStorage:', storageError)
                     }
                     setPurchaseReady(true)
                     
@@ -1195,11 +1138,9 @@ export default function CheckoutPage() {
                           customerId: customerIdValue, 
                           redirect: false 
                         }).catch((e) => {
-                          console.warn('[Checkout] Failed to update session after passkey verification:', e)
                         })
                       }).catch(() => {})
                     } catch (sessionError) {
-                      console.warn('[Checkout] Error updating session after passkey verification:', sessionError)
                     }
                     
                     setIdentityError('✅ Login successful with passkey!')

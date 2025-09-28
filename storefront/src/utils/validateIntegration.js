@@ -158,7 +158,6 @@ class MockSessionTrackingManager {
 
 // Validation tests
 function runIntegrationValidation() {
-  console.log('🔧 Running Session Tracking Integration Validation...\n');
   
   let passed = 0;
   let failed = 0;
@@ -167,14 +166,11 @@ function runIntegrationValidation() {
     try {
       const result = testFn();
       if (result) {
-        console.log(`✅ ${description}`);
         passed++;
       } else {
-        console.log(`❌ ${description}`);
         failed++;
       }
     } catch (error) {
-      console.log(`❌ ${description} - Error: ${error.message}`);
       failed++;
     }
   }
@@ -339,12 +335,9 @@ function runIntegrationValidation() {
     return hadTimer && cleanedTimer;
   });
   
-  console.log(`\n📊 Integration Validation Results: ${passed} passed, ${failed} failed`);
   
   if (failed === 0) {
-    console.log('🎉 All integration validations passed! Session tracking integration is working correctly.');
   } else {
-    console.log('⚠️  Some integration validations failed. Please review the implementation.');
   }
   
   return failed === 0;

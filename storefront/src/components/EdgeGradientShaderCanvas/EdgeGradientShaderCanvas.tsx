@@ -21,7 +21,6 @@ const EdgeGradientShaderCanvas: React.FC<EdgeGradientShaderCanvasProps> = ({ isH
       edgeGradientFragmentShaderSource
     );
   } catch (error) {
-    console.error('Edge gradient shader initialization failed:', error);
     setShaderError(true);
   }
 

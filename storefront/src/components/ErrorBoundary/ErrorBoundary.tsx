@@ -46,7 +46,6 @@ class ErrorBoundary extends Component<Props, State> {
     }
 
     // Log error for debugging
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   handleRetry = () => {

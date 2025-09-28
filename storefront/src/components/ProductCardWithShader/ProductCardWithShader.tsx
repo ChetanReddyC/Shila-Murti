@@ -59,15 +59,6 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
 
   // Debug: Log the product data received by the component
   useEffect(() => {
-    console.log('[ProductCardWithShader] Product data received:', {
-      title: product.title,
-      price: product.price,
-      currency: product.currency,
-      originalPrice: product.originalPrice,
-      material: product.material,
-      dimensions: product.dimensions,
-      inStock: product.inStock
-    });
 
     // If price is 0, we keep logs minimal to avoid noisy direct API calls in production
   }, [product]);

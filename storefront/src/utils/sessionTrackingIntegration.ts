@@ -107,7 +107,6 @@ export class SessionTrackingManager {
         this.onAuthEventCallback(authenticationEvent)
       }
       
-      console.log('[SessionTracking] Detected authentication event:', authenticationEvent.type, authenticationEvent.identifier)
     }
     
     // Update tracking state
@@ -182,7 +181,6 @@ export class SessionTrackingManager {
     // Determine delay based on authentication event
     const delay = getDelayForAuthEvent(authEvent || this.trackingState.lastAuthEvent, this.timingConfig)
     
-    console.log('[SessionTracking] Scheduling dialog evaluation with delay:', delay, 'ms')
     
     // Schedule evaluation
     this.trackingState.stabilizationTimer = createStabilizationTimer(callback, delay)
@@ -225,7 +223,6 @@ export class SessionTrackingManager {
    */
   consumeAuthenticationEvents(identifier: string, eventType?: string): void {
     consumeAuthEvent(identifier, eventType)
-    console.log('[SessionTracking] Consumed authentication events for:', identifier, eventType || 'all')
   }
 
   /**
@@ -271,7 +268,6 @@ export class SessionTrackingManager {
     // Clean up expired events
     cleanupExpiredEvents()
     
-    console.log('[SessionTracking] Cleaned up session tracking manager')
   }
 
   /**

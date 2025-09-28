@@ -79,23 +79,16 @@ export async function POST(req: NextRequest) {
   }
   const rawCandidates = normalizeCandidatesFromBody(body)
   if (!cid || !body?.id) {
-    console.log('[Passkey Verify] Missing customer ID or credential ID:', { cid, bodyId: body?.id })
     return new Response(JSON.stringify({ comboRequired: true, reason: 'missing_id' }), { status: 200 })
   }
 
   // Enhanced validation: Check if the request contains all required fields
   if (!body.response || !body.response.authenticatorData || !body.response.clientDataJSON || !body.response.signature) {
-    console.log('[Passkey Verify] Missing required authentication response fields:', { 
-      hasAuthenticatorData: !!body.response?.authenticatorData,
-      hasClientDataJSON: !!body.response?.clientDataJSON,
-      hasSignature: !!body.response?.signature
-    })
     return new Response(JSON.stringify({ comboRequired: true, reason: 'invalid_response' }), { status: 200 })
   }
 
   const auth = await kvGet<{ challenge: string }>(`webauthn:auth:${cid}`)
   if (!auth?.challenge) {
-    console.log('[Passkey Verify] Missing challenge for customer:', cid)
     return new Response(JSON.stringify({ comboRequired: true, reason: 'missing_challenge' }), { status: 200 })
   }
 
@@ -113,7 +106,6 @@ export async function POST(req: NextRequest) {
     }
   }
   if (!credRecord) {
-    console.log('[Passkey Verify] Missing credential record for:', { cid, credentialId: body.id })
     return new Response(JSON.stringify({ comboRequired: true, reason: 'missing_credential' }), { status: 200 })
   }
 
@@ -121,10 +113,6 @@ export async function POST(req: NextRequest) {
 
   // Enhanced validation: Verify that the credential record contains all required fields
   if (!credRecord.credentialID || !credRecord.credentialPublicKey) {
-    console.log('[Passkey Verify] Invalid credential record:', { 
-      hasCredentialID: !!credRecord.credentialID,
-      hasCredentialPublicKey: !!credRecord.credentialPublicKey
-    })
     return new Response(JSON.stringify({ comboRequired: true, reason: 'invalid_credential' }), { status: 200 })
   }
 
@@ -144,7 +132,6 @@ export async function POST(req: NextRequest) {
 
   await kvDel(`webauthn:auth:${cid}`)
   if (!verification.verified) {
-    console.log('[Passkey Verify] Verification failed')
     try { const c = await getCounter({ name: 'auth_passkey_failure_total', help: 'Passkey verify failure total' }); c.inc() } catch {}
     return new Response(JSON.stringify({ comboRequired: true, reason: 'verification_failed' }), { status: 200 })
   }
@@ -161,6 +148,5 @@ export async function POST(req: NextRequest) {
   try { const c = await getCounter({ name: 'auth_passkey_success_total', help: 'Passkey verify success total' }); c.inc() } catch {}
   
   const response = { comboRequired: false, hasPasskey: true, credentialId: body.id, counter: newCounter ?? credRecord.counter }
-  console.log('[Passkey Verify] Success response:', response)
   return new Response(JSON.stringify(response), { status: 200 })
 }

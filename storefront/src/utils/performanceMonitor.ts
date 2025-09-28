@@ -63,16 +63,10 @@ class PerformanceMonitor {
 
     // Log slow renders
     if (renderTime > this.thresholds.slowRenderTime) {
-      console.warn(`[PerformanceMonitor] Slow render detected: ${componentName} took ${renderTime}ms`, {
-        componentName,
-        renderTime,
-        props: metric.props
-      });
     }
 
     // Log render performance in development
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[PerformanceMonitor] ${componentName} render: ${renderTime}ms`);
     }
   }
 
@@ -87,14 +81,12 @@ class PerformanceMonitor {
 
     // Log slow API responses
     if (metric.responseTime > this.thresholds.slowApiResponse) {
-      console.warn(`[PerformanceMonitor] Slow API response: ${metric.endpoint} took ${metric.responseTime}ms`, metric);
     }
 
     // Log API performance in development
     if (process.env.NODE_ENV === 'development') {
       const cacheStatus = metric.cacheHit ? ' (cached)' : '';
       const retryStatus = metric.retryCount ? ` (${metric.retryCount} retries)` : '';
-      console.log(`[PerformanceMonitor] API ${metric.method} ${metric.endpoint}: ${metric.responseTime}ms${cacheStatus}${retryStatus}`);
     }
   }
 

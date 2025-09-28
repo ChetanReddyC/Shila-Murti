@@ -48,7 +48,6 @@ export async function sendWhatsAppLoginCode(toPhoneE164: string, otp: string): P
   // Store authentication metadata in session or database
   // This is a placeholder for actual implementation
   // In a real app, you would store this in a database or session store
-  console.log('[WhatsApp] Storing authentication metadata:', authMetadata);
 
   const url = `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`
   const template: any = {

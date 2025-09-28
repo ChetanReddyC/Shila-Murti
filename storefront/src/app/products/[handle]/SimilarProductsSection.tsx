@@ -89,7 +89,6 @@ const SimilarProductsSection: React.FC<SimilarProductsSectionProps> = ({ current
       updateState({ products: scored, loading: false });
     } catch (err) {
       updateState({ error: err as ProductsServiceError, loading: false });
-      console.error('Failed to fetch similar products:', err);
     }
   }, [current, limit, updateState]);
 

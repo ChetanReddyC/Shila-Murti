@@ -88,16 +88,13 @@ export async function POST(req: NextRequest) {
       phoneNumberIdSet: Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID),
       apiVersion: process.env.WHATSAPP_API_VERSION,
     }
-    console.info('[OTP SEND] WhatsApp attempt', { ...debugConfig, keys })
     const wa = await sendWhatsAppLoginCode(phone, otp)
     if (!wa.ok) {
-      console.error('[OTP SEND] WhatsApp failed', { error: wa.error, ...debugConfig })
       return new Response(
         JSON.stringify({ ok: false, error: 'wa_send_failed', details: wa.error, debug: debugConfig }),
         { status: 502 },
       )
     }
-    console.info('[OTP SEND] WhatsApp success', { messageId: wa.messageId, phoneMasked: debugConfig.phoneMasked })
     sent = { ok: true, ...(wa.messageId ? { messageId: wa.messageId } : {}) }
   } else if (email) {
     // You could optionally support email OTP; for now, we expect WhatsApp for OTP and email for magic link

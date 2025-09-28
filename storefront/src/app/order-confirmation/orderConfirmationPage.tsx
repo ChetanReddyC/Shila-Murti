@@ -39,7 +39,6 @@ export default function OrderConfirmationPage() {
     // Defer silent clearing until after initial content is prepared to avoid visible empty-cart flash
     const clearTimer = setTimeout(() => {
       try { void clearCartSilently() } catch (e) {
-        console.warn('[OrderConfirmation] Silent cart clear failed on mount', e)
       }
     }, 1200);
     // Capture cart once at mount to keep UI stable regardless of later cart updates
@@ -50,21 +49,16 @@ export default function OrderConfirmationPage() {
     // Try to read order result from session as set by checkout
     try {
       const rawResult = sessionStorage.getItem('order_result');
-      console.log('[OrderConfirmation] sessionStorage order_result raw:', rawResult);
       if (rawResult) {
         try {
           const parsed = JSON.parse(rawResult);
-          console.log('[OrderConfirmation] parsed order_result JSON:', parsed);
           if (parsed?.orderId) {
-            console.log('[OrderConfirmation] setting orderId to:', parsed.orderId);
             setOrderId(parsed.orderId);
             if (typeof parsed.displayId === 'number') {
-              console.log('[OrderConfirmation] setting orderNumber to displayId:', parsed.displayId);
               setOrderNumber(`#${String(parsed.displayId).padStart(6, '0')}`);
             }
           }
         } catch (parseErr) {
-          console.warn('[OrderConfirmation] Corrupted order_result in sessionStorage, clearing.', parseErr)
           try { sessionStorage.removeItem('order_result') } catch {}
         }
       }
@@ -87,12 +81,10 @@ export default function OrderConfirmationPage() {
             sessionStorage.removeItem('order_checkout_snapshot');
           }
         } catch (parseErr) {
-          console.warn('[OrderConfirmation] Corrupted order_checkout_snapshot, clearing.', parseErr)
           try { sessionStorage.removeItem('order_checkout_snapshot') } catch {}
         }
       }
     } catch (e) {
-      console.warn('[OrderConfirmation] Failed to read order snapshot:', e);
     }
 
     // Generate random order number
@@ -139,7 +131,6 @@ export default function OrderConfirmationPage() {
           setOrderShippingMethodName(methodName)
         } catch {}
       } catch (err) {
-        console.warn('[OrderConfirmation] Failed to fetch order, will fall back to snapshot/cart', err);
       } finally {
         setOrderLoaded(true);
       }

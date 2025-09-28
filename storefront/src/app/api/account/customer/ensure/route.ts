@@ -232,7 +232,6 @@ export async function POST(req: NextRequest) {
     try { const h = await getHistogram({ name: 'account_ensure_latency_ms', help: 'Ensure customer latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
     return new Response(JSON.stringify({ ok: true, customerId: customer.id || (email ? String(email).toLowerCase() : `+${String(phone).replace(/\D/g,'')}`) }), { status: 200 })
   } catch (e: any) {
-    console.error('[account/customer/ensure] failed', e)
     try { const c = await getCounter({ name: 'account_ensure_failure_total', help: 'Ensure customer failures' }); c.inc() } catch {}
     try { const h = await getHistogram({ name: 'account_ensure_latency_ms', help: 'Ensure customer latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
     return new Response(JSON.stringify({ ok: false, error: 'internal_error', message: 'Unable to ensure your account at the moment. Please try again.' }), { status: 500 })
