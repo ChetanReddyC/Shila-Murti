@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json().catch(() => ({}))
-    const { customerId, cartId, formData, orderCreated, whatsapp_authenticated = false, email_authenticated = false, identityMethod = 'phone' } = body
+    const { customerId, cartId, orderId, formData, orderCreated, whatsapp_authenticated = false, email_authenticated = false, identityMethod = 'phone' } = body
+    try { console.log('[SYNC_API][start]', { customerId, cartId, orderId, identityMethod, whatsapp_authenticated, email_authenticated }) } catch {}
     
     // Enhanced input validation
     if (!customerId || typeof customerId !== 'string') {
@@ -69,13 +70,6 @@ export async function POST(req: NextRequest) {
       primaryIdentifier = customerId;
       primaryPhone = normalizePhoneNumber(formData.phone); // Use form phone as primary
       
-      console.log('[CustomerSync] Email customer identification:', {
-        customerId,
-        email: primaryIdentifier,
-        formPhone: formData.phone,
-        normalizedFormPhone: primaryPhone,
-        identityMethod
-      });
     } else {
       // For WhatsApp/phone authentication, extract phone from customerId
       // customerId format: "919014711878@guest.local" 
@@ -83,13 +77,6 @@ export async function POST(req: NextRequest) {
       primaryIdentifier = whatsappPhone;
       primaryPhone = normalizePhoneNumber(whatsappPhone);
       
-      console.log('[CustomerSync] WhatsApp customer identification:', {
-        customerId,
-        whatsappPhone,
-        whatsappPhoneNormalized: primaryPhone,
-        shippingPhone: formData.phone,
-        phoneConflictDetected: !arePhoneNumbersEquivalent(whatsappPhone, formData.phone)
-      });
     }
     
     // Enhanced phone conflict detection based on authentication method
@@ -101,14 +88,8 @@ export async function POST(req: NextRequest) {
     };
     
     if (phoneConflictInfo.conflictDetected) {
-      console.warn('[CustomerSync] Phone number conflict detected - will update WhatsApp customer with shipping address:', {
-        whatsappPhone: phoneConflictInfo.whatsappPhone,
-        shippingPhone: phoneConflictInfo.shippingPhone,
-        resolutionStrategy: phoneConflictInfo.resolutionStrategy
-      });
       
       // Log conflict metrics
-      console.info('[Metrics] customer_sync_phone_conflict_detected++');
     }
     
     // Use appropriate phone based on authentication method
@@ -165,21 +146,6 @@ export async function POST(req: NextRequest) {
       }), { status: 400 })
     }
     
-    console.log('[CustomerSync] Starting sync for customer:', customerId, {
-      formData: {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        phone: formData.phone,
-        hasAddress: !!formData.address,
-        addressDetails: formData.address ? {
-          address_1: formData.address.address_1,
-          city: formData.address.city,
-          postal_code: formData.address.postal_code,
-          province: formData.address.province
-        } : null
-      },
-      whatsapp_authenticated
-    })
     
     // Initialize retry variables
     let lastError: Error | null = null
@@ -191,7 +157,6 @@ export async function POST(req: NextRequest) {
     const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
     
     if (!PUBLISHABLE_KEY) {
-      console.error('[CustomerSync] Missing publishable API key')
       return new Response(JSON.stringify({
         ok: false,
         error: 'missing_api_key',
@@ -219,6 +184,7 @@ export async function POST(req: NextRequest) {
     updatePayload.metadata = {
       checkout_sync_timestamp: Date.now(),
       last_order_form_sync: cartId,
+      last_order_id: orderId,
       profile_source: 'checkout',
       phone: normalizedPhone,
       phone_normalized: normalizedPhone,
@@ -262,21 +228,12 @@ export async function POST(req: NextRequest) {
       }]
     }
     
-    console.log('[CustomerSync] Calling backend with complete payload:', {
-      endpoint: `${BACKEND_URL}/store/custom`,
-      payload: updatePayload,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-publishable-api-key': PUBLISHABLE_KEY ? 'present' : 'missing'
-      }
-    })
     
     // Begin retry loop
     
     while (attempt <= maxRetries) {
       try {
         attempt++
-        console.log(`[CustomerSync] Backend call attempt ${attempt}/${maxRetries + 1}`)
         
         const res = await fetch(`${BACKEND_URL}/store/custom`, {
           method: 'POST',
@@ -284,18 +241,13 @@ export async function POST(req: NextRequest) {
             'Content-Type': 'application/json',
             'x-publishable-api-key': PUBLISHABLE_KEY
           },
-          body: JSON.stringify(updatePayload),
+          body: JSON.stringify({ ...updatePayload, cart_id: cartId, order_id: orderId }),
           signal: AbortSignal.timeout(15000) // 15 second timeout
         })
+        try { console.log('[SYNC_API][call_backend]', { status: res.status }) } catch {}
         
         const responseText = await res.text().catch(() => '')
         
-        console.log('[CustomerSync] Backend response:', {
-          attempt,
-          ok: res.ok,
-          status: res.status,
-          response: responseText
-        })
         
         if (res.ok) {
           // Success! Parse the response
@@ -314,7 +266,6 @@ export async function POST(req: NextRequest) {
             counter.inc()
           } catch {}
           
-          console.log('[CustomerSync] Sync completed successfully:', result)
           
           return new Response(JSON.stringify({
             ok: true,
@@ -352,7 +303,6 @@ export async function POST(req: NextRequest) {
           // Server error - might be temporary, can retry
           lastError = new Error(`Backend server error (${res.status}): ${responseText}`)
           if (attempt <= maxRetries) {
-            console.log(`[CustomerSync] Retrying after server error (attempt ${attempt}/${maxRetries + 1})`)
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Exponential backoff
             continue
           }
@@ -370,7 +320,6 @@ export async function POST(req: NextRequest) {
         }
         
         if (attempt <= maxRetries) {
-          console.log(`[CustomerSync] Retrying after error: ${error.message} (attempt ${attempt}/${maxRetries + 1})`)
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         }
       }
@@ -380,7 +329,6 @@ export async function POST(req: NextRequest) {
     throw lastError || new Error('Unknown error during backend communication')
     
   } catch (error: any) {
-    console.error('[CustomerSync] Sync failed:', error)
     
     try { 
       const counter = await getCounter({ 
@@ -411,6 +359,7 @@ export async function POST(req: NextRequest) {
       statusCode = 500
     }
     
+    try { console.log('[SYNC_API][error]', { error: error?.message }) } catch {}
     return new Response(JSON.stringify({
       ok: false,
       error: errorType,

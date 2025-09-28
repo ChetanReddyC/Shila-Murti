@@ -27,7 +27,7 @@ async function handleCustomerRequest(
   req: MedusaRequest,
   res: MedusaResponse
 ) {
-  const { first_name, last_name, name, email, password, phone, addresses = [], whatsapp_authenticated = false, email_authenticated = false, identity_method = 'phone' } = (req.body as any) ?? {};
+  const { first_name, last_name, name, email, password, phone, addresses = [], whatsapp_authenticated = false, email_authenticated = false, identity_method = 'phone', cart_id, order_id } = (req.body as any) ?? {};
 
   // Log phone conflict detection results
   if (req.phoneConflictDetected) {
@@ -216,6 +216,55 @@ async function handleCustomerRequest(
           addresses_count: finalCustomer.addresses?.length || 0
         });
 
+        // Attempt to associate cart/order even for existing customers
+        try {
+          if (cart_id && finalCustomer?.id) {
+            const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
+            if (adminToken) {
+              const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+              console.log('[ASSOC_BACKEND][cart]', { cart_id, customer_id: finalCustomer.id })
+              await fetch(`${base}/admin/carts/${cart_id}` as any, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
+                body: JSON.stringify({ customer_id: finalCustomer.id })
+              } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][cart][fail]', { error: e?.message }) } catch {} })
+            }
+          }
+          if (order_id && finalCustomer?.id) {
+            let linked = false
+            try {
+              const anyScope: any = req.scope
+              const orderModuleService = (anyScope && typeof anyScope.resolve === 'function') ? anyScope.resolve((Modules as any).ORDER) : null
+              if (orderModuleService && typeof orderModuleService.updateOrders === 'function') {
+                await orderModuleService.updateOrders(order_id, { customer_id: finalCustomer.id })
+                linked = true
+              }
+            } catch {}
+            if (!linked) {
+              const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
+              if (adminToken) {
+                const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+                console.log('[ASSOC_BACKEND][order]', { order_id, customer_id: finalCustomer.id })
+                await fetch(`${base}/admin/orders/${order_id}` as any, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
+                  body: JSON.stringify({ customer_id: finalCustomer.id })
+                } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][order][fail]', { error: e?.message }) } catch {} })
+              }
+            }
+            // Persist last order id to aid reconciliation jobs
+            try {
+              await customerModuleService.updateCustomers(finalCustomer.id, {
+                metadata: {
+                  ...(finalCustomer.metadata || {}),
+                  last_order_id: order_id,
+                  last_order_linked_at: new Date().toISOString(),
+                }
+              })
+            } catch {}
+          }
+        } catch {}
+
         return res.status(200).json({ 
           customer: finalCustomer,
           update_verified: true,
@@ -309,6 +358,60 @@ async function handleCustomerRequest(
       }
     }
     
+    // Best-effort association: if cart_id is present, try to attach the customer to the cart before completion
+    // and if order_id is present, set customer metadata for audit. Medusa v2 store/cart APIs from admin are not
+    // directly available in this route without admin token; we avoid failing the request if association fails.
+    try {
+      if (cart_id && finalCustomer?.id) {
+        // Attempt via admin cart update only if an admin token is configured in env at the gateway level
+        const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
+        if (adminToken) {
+          const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+          console.log('[ASSOC_BACKEND][cart]', { cart_id, customer_id: finalCustomer.id })
+          await fetch(`${base}/admin/carts/${cart_id}` as any, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
+            body: JSON.stringify({ customer_id: finalCustomer.id })
+          } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][cart][fail]', { error: e?.message }) } catch {} })
+        }
+      }
+      if (order_id && finalCustomer?.id) {
+        // Try to link the order -> customer via module first, then fallback to admin HTTP
+        let linked = false
+        try {
+          const anyScope: any = req.scope
+          const orderModuleService = (anyScope && typeof anyScope.resolve === 'function') ? anyScope.resolve((Modules as any).ORDER) : null
+          if (orderModuleService && typeof orderModuleService.updateOrders === 'function') {
+            await orderModuleService.updateOrders(order_id, { customer_id: finalCustomer.id })
+            linked = true
+          }
+        } catch {}
+        if (!linked) {
+          const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
+          if (adminToken) {
+            const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+            console.log('[ASSOC_BACKEND][order]', { order_id, customer_id: finalCustomer.id })
+            await fetch(`${base}/admin/orders/${order_id}` as any, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
+              body: JSON.stringify({ customer_id: finalCustomer.id })
+            } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][order][fail]', { error: e?.message }) } catch {} })
+          }
+        }
+        // Store last seen order id on customer metadata for reconciliation jobs
+        try {
+          const customerModuleService: any = req.scope.resolve(Modules.CUSTOMER);
+          await customerModuleService.updateCustomers(finalCustomer.id, {
+            metadata: {
+              ...(finalCustomer.metadata || {}),
+              last_order_id: order_id,
+              last_order_linked_at: new Date().toISOString(),
+            }
+          })
+        } catch {}
+      }
+    } catch {}
+
     return res.status(201).json({ 
       customer: finalCustomer,
       consolidation_info: consolidationInfo

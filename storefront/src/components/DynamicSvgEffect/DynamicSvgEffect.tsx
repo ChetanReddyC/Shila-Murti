@@ -52,7 +52,6 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
 
   // Validate that the children prop is a single, valid React element.
   if (!React.isValidElement(children)) {
-    console.error("DynamicSvgEffect requires a single valid React element as a child.");
     return null;
   }
 

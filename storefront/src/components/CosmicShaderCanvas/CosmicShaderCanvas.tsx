@@ -40,7 +40,6 @@ const CosmicShaderCanvas: React.FC<CosmicShaderCanvasProps> = ({ isHovering, var
 
         const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
         if (!gl) {
-            console.error('WebGL not supported');
             return;
         }
         glRef.current = gl;

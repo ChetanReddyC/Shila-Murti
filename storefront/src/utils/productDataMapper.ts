@@ -161,7 +161,6 @@ export class ProductDataMapper {
       return Object.keys(sanitizedMetadata).length > 0 ? sanitizedMetadata : null;
     } catch (error) {
       // Log error but don't break the application
-      console.error('Error processing product metadata:', error);
       return null;
     }
   }
@@ -330,26 +329,15 @@ export class ProductDataMapper {
    * Calculates price information from product variants
    */
   static calculatePrice(variants: ProductVariant[]): PriceCalculationResult {
-    console.log('[ProductDataMapper] calculatePrice input:', {
-      variantsCount: variants?.length || 0,
-      variants: variants?.map(v => ({
-        id: v.id,
-        title: v.title,
-        prices: v.prices
-      }))
-    });
 
     if (!variants || variants.length === 0) {
-      console.log('[ProductDataMapper] No variants found, returning price 0');
       return { price: 0 };
     }
 
     const priceData = this.extractPricesFromVariants(variants);
     
-    console.log('[ProductDataMapper] Extracted price data:', priceData);
     
     if (priceData.length === 0) {
-      console.log('[ProductDataMapper] No price data found, returning price 0');
       return { price: 0 };
     }
 
@@ -370,7 +358,6 @@ export class ProductDataMapper {
       currency: minPriceData.currency_code.toUpperCase()
     };
 
-    console.log('[ProductDataMapper] Final price calculation result:', result);
     
     return result;
   }
@@ -381,44 +368,26 @@ export class ProductDataMapper {
   private static extractPricesFromVariants(variants: ProductVariant[]): Array<{amount: number, currency_code: string}> {
     const prices: Array<{amount: number, currency_code: string}> = [];
 
-    console.log('[ProductDataMapper] extractPricesFromVariants input:', variants.length, 'variants');
 
     for (const variant of variants) {
-      console.log('[ProductDataMapper] Processing variant:', {
-        id: variant.id,
-        title: variant.title,
-        pricesCount: variant.prices?.length || 0,
-        prices: variant.prices,
-        rawVariant: variant // Log the entire variant to see structure
-      });
 
       if (!variant.prices || variant.prices.length === 0) {
-        console.log('[ProductDataMapper] Variant has no prices, skipping');
         continue;
       }
 
       // Try all prices, not just the first one
       for (const price of variant.prices) {
-        console.log('[ProductDataMapper] Processing price:', price);
 
         if (price && typeof price.amount === 'number' && price.amount > 0) {
           prices.push({
             amount: price.amount,
             currency_code: price.currency_code
           });
-          console.log('[ProductDataMapper] Added price:', { amount: price.amount, currency_code: price.currency_code });
         } else {
-          console.log('[ProductDataMapper] Price is invalid or zero:', {
-            price,
-            amount: price?.amount,
-            amountType: typeof price?.amount,
-            isPositive: price?.amount > 0
-          });
         }
       }
     }
 
-    console.log('[ProductDataMapper] Final extracted prices:', prices);
     return prices;
   }
 

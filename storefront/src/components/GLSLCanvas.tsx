@@ -91,7 +91,6 @@ const GLSLCanvas = () => {
 
     const gl = canvas.getContext('webgl', { alpha: true });
     if (!gl) {
-      console.error("WebGL is not supported");
       return;
     }
     

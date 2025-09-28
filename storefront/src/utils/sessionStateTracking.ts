@@ -78,7 +78,6 @@ export function hasSessionDataChanged(
     
     // Validate session data structure
     if (typeof previousData !== 'object' || typeof currentData !== 'object') {
-      console.warn('[SessionStateTracking] Invalid session data types for comparison')
       return true // Assume change to trigger re-evaluation
     }
     
@@ -94,7 +93,6 @@ export function hasSessionDataChanged(
       prevCustomerId = getCustomerIdFromSession(previousData)
       currCustomerId = getCustomerIdFromSession(currentData)
     } catch (customerIdError) {
-      console.warn('[SessionStateTracking] Error comparing customerIds:', customerIdError)
       // Continue with other comparisons
     }
     
@@ -117,7 +115,6 @@ export function hasSessionDataChanged(
     
     return false
   } catch (error) {
-    console.warn('[SessionStateTracking] Error comparing session data:', error)
     return true // Assume change to trigger re-evaluation when in doubt
   }
 }
@@ -235,7 +232,6 @@ export function getUserIdentifierFromSession(session: Session | null): string | 
     
     // Validate user object structure
     if (typeof user !== 'object') {
-      console.warn('[SessionStateTracking] Invalid user object in session:', user)
       return null
     }
     
@@ -248,12 +244,10 @@ export function getUserIdentifierFromSession(session: Session | null): string | 
         customerId = sessionStorage.getItem('customerId')
         // Validate customerId if present
         if (customerId && typeof customerId !== 'string') {
-          console.warn('[SessionStateTracking] Invalid customerId type:', typeof customerId)
           customerId = null
         }
       }
     } catch (storageError) {
-      console.warn('[SessionStateTracking] Failed to access sessionStorage for customerId:', storageError)
       // Continue without customerId
     }
     
@@ -261,13 +255,11 @@ export function getUserIdentifierFromSession(session: Session | null): string | 
     
     // Validate final identifier
     if (identifier && typeof identifier !== 'string') {
-      console.warn('[SessionStateTracking] Invalid identifier type:', typeof identifier)
       return null
     }
     
     return identifier
   } catch (error) {
-    console.warn('[SessionStateTracking] Error extracting user identifier:', error)
     return null
   }
 }
@@ -283,7 +275,6 @@ export function getOriginalIdentifierFromSession(session: Session | null): strin
     
     // Validate user object structure
     if (typeof user !== 'object') {
-      console.warn('[SessionStateTracking] Invalid user object in session:', user)
       return null
     }
     
@@ -296,12 +287,10 @@ export function getOriginalIdentifierFromSession(session: Session | null): strin
         customerId = sessionStorage.getItem('customerId')
         // Validate customerId if present
         if (customerId && typeof customerId !== 'string') {
-          console.warn('[SessionStateTracking] Invalid customerId type:', typeof customerId)
           customerId = null
         }
       }
     } catch (storageError) {
-      console.warn('[SessionStateTracking] Failed to access sessionStorage for customerId:', storageError)
       // Continue without customerId
     }
     
@@ -309,13 +298,11 @@ export function getOriginalIdentifierFromSession(session: Session | null): strin
     
     // Validate final identifier
     if (identifier && typeof identifier !== 'string') {
-      console.warn('[SessionStateTracking] Invalid original identifier type:', typeof identifier)
       return null
     }
     
     return identifier
   } catch (error) {
-    console.warn('[SessionStateTracking] Error extracting original identifier:', error)
     return null
   }
 }
@@ -334,12 +321,10 @@ export function getCustomerIdFromSession(session: Session | null): string | null
           if (typeof customerId === 'string' && customerId.trim().length > 0) {
             return customerId
           } else {
-            console.warn('[SessionStateTracking] Invalid customerId from sessionStorage:', customerId)
           }
         }
       }
     } catch (storageError) {
-      console.warn('[SessionStateTracking] Failed to access sessionStorage for customerId:', storageError)
       // Continue to fallback
     }
     
@@ -353,7 +338,6 @@ export function getCustomerIdFromSession(session: Session | null): string | null
     
     return null
   } catch (error) {
-    console.warn('[SessionStateTracking] Error extracting customerId:', error)
     return null
   }
 }
@@ -384,22 +368,18 @@ export function hasExistingPasskeyPolicy(identifier: string): boolean {
                 // Additional check: verify the credential still exists by attempting to use it
                 // This is a simplified check - in a real implementation, you might want to
                 // actually test the credential with the WebAuthn API
-                console.log('[SessionStateTracking] Passkey policy found with session data for:', identifier)
                 return true
               } else if (hasPasskeySession !== 'true') {
                 // Session indicates no passkey, but policy exists - this means passkey was removed
-                console.log('[SessionStateTracking] Passkey policy exists but session indicates no passkey for:', identifier)
                 // Clear the outdated policy
                 try {
                   localStorage.removeItem(policyKey)
                 } catch (clearError) {
-                  console.warn('[SessionStateTracking] Failed to clear outdated policy:', clearError)
                 }
                 return false
               }
             }
           } catch (sessionError) {
-            console.warn('[SessionStateTracking] Error accessing sessionStorage:', sessionError)
           }
           
           // If we can't verify through session, assume the policy is valid
@@ -407,17 +387,14 @@ export function hasExistingPasskeyPolicy(identifier: string): boolean {
           return true
         }
       } catch (policyParseError) {
-        console.warn('[SessionStateTracking] Failed to parse cached policy, clearing:', policyParseError)
         try {
           localStorage.removeItem(policyKey)
         } catch (clearError) {
-          console.warn('[SessionStateTracking] Failed to clear corrupted policy:', clearError)
         }
       }
     }
     return false
   } catch (error) {
-    console.warn('[SessionStateTracking] Error checking passkey policy:', error)
     return false
   }
 }
@@ -498,13 +475,11 @@ export function hasEventStabilized(
 export function validateAndSanitizeSession(session: any): Session | null {
   try {
     if (!session || typeof session !== 'object') {
-      console.warn('[SessionStateTracking] Invalid session object:', session)
       return null
     }
     
     // Validate user object
     if (!session.user || typeof session.user !== 'object') {
-      console.warn('[SessionStateTracking] Invalid user object in session:', session.user)
       return null
     }
     
@@ -524,13 +499,11 @@ export function validateAndSanitizeSession(session: any): Session | null {
     // Validate that we have at least one identifier
     if (!sanitizedSession.user.email && !sanitizedSession.user.phone && 
         !sanitizedSession.user.originalEmail && !sanitizedSession.user.originalPhone) {
-      console.warn('[SessionStateTracking] Session has no valid identifiers')
       return null
     }
     
     return sanitizedSession
   } catch (error) {
-    console.error('[SessionStateTracking] Error validating session:', error)
     return null
   }
 }
@@ -546,19 +519,16 @@ export function createSafeAuthenticationEvent(
   try {
     // Validate required fields
     if (!type || typeof type !== 'string' || type.trim().length === 0) {
-      console.warn('[SessionStateTracking] Invalid event type:', type)
       return null
     }
     
     if (!identifier || typeof identifier !== 'string' || identifier.trim().length === 0) {
-      console.warn('[SessionStateTracking] Invalid identifier:', identifier)
       return null
     }
     
     // Validate event type
     const validTypes = ['mfa-complete', 'checkout-auth', 'login-complete']
     if (!validTypes.includes(type as any)) {
-      console.warn('[SessionStateTracking] Unknown event type:', type)
       return null
     }
     
@@ -572,7 +542,6 @@ export function createSafeAuthenticationEvent(
     
     return event
   } catch (error) {
-    console.error('[SessionStateTracking] Error creating authentication event:', error)
     return null
   }
 }
@@ -589,7 +558,6 @@ export function performErrorRecovery(): {
   const warnings: string[] = []
   
   try {
-    console.log('[SessionStateTracking] Performing error recovery')
     
     // Test storage access
     try {
@@ -601,7 +569,6 @@ export function performErrorRecovery(): {
           sessionStorage.removeItem(testKey)
         } catch (sessionError) {
           errors.push('SessionStorage access failed')
-          console.error('[SessionStateTracking] SessionStorage test failed:', sessionError)
         }
         
         // Test localStorage
@@ -611,12 +578,10 @@ export function performErrorRecovery(): {
           localStorage.removeItem(testKey)
         } catch (localError) {
           warnings.push('LocalStorage access failed')
-          console.warn('[SessionStateTracking] LocalStorage test failed:', localError)
         }
       }
     } catch (storageTestError) {
       errors.push('Storage testing failed')
-      console.error('[SessionStateTracking] Storage testing error:', storageTestError)
     }
     
     // Validate timer functionality
@@ -627,7 +592,6 @@ export function performErrorRecovery(): {
       clearTimeout(testTimer)
     } catch (timerError) {
       errors.push('Timer functionality failed')
-      console.error('[SessionStateTracking] Timer test failed:', timerError)
     }
     
     // Check for corrupted data and clean up
@@ -663,24 +627,19 @@ export function performErrorRecovery(): {
           })
           
           if (corruptedKeys.length > 0) {
-            console.log('[SessionStateTracking] Cleaned up corrupted keys:', corruptedKeys.length)
           }
         } catch (keyCleanupError) {
           warnings.push('Key cleanup failed')
-          console.warn('[SessionStateTracking] Key cleanup error:', keyCleanupError)
         }
       }
     } catch (dataValidationError) {
       warnings.push('Data validation failed')
-      console.warn('[SessionStateTracking] Data validation error:', dataValidationError)
     }
     
     const success = errors.length === 0
-    console.log('[SessionStateTracking] Error recovery completed:', { success, errors: errors.length, warnings: warnings.length })
     
     return { success, errors, warnings }
   } catch (recoveryError) {
-    console.error('[SessionStateTracking] Error during recovery:', recoveryError)
     return {
       success: false,
       errors: [...errors, 'Recovery process failed'],

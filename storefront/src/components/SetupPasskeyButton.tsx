@@ -73,12 +73,10 @@ export default function SetupPasskeyButton({ userId, username, onRegistered }: {
                 sessionStorage.setItem('passkeyUserId', userId)
               }
             } catch (sessionError) {
-              console.warn('[SetupPasskeyButton] Failed to update session storage:', sessionError)
             }
             
             try { onRegistered && onRegistered() } catch {}
           } catch (e: any) {
-            console.error('[Passkey Register] failed', e)
             setStatus(`Failed to register passkey${e?.message ? `: ${e.message}` : ''}`)
           } finally { setBusy(false) }
         }}

@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
   const url = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/auth/magic/confirm?${qs.toString()}`
   const res = await sendMagicLink(normalized, url)
   if (!res.ok) {
-    console.error('[MAGIC SEND] failed', { email: normalized, error: res.error })
     return new Response(JSON.stringify({ ok: false, error: 'email_send_failed', details: res.error }), { status: 502 })
   }
   try {

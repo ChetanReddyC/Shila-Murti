@@ -101,7 +101,6 @@ export class PriceErrorHandler {
             };
           }
         } catch (recoveryError) {
-          console.warn(`Recovery strategy ${strategy.name} failed:`, recoveryError);
         }
       }
     }
@@ -357,16 +356,12 @@ export class PriceErrorHandler {
     
     switch (error.severity) {
       case 'critical':
-        console.error(logMessage, error.context);
         break;
       case 'high':
-        console.error(logMessage, error.context);
         break;
       case 'medium':
-        console.warn(logMessage, error.context);
         break;
       case 'low':
-        console.info(logMessage, error.context);
         break;
     }
   }
@@ -420,7 +415,6 @@ export class PriceErrorHandler {
 
           return fallbackTotals;
         } catch (fallbackError) {
-          console.error('Backend fallback failed:', fallbackError);
           return null;
         }
       }
@@ -446,7 +440,6 @@ export class PriceErrorHandler {
           // For now, return null to indicate no cached data available
           return null;
         } catch (cacheError) {
-          console.error('Cache recovery failed:', cacheError);
           return null;
         }
       }
@@ -488,7 +481,6 @@ export class PriceErrorHandler {
 
           return defaultTotals;
         } catch (defaultError) {
-          console.error('Default value recovery failed:', defaultError);
           return null;
         }
       }
@@ -514,7 +506,6 @@ export class PriceErrorHandler {
           // For now, return null to indicate retry not implemented
           return null;
         } catch (retryError) {
-          console.error('Retry recovery failed:', retryError);
           return null;
         }
       }

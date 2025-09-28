@@ -6,13 +6,11 @@ const orderCartMap = global.orderCartMap || new Map();
 global.orderCartMap = orderCartMap;
 
 export default async function handler(req, res) {
-  console.log('[create-order] handler start - method:', req.method, 'body:', req.body)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { orderId, orderAmount, customer = {}, cartId } = req.body || {};
-  console.log('[create-order] parsed body:', { orderId, orderAmount, customer, cartId });
   if (!orderId || !orderAmount) {
     return res.status(400).json({ error: 'orderId and orderAmount required' });
   }
@@ -45,7 +43,6 @@ export default async function handler(req, res) {
       ...(publicNotifyUrl ? { notify_url: publicNotifyUrl } : {}),
     },
   };
-  console.log('[create-order] Cashfree create-order payload:', payload, 'CF_BASE:', CF_BASE);
 
   try {
     const response = await fetch(`${CF_BASE}/orders`, {
@@ -60,9 +57,7 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    console.log('[create-order] response status:', response.status, 'data:', data);
     if (!response.ok) {
-      console.error('Cashfree create-order error:', data);
       return res.status(response.status).json({ error: 'create-order failed', details: data });
     }
     try {
@@ -84,7 +79,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json(data);
   } catch (err) {
-    console.error('create-order exception:', err);
     return res.status(500).json({ error: 'server error', details: String(err) });
   }
 }

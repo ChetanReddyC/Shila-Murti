@@ -79,7 +79,6 @@ const sessionStateTracking = {
 
 // Validation tests
 function runValidation() {
-  console.log('🧪 Running Session State Tracking Validation...\n');
   
   let passed = 0;
   let failed = 0;
@@ -88,14 +87,11 @@ function runValidation() {
     try {
       const result = testFn();
       if (result) {
-        console.log(`✅ ${description}`);
         passed++;
       } else {
-        console.log(`❌ ${description}`);
         failed++;
       }
     } catch (error) {
-      console.log(`❌ ${description} - Error: ${error.message}`);
       failed++;
     }
   }
@@ -150,12 +146,9 @@ function runValidation() {
     return event1 === null && event2 === null;
   });
   
-  console.log(`\n📊 Validation Results: ${passed} passed, ${failed} failed`);
   
   if (failed === 0) {
-    console.log('🎉 All validations passed! Session state tracking utilities are working correctly.');
   } else {
-    console.log('⚠️  Some validations failed. Please review the implementation.');
   }
   
   return failed === 0;

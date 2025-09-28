@@ -42,7 +42,6 @@ export class CurrencyFormatter {
       }).format(amount);
     } catch (error) {
       // Fallback for unsupported currencies
-      console.warn(`Unsupported currency: ${currencyCode}, falling back to USD`);
       return new Intl.NumberFormat(this.DEFAULT_LOCALE, {
         style: 'currency',
         currency: 'USD',

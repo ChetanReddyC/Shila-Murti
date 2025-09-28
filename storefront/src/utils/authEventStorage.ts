@@ -24,7 +24,6 @@ export function storeAuthenticationEvent(event: AuthenticationEvent): void {
     
     // Validate event data before storing
     if (!event || !event.type || !event.identifier || !event.timestamp) {
-      console.warn('[AuthEventStorage] Invalid event data, skipping storage:', event)
       return
     }
     
@@ -42,29 +41,23 @@ export function storeAuthenticationEvent(event: AuthenticationEvent): void {
     // Check if sessionStorage is available and has space
     try {
       sessionStorage.setItem(AUTH_EVENTS_KEY, JSON.stringify(updatedEvents))
-      console.log('[AuthEventStorage] Stored authentication event:', event.type, event.identifier)
     } catch (storageError) {
       // Handle storage quota exceeded or access denied
       if (storageError instanceof DOMException) {
         if (storageError.code === 22 || storageError.name === 'QuotaExceededError') {
-          console.warn('[AuthEventStorage] Storage quota exceeded, cleaning up old events')
           // Try to clean up old events and retry
           cleanupExpiredEvents()
           try {
             sessionStorage.setItem(AUTH_EVENTS_KEY, JSON.stringify(updatedEvents))
-            console.log('[AuthEventStorage] Stored authentication event after cleanup:', event.type, event.identifier)
           } catch (retryError) {
-            console.error('[AuthEventStorage] Failed to store event even after cleanup:', retryError)
           }
         } else {
-          console.error('[AuthEventStorage] SessionStorage access denied:', storageError)
         }
       } else {
         throw storageError
       }
     }
   } catch (error) {
-    console.warn('[AuthEventStorage] Failed to store authentication event:', error)
     // Fallback: Continue without storing the event
     // The system should still function, just without cross-session event tracking
   }
@@ -81,7 +74,6 @@ export function getStoredAuthEvents(): StoredAuthEvent[] {
     try {
       stored = sessionStorage.getItem(AUTH_EVENTS_KEY)
     } catch (storageError) {
-      console.warn('[AuthEventStorage] SessionStorage access failed:', storageError)
       return []
     }
     
@@ -91,23 +83,19 @@ export function getStoredAuthEvents(): StoredAuthEvent[] {
     try {
       events = JSON.parse(stored)
     } catch (parseError) {
-      console.warn('[AuthEventStorage] Failed to parse stored events, clearing corrupted data:', parseError)
       // Clear corrupted data
       try {
         sessionStorage.removeItem(AUTH_EVENTS_KEY)
       } catch (clearError) {
-        console.warn('[AuthEventStorage] Failed to clear corrupted data:', clearError)
       }
       return []
     }
     
     // Validate events array structure
     if (!Array.isArray(events)) {
-      console.warn('[AuthEventStorage] Stored events is not an array, clearing corrupted data')
       try {
         sessionStorage.removeItem(AUTH_EVENTS_KEY)
       } catch (clearError) {
-        console.warn('[AuthEventStorage] Failed to clear corrupted data:', clearError)
       }
       return []
     }
@@ -129,13 +117,11 @@ export function getStoredAuthEvents(): StoredAuthEvent[] {
       try {
         sessionStorage.setItem(AUTH_EVENTS_KEY, JSON.stringify(validEvents))
       } catch (storageError) {
-        console.warn('[AuthEventStorage] Failed to update storage after filtering:', storageError)
       }
     }
     
     return validEvents
   } catch (error) {
-    console.warn('[AuthEventStorage] Failed to retrieve authentication events:', error)
     return []
   }
 }
@@ -163,7 +149,6 @@ export function consumeAuthEvent(identifier: string, eventType?: string): void {
     
     // Validate input parameters
     if (!identifier || typeof identifier !== 'string') {
-      console.warn('[AuthEventStorage] Invalid identifier for consuming event:', identifier)
       return
     }
     
@@ -184,15 +169,12 @@ export function consumeAuthEvent(identifier: string, eventType?: string): void {
     if (updated) {
       try {
         sessionStorage.setItem(AUTH_EVENTS_KEY, JSON.stringify(updatedEvents))
-        console.log('[AuthEventStorage] Consumed authentication event for:', identifier, eventType || 'any')
       } catch (storageError) {
-        console.warn('[AuthEventStorage] Failed to update storage when consuming event:', storageError)
         // Continue without updating storage - the event will remain unconsumed
         // This is acceptable as it's better to show the dialog again than to miss it
       }
     }
   } catch (error) {
-    console.warn('[AuthEventStorage] Failed to consume authentication event:', error)
   }
 }
 
@@ -230,23 +212,18 @@ export function cleanupExpiredEvents(): void {
     if (validEvents.length !== events.length) {
       try {
         sessionStorage.setItem(AUTH_EVENTS_KEY, JSON.stringify(validEvents))
-        console.log('[AuthEventStorage] Cleaned up expired authentication events:', events.length - validEvents.length, 'removed')
       } catch (storageError) {
-        console.warn('[AuthEventStorage] Failed to update storage during cleanup:', storageError)
         
         // If we can't update storage, try to clear it entirely as a fallback
         if (storageError instanceof DOMException && storageError.code === 22) {
           try {
             sessionStorage.removeItem(AUTH_EVENTS_KEY)
-            console.log('[AuthEventStorage] Cleared all events due to storage quota issues')
           } catch (clearError) {
-            console.error('[AuthEventStorage] Failed to clear storage entirely:', clearError)
           }
         }
       }
     }
   } catch (error) {
-    console.warn('[AuthEventStorage] Failed to cleanup expired events:', error)
   }
 }
 
@@ -258,9 +235,7 @@ export function clearAllAuthEvents(): void {
     if (typeof window === 'undefined') return
     
     sessionStorage.removeItem(AUTH_EVENTS_KEY)
-    console.log('[AuthEventStorage] Cleared all authentication events')
   } catch (error) {
-    console.warn('[AuthEventStorage] Failed to clear authentication events:', error)
   }
 }
 
@@ -277,7 +252,6 @@ export function broadcastAuthEvent(event: AuthenticationEvent): void {
     
     // Validate event data before broadcasting
     if (!event || !event.type || !event.identifier || !event.timestamp) {
-      console.warn('[AuthEventStorage] Invalid event data for broadcast:', event)
       return
     }
     
@@ -290,9 +264,7 @@ export function broadcastAuthEvent(event: AuthenticationEvent): void {
     
     try {
       localStorage.setItem(broadcastKey, JSON.stringify(broadcastData))
-      console.log('[AuthEventStorage] Broadcasted authentication event:', event.type, event.identifier)
     } catch (storageError) {
-      console.warn('[AuthEventStorage] Failed to broadcast to localStorage:', storageError)
       // Continue without broadcasting - this is not critical for core functionality
       return
     }
@@ -303,7 +275,6 @@ export function broadcastAuthEvent(event: AuthenticationEvent): void {
         localStorage.removeItem(broadcastKey)
       } catch (cleanupError) {
         // Ignore cleanup errors - the data will eventually be overwritten
-        console.debug('[AuthEventStorage] Failed to cleanup broadcast data:', cleanupError)
       }
     }, 1000)
     
@@ -315,7 +286,6 @@ export function broadcastAuthEvent(event: AuthenticationEvent): void {
     }
     
   } catch (error) {
-    console.warn('[AuthEventStorage] Failed to broadcast authentication event:', error)
   }
 }
 
@@ -346,7 +316,6 @@ export function setupCrossTabListener(
         callback(authEvent)
       }
     } catch (error) {
-      console.warn('[AuthEventStorage] Error handling cross-tab storage event:', error)
     }
   }
   
@@ -409,16 +378,13 @@ export function getAuthEventDebugInfo(): {
  */
 export function emergencyCleanup(): void {
   try {
-    console.log('[AuthEventStorage] Performing emergency cleanup')
     
     // Clear all authentication events
     try {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem(AUTH_EVENTS_KEY)
-        console.log('[AuthEventStorage] Cleared authentication events storage')
       }
     } catch (sessionError) {
-      console.warn('[AuthEventStorage] Failed to clear session storage:', sessionError)
     }
     
     // Clear broadcast events from localStorage
@@ -435,13 +401,10 @@ export function emergencyCleanup(): void {
           try {
             localStorage.removeItem(key)
           } catch (removeError) {
-            console.debug('[AuthEventStorage] Failed to remove broadcast key:', key, removeError)
           }
         })
-        console.log('[AuthEventStorage] Cleared broadcast events:', keysToRemove.length)
       }
     } catch (localStorageError) {
-      console.warn('[AuthEventStorage] Failed to clear localStorage broadcasts:', localStorageError)
     }
     
     // Clear global cleanup timers
@@ -451,14 +414,11 @@ export function emergencyCleanup(): void {
           try {
             clearTimeout(timer)
           } catch (timerError) {
-            console.debug('[AuthEventStorage] Failed to clear cleanup timer:', timerError)
           }
         })
         ;(window as any).passkeyNudgeCleanupTimers = []
-        console.log('[AuthEventStorage] Cleared global cleanup timers')
       }
     } catch (timerCleanupError) {
-      console.warn('[AuthEventStorage] Failed to clear global timers:', timerCleanupError)
     }
     
     // Clear any abandoned passkey nudge related data
@@ -478,11 +438,9 @@ export function emergencyCleanup(): void {
             try {
               sessionStorage.removeItem(key)
             } catch (removeError) {
-              console.debug('[AuthEventStorage] Failed to remove session key:', key, removeError)
             }
           })
         } catch (sessionCleanupError) {
-          console.warn('[AuthEventStorage] Failed to cleanup session storage keys:', sessionCleanupError)
         }
         
         // Clear localStorage keys
@@ -498,21 +456,15 @@ export function emergencyCleanup(): void {
             try {
               localStorage.removeItem(key)
             } catch (removeError) {
-              console.debug('[AuthEventStorage] Failed to remove local key:', key, removeError)
             }
           })
-          console.log('[AuthEventStorage] Cleared passkey-related storage keys:', keysToRemove.length + localKeysToRemove.length)
         } catch (localCleanupError) {
-          console.warn('[AuthEventStorage] Failed to cleanup localStorage keys:', localCleanupError)
         }
       }
     } catch (storageCleanupError) {
-      console.warn('[AuthEventStorage] Failed to cleanup storage keys:', storageCleanupError)
     }
     
-    console.log('[AuthEventStorage] Emergency cleanup completed')
   } catch (error) {
-    console.error('[AuthEventStorage] Error during emergency cleanup:', error)
   }
 }
 
@@ -529,7 +481,6 @@ export function validateAndCleanupStorage(): boolean {
         sessionStorage.removeItem(testKey)
       }
     } catch (sessionTestError) {
-      console.warn('[AuthEventStorage] SessionStorage access test failed:', sessionTestError)
       return false
     }
     
@@ -541,7 +492,6 @@ export function validateAndCleanupStorage(): boolean {
         localStorage.removeItem(testKey)
       }
     } catch (localTestError) {
-      console.warn('[AuthEventStorage] LocalStorage access test failed:', localTestError)
       return false
     }
     
@@ -558,13 +508,11 @@ export function validateAndCleanupStorage(): boolean {
     })
     
     if (hasCorruptedEvents) {
-      console.warn('[AuthEventStorage] Corrupted events detected, performing cleanup')
       cleanupExpiredEvents()
     }
     
     return true
   } catch (error) {
-    console.error('[AuthEventStorage] Storage validation failed:', error)
     return false
   }
 }

@@ -41,14 +41,12 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
   }, []);
   
   useEffect(() => {
-    console.log("SVGShaderCanvas initializing with URL:", svgUrl);
     
     // Create image element
     const img = new Image();
     img.crossOrigin = 'anonymous';
     
     img.onload = () => {
-      console.log("SVG image loaded successfully:", img.width, "x", img.height);
       imgRef.current = img;
       
       // Use the actual dimensions of the loaded SVG
@@ -61,7 +59,6 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
     };
     
     img.onerror = (e) => {
-      console.error('Error loading SVG:', e);
       setRenderInfo(prev => ({...prev, error: 'Failed to load SVG image: ' + e}));
     };
     
@@ -76,11 +73,9 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
   
   useEffect(() => {
     if (!svgLoaded || !imgRef.current || !canvasRef.current) {
-      console.log("Not ready to render:", { svgLoaded, hasImgRef: !!imgRef.current, hasCanvasRef: !!canvasRef.current });
       return;
     }
     
-    console.log("Setting up WebGL context");
     const canvas = canvasRef.current;
     const gl = canvas.getContext('webgl', { 
       premultipliedAlpha: false,
@@ -90,7 +85,6 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
     });
     
     if (!gl) {
-      console.error('WebGL not supported');
       setRenderInfo(prev => ({...prev, error: 'WebGL context creation failed'}));
       return;
     }
@@ -107,7 +101,6 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
     const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, svgLineFragmentShaderSource);
     
     if (!vertexShader || !fragmentShader) {
-      console.error("Failed to create shaders");
       setRenderInfo(prev => ({...prev, error: 'Shader compilation failed'}));
       return;
     }
@@ -116,12 +109,10 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
     const program = createProgram(gl, vertexShader, fragmentShader);
     
     if (!program) {
-      console.error("Failed to create program");
       setRenderInfo(prev => ({...prev, error: 'Shader program creation failed'}));
       return;
     }
     
-    console.log("WebGL program created successfully");
     
     // Set up vertex attribute and uniforms
     const positionAttributeLocation = gl.getAttribLocation(program, 'a_pos');
@@ -167,7 +158,6 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
     canvas.height = dimensions.height;
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     
-    console.log("Canvas size set to:", canvas.width, "x", canvas.height);
     
     // Start time for animation
     const startTime = performance.now();
@@ -213,7 +203,6 @@ const SVGShaderCanvas: React.FC<SVGShaderCanvasProps> = ({
       requestRef.current = requestAnimationFrame(render);
     };
     
-    console.log("Starting render loop");
     render();
     
     return () => {

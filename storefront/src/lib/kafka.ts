@@ -34,11 +34,9 @@ export async function kafkaEmit(topic: string, payload: EventPayload): Promise<v
     await producer.disconnect()
   } catch (error: any) {
     // Log the error but don't throw - this prevents Kafka issues from breaking the app
-    console.warn(`[Kafka] Failed to emit event to topic "${topic}":`, error.message)
     
     // If it's a connection error, disable Kafka for this session to prevent spam
     if (error.message?.includes('ENOTFOUND') || error.message?.includes('Connection timeout')) {
-      console.warn('[Kafka] Disabling Kafka for this session due to connection issues')
       kafkaDisabled = true
       producerReady = false
     }

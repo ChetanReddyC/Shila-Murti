@@ -210,10 +210,7 @@ export class MedusaApiClient {
     this.defaultSalesChannelId = config.defaultSalesChannelId || process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID || '';
     
     if (!this.publishableApiKey) {
-      console.error('[MedusaApiClient] No publishable API key provided. Please add NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY to your .env.local file.');
-      console.error('[MedusaApiClient] You can get this key from your Medusa admin dashboard at http://localhost:9000/app → Settings → API Key Management');
     } else {
-      console.log('[MedusaApiClient] Using publishable key (present). Base URL:', this.baseUrl)
     }
     // Note: We do NOT force-append sales_channel_id to requests by default, as some endpoints
     // may not recognize it depending on Medusa version/plugins. We rely primarily on the
@@ -341,14 +338,11 @@ export class MedusaApiClient {
     };
 
     if (logLevel === 'info') {
-      console.log(`[MedusaApiClient] ${logMessage}`, logData);
     } else {
-      console.warn(`[MedusaApiClient] ${logMessage}`, logData);
     }
 
     // Log performance warnings
     if (metrics.duration > 3000) {
-      console.warn(`[MedusaApiClient] Slow API response detected: ${metrics.endpoint} took ${metrics.duration}ms`);
     }
   }
 
@@ -435,14 +429,11 @@ export class MedusaApiClient {
               const errorText = await response.text().catch(() => '');
               let errorData: any = {}
               try { errorData = errorText ? JSON.parse(errorText) : {} } catch {}
-              console.error('[MedusaApiClient] API Error Response Body:', errorText || errorData);
               if (response.status === 401 || response.status === 403) {
-                console.warn('[MedusaApiClient] Auth-like failure. Ensure x-publishable-api-key is valid and linked to the sales channel.')
               }
               try {
                 const message = (errorData && typeof errorData.message === 'string') ? errorData.message : String(errorText || '')
                 if (message && message.toLowerCase().includes('publishable key') && message.toLowerCase().includes('sales channel')) {
-                  console.error('[MedusaApiClient] Hint: In Medusa Admin, open Settings → API Key Management → your publishable key, and assign at least one Sales Channel. Optionally set NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID in .env.local to hint the UI.')
                 }
               } catch {}
               const apiError = new ApiError(
@@ -556,8 +547,6 @@ export class MedusaApiClient {
 
     const endpoint = `/store/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    console.log('[MedusaApiClient] Fetching products with params:', params);
-    console.log('[MedusaApiClient] Final endpoint:', endpoint);
     
     return this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
   }
@@ -570,8 +559,6 @@ export class MedusaApiClient {
     // Do not append sales_channel_id here; not all deployments accept this on categories.
 
     const endpoint = `/store/product-categories${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    console.log('[MedusaApiClient] Fetching product categories with params:', params);
-    console.log('[MedusaApiClient] Final endpoint:', endpoint);
     return this.makeRequestWithRetry<MedusaProductCategoriesResponse>(endpoint);
   }
 
@@ -599,7 +586,6 @@ export class MedusaApiClient {
           finalPayload.region_id = indiaRegion.id;
         }
       } catch (e) {
-        console.error('[MedusaApiClient] Failed to getIndiaRegion', e);
       }
     }
 
@@ -627,7 +613,6 @@ export class MedusaApiClient {
     
     const endpoint = `/store/carts/${cartId}?${queryParams.toString()}`;
     
-    console.log('[MedusaApiClient] Fetching cart:', cartId);
     
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint);
@@ -643,7 +628,6 @@ export class MedusaApiClient {
   async addLineItem(cartId: string, payload: AddLineItemPayload): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}/line-items`;
     
-    console.log('[MedusaApiClient] Adding line item to cart:', cartId, payload);
     
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
@@ -668,7 +652,6 @@ export class MedusaApiClient {
   async updateLineItem(cartId: string, lineItemId: string, payload: UpdateLineItemPayload): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}/line-items/${lineItemId}`;
     
-    console.log('[MedusaApiClient] Updating line item:', cartId, lineItemId, payload);
     
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
@@ -693,7 +676,6 @@ export class MedusaApiClient {
   async removeLineItem(cartId: string, lineItemId: string): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}/line-items/${lineItemId}`;
     
-    console.log('[MedusaApiClient] Removing line item:', cartId, lineItemId);
     
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
@@ -722,13 +704,11 @@ export class MedusaApiClient {
       );
       
       if (!indiaRegion) {
-        console.warn('[MedusaApiClient] India & International region not found, using first available region');
         return regionsResponse.regions[0] || null;
       }
       
       return indiaRegion;
     } catch (error) {
-      console.error('[MedusaApiClient] Failed to fetch regions:', error);
       return null;
     }
   }
@@ -762,11 +742,6 @@ export class MedusaApiClient {
   /** Update cart details: email, shipping/billing address */
   async updateCart(cartId: string, payload: UpdateCartPayload): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}`;
-    console.log('[MedusaApiClient] Updating cart:', cartId, {
-      hasEmail: !!payload.email,
-      hasShippingAddress: !!payload.shipping_address,
-      hasBillingAddress: !!payload.billing_address
-    });
     const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -776,7 +751,6 @@ export class MedusaApiClient {
 
   /** Associate customer with cart using storefront API (Medusa v2 compatible) */
   async associateCustomerWithCart(cartId: string, customerId: string): Promise<void> {
-    console.log('[MedusaApiClient] Associating customer with cart:', { cartId, customerId });
     
     try {
       // Use the storefront customer sync API to ensure customer association before completion
@@ -793,9 +767,7 @@ export class MedusaApiClient {
         throw new Error(`Customer association failed: ${response.status} ${errorText}`);
       }
       
-      console.log('[MedusaApiClient] Customer successfully associated with cart');
     } catch (error: any) {
-      console.error('[MedusaApiClient] Customer association error:', error);
       // Don't throw - this is a best-effort optimization
       // The customer sync after order creation will handle this
     }
@@ -805,7 +777,6 @@ export class MedusaApiClient {
   async getShippingOptionsForCart(cartId: string): Promise<ShippingOption[]> {
     // Request all fields to ensure profile_id is included for grouping per profile
     const endpoint = `/store/shipping-options?cart_id=${encodeURIComponent(cartId)}&fields=*`;
-    console.log('[MedusaApiClient] Fetching shipping options for cart:', cartId);
     const response = await this.makeRequestWithRetry<ShippingOptionsResponse>(endpoint);
     return response.shipping_options || [];
   }
@@ -813,7 +784,6 @@ export class MedusaApiClient {
   /** Add a shipping method to the cart using the selected option id */
   async addShippingMethod(cartId: string, optionId: string): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}/shipping-methods`;
-    console.log('[MedusaApiClient] Adding shipping method:', { cartId, optionId });
     const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
       method: 'POST',
       body: JSON.stringify({ option_id: optionId }),
@@ -824,7 +794,6 @@ export class MedusaApiClient {
   /** Create payment sessions for the cart */
   async createPaymentSessions(cartId: string): Promise<MedusaCart> {
     // Medusa v2.8+: Use Payment Collections instead of legacy cart payment-sessions
-    console.log('[MedusaApiClient] [v2.8] Creating payment collection + sessions for cart:', cartId)
 
     // 1) Create or fetch the payment collection for this cart
     const createPcEndpoint = `/store/payment-collections`
@@ -851,14 +820,12 @@ export class MedusaApiClient {
   async selectPaymentSession(cartId: string, providerId: string): Promise<MedusaCart> {
     // In v2 payment collections flow, provider selection happens when creating sessions.
     // We keep this method for backwards compatibility and simply return the cart.
-    console.log('[MedusaApiClient] [v2.8] selectPaymentSession is a no-op; sessions were created with provider during payment-collections step', { cartId, providerId })
     return this.getCart(cartId)
   }
 
   /** Complete the cart and expect an order in response */
   async completeCart(cartId: string): Promise<CompleteCartResponse> {
     const endpoint = `/store/carts/${cartId}/complete`;
-    console.log('[MedusaApiClient] Completing cart:', cartId);
     const response = await this.makeRequestWithRetry<CompleteCartResponse>(endpoint, {
       method: 'POST',
     });
@@ -870,7 +837,6 @@ export class MedusaApiClient {
     // Request expanded fields so the order confirmation page can render
     // shipping address, shipping methods and items reliably.
     const endpoint = `/store/orders/${orderId}?fields=*shipping_address,*shipping_methods,*items,*items.variant,*items.variant.product`;
-    console.log('[MedusaApiClient] Fetching order:', orderId);
     const response = await this.makeRequestWithRetry<OrderResponse>(endpoint);
     return response.order;
   }

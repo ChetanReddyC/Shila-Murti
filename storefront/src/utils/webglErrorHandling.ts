@@ -52,7 +52,6 @@ export class WebGLErrorHandler {
     this.errors.push(errorInfo);
     
     // Log the error to the console
-    console.error(`WebGL Error (${type}): ${message}`, originalError || '');
     
     // Notify all error listeners
     this.errorListeners.forEach(listener => listener(errorInfo));

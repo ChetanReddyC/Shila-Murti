@@ -16,6 +16,7 @@
     "build": "medusa build",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "seed:stone-idols": "medusa exec ./src/scripts/stone-idol-seed.ts",
+    "reconcile:orders": "medusa exec ./src/scripts/reconcile-orders-customer-link.ts --",
     "start": "medusa start",
     "dev": "medusa develop",
     "test:integration:http": "TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",

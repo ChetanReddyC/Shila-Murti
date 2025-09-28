@@ -41,12 +41,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (!data?.otpHash || !foundKey) {
-    console.warn('[OTP VERIFY] No matching key found', { candidateKeys })
     return new Response(JSON.stringify({ ok: false, error: 'expired_or_missing', debug: { keysTried: candidateKeys } }), { status: 400 })
   }
   const ok = await bcrypt.compare(code, data.otpHash)
   if (!ok) {
-    console.warn('[OTP VERIFY] Invalid code for key', { key: foundKey })
     return new Response(JSON.stringify({ ok: false, error: 'invalid_code' }), { status: 400 })
   }
 

@@ -80,11 +80,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
     setCanvasRect({ left, top, width, height });
     if (isDebug) {
       // eslint-disable-next-line no-console
-      console.log('[HoverOverlay] beginHover', {
-        title: cardElement.getAttribute('data-card-title') || null,
-        left, top, width, height,
-        dpr: devicePixelRatioRef.current,
-      });
     }
   }, [getContainerRect]);
 
@@ -117,7 +112,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
         } catch (e) {
           if (isDebug) {
             // eslint-disable-next-line no-console
-            console.warn('[HoverEffectOverlay] Failed to host canvas in card', e);
           }
         }
       }
@@ -136,7 +130,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
       pointerRef.current = null;
       if (isDebug) {
         // eslint-disable-next-line no-console
-        console.log('[HoverOverlay] endHover');
       }
       // Return canvas to overlay root to avoid leaving DOM inside card
       const canvas = canvasRef.current;
@@ -148,7 +141,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
         } catch (e) {
           if (isDebug) {
             // eslint-disable-next-line no-console
-            console.warn('[HoverEffectOverlay] Failed to unhost canvas', e);
           }
         }
       }
@@ -171,7 +163,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
         setWebglSupported(false);
         if (isDebug) {
           // eslint-disable-next-line no-console
-          console.warn('[HoverEffectOverlay] WebGL not supported, falling back to no effects');
         }
         return;
       }
@@ -186,7 +177,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
       if (!positionBuffer) {
         if (isDebug) {
           // eslint-disable-next-line no-console
-          console.warn('[HoverEffectOverlay] Failed to create position buffer');
         }
         return;
       }
@@ -255,9 +245,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
       gl.clear(gl.COLOR_BUFFER_BIT);
       if (isDebug) {
         // eslint-disable-next-line no-console
-        console.info('[HoverEffectOverlay] WebGL initialized', {
-          maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
-        });
       }
 
       // Prewarm: draw a tiny frame with zero intensity to avoid first-hover jank
@@ -285,13 +272,11 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
           prewarmedRef.current = true;
           if (isDebug) {
             // eslint-disable-next-line no-console
-            console.info('[HoverEffectOverlay] Prewarm complete');
           }
         }
       } catch (e) {
         if (isDebug) {
           // eslint-disable-next-line no-console
-          console.warn('[HoverEffectOverlay] Prewarm failed', e);
         }
       }
     };
@@ -301,7 +286,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
       e.preventDefault();
       if (isDebug) {
         // eslint-disable-next-line no-console
-        console.warn('[HoverEffectOverlay] WebGL context lost');
       }
       glRef.current = null;
       mainProgramRef.current = null;
@@ -311,7 +295,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
     const handleContextRestored = () => {
       if (isDebug) {
         // eslint-disable-next-line no-console
-        console.info('[HoverEffectOverlay] WebGL context restored');
       }
       initWebGL();
       // After restore, sizing will be reapplied by the size effect below
@@ -373,7 +356,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
     gl.clear(gl.COLOR_BUFFER_BIT);
     if (isDebug) {
       // eslint-disable-next-line no-console
-      console.log('[HoverEffectOverlay] resize', { width: targetWidth, height: targetHeight });
     }
   }, [canvasRect]);
 
@@ -385,7 +367,6 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
       setCanvasRect(prev => (prev ? { ...prev } : prev));
       if (isDebug) {
         // eslint-disable-next-line no-console
-        console.log('[HoverEffectOverlay] DPR change', { dpr: devicePixelRatioRef.current });
       }
     };
     window.addEventListener('resize', handleWindowResize);

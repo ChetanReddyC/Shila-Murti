@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server'
+import { storeFetch } from '@/lib/medusaServer'
 
 export const runtime = 'nodejs'
 
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const { cartId, customerId } = body
+    try { console.log('[ASSOC_API][start]', { cartId, customerId }) } catch {}
     
     // Validate required parameters
     if (!cartId || typeof cartId !== 'string') {
@@ -31,39 +33,22 @@ export async function POST(req: NextRequest) {
       }), { status: 400 })
     }
     
-    console.log('[CustomerAssociate] Associating customer with cart:', { cartId, customerId })
     
     // Backend configuration
     const BACKEND_URL = process.env.MEDUSA_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
-    const ADMIN_TOKEN = process.env.MEDUSA_ADMIN_TOKEN || ''
-    
-    if (!ADMIN_TOKEN) {
-      console.warn('[CustomerAssociate] No admin token available, skipping direct association')
-      return new Response(JSON.stringify({
-        ok: true,
-        message: 'Customer association will be handled during checkout sync',
-        skipped: true
-      }), { status: 200 })
-    }
     
     try {
-      // Use Medusa admin API to update cart with customer
-      const response = await fetch(`${BACKEND_URL}/admin/carts/${cartId}`, {
+      // Prefer secure server-side association via backend route (no token in Next runtime required)
+      const response = await storeFetch(`/store/custom/associate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-medusa-access-token': ADMIN_TOKEN
-        },
-        body: JSON.stringify({
-          customer_id: customerId
-        }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cart_id: cartId, customer_id: customerId }),
       })
       
       const responseText = await response.text().catch(() => '')
       
       if (response.ok) {
-        console.log('[CustomerAssociate] Successfully associated customer with cart')
+        try { console.log('[ASSOC_API][ok]', { cartId, customerId }) } catch {}
         return new Response(JSON.stringify({
           ok: true,
           message: 'Customer successfully associated with cart',
@@ -71,10 +56,7 @@ export async function POST(req: NextRequest) {
           customerId
         }), { status: 200 })
       } else {
-        console.warn('[CustomerAssociate] Admin API association failed:', {
-          status: response.status,
-          response: responseText
-        })
+        try { console.log('[ASSOC_API][fallback]', { cartId, customerId, status: response.status, body: responseText }) } catch {}
         
         // Don't fail the checkout - let the sync handle it
         return new Response(JSON.stringify({
@@ -86,8 +68,7 @@ export async function POST(req: NextRequest) {
       }
       
     } catch (error: any) {
-      console.warn('[CustomerAssociate] Admin API error:', error.message)
-      
+      try { console.log('[ASSOC_API][error]', { cartId, customerId, error: error?.message }) } catch {}
       // Don't fail the checkout - let the sync handle it
       return new Response(JSON.stringify({
         ok: true,
@@ -98,7 +79,6 @@ export async function POST(req: NextRequest) {
     }
     
   } catch (error: any) {
-    console.error('[CustomerAssociate] Request processing error:', error)
     
     return new Response(JSON.stringify({
       ok: false,

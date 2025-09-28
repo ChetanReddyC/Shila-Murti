@@ -77,7 +77,6 @@ export default function ProductsPage() {
       if (isMountedRef.current) {
         const serviceError = err as ProductsServiceError;
         updateState({ error: serviceError, loading: false });
-        console.error('Failed to fetch products:', serviceError);
       }
     }
   }, [updateState, reset]);
@@ -120,12 +119,10 @@ export default function ProductsPage() {
     // Make debug function available in browser console
     if (typeof window !== 'undefined') {
       (window as any).debugMedusaApi = debugMedusaApiResponse;
-      console.log('🔧 Debug functions: window.debugMedusaApi(), window.debugCategoryFilterStatus()');
       
       // Also make shader test available
       import('../../utils/testShaderCompilation').then(({ testShaderCompilation }) => {
         (window as any).testShaderCompilation = testShaderCompilation;
-        console.log('🔧 Shader test function available: window.testShaderCompilation()');
       });
     }
     
@@ -144,13 +141,11 @@ export default function ProductsPage() {
       await retry(fetchProducts);
     } catch (err) {
       // Error is already handled in fetchProducts
-      console.error('Retry failed:', err);
     }
   }, [retry, fetchProducts, canRetry]);
 
   // Error boundary error handler - memoized to prevent re-renders
   const handleErrorBoundaryError = useCallback((error: Error, errorInfo: any) => {
-    console.error('ErrorBoundary caught an error in ProductsPage:', error, errorInfo);
     
     // You could send this to an error reporting service
     // errorReportingService.captureException(error, { extra: errorInfo });
@@ -188,7 +183,6 @@ export default function ProductsPage() {
         }));
         if (!cancelled) setAllCategories(list);
       } catch (e) {
-        console.warn('[ProductsPage] Failed to fetch categories list', e);
       }
     })();
     return () => { cancelled = true; };
@@ -252,7 +246,6 @@ export default function ProductsPage() {
       try {
         setPendingFetch(true);
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[ProductsPage] Selected categories:', Array.from(selectedCategories.values()));
         }
         const t0 = performance.now();
         const version = ++fetchVersionRef.current;
@@ -273,13 +266,11 @@ export default function ProductsPage() {
           const t1 = performance.now();
           const took = Math.round(t1 - t0);
           setLastCategoryFetchMs(took);
-          console.log('[ProductsPage] Category fetch completed in', took, 'ms');
         }
       } catch (err) {
         if (isMountedRef.current) {
           const serviceError = err as ProductsServiceError;
           updateState({ error: serviceError, loading: false });
-          console.error('Failed to fetch products by categories:', serviceError);
         }
       } finally {
         setPendingFetch(false);

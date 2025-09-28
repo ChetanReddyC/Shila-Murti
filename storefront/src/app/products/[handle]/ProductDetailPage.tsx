@@ -181,7 +181,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         }
       } catch (handleError) {
         // If handle-based fetch fails, fall back to searching all products
-        console.log('Handle-based fetch failed, falling back to search:', handleError);
 
         const allProducts = await productsService.fetchProducts();
         const matchingProduct = allProducts.find(p => {
@@ -200,7 +199,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         try {
           rawProduct = await medusaApiClient.getProduct(matchingProduct.id);
         } catch (rawError) {
-          console.warn('Failed to fetch raw product data:', rawError);
         }
 
         if (isMountedRef.current) {
@@ -227,7 +225,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         }
 
         updateState({ error: serviceError, loading: false });
-        console.error('Failed to fetch product:', serviceError);
       }
     }
   }, [handle, updateState, reset]);
@@ -240,7 +237,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       await retry(fetchProductByHandle);
     } catch (err) {
       // Error is already handled in fetchProductByHandle
-      console.error('Retry failed:', err);
     }
   }, [retry, fetchProductByHandle, canRetry]);
 
@@ -357,7 +353,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       }, 3000);
 
     } catch (error) {
-      console.error('Failed to add to cart:', error);
       
       // Handle specific error types
       let errorMessage = 'Failed to add item to cart. Please try again.';
@@ -401,7 +396,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   // Error boundary error handler
   const handleErrorBoundaryError = useCallback((error: Error, errorInfo: any) => {
-    console.error('ErrorBoundary caught an error in ProductDetailPage:', error, errorInfo);
   }, []);
 
   // Effect to resolve params

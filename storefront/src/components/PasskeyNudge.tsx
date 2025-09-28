@@ -100,22 +100,18 @@ class PasskeyNudgeLogger {
 
   debug(category: string, message: string, data?: any) {
     if (!DEBUG_CONFIG.enabled) return
-    console.debug(this.formatMessage('DEBUG', category, message, data))
   }
 
   info(category: string, message: string, data?: any) {
     if (!DEBUG_CONFIG.enabled) return
-    console.info(this.formatMessage('INFO', category, message, data))
   }
 
   warn(category: string, message: string, data?: any) {
     if (!DEBUG_CONFIG.enabled) return
-    console.warn(this.formatMessage('WARN', category, message, data))
   }
 
   error(category: string, message: string, data?: any) {
     if (!DEBUG_CONFIG.enabled) return
-    console.error(this.formatMessage('ERROR', category, message, data))
   }
 
   // Performance monitoring methods
@@ -426,7 +422,6 @@ export default function PasskeyNudge() {
     try {
       return getUserIdentifierFromSession(session)
     } catch (error) {
-      console.warn('[PasskeyNudge] Error getting user identifier:', error)
       return null
     }
   }
@@ -436,7 +431,6 @@ export default function PasskeyNudge() {
     try {
       return getOriginalIdentifierFromSession(session)
     } catch (error) {
-      console.warn('[PasskeyNudge] Error getting original identifier:', error)
       return null
     }
   }
@@ -446,7 +440,6 @@ export default function PasskeyNudge() {
     try {
       return utilGetCustomerIdFromSession(sessionData)
     } catch (error) {
-      console.warn('[PasskeyNudge] Error getting customerId:', error)
       return null
     }
   }
@@ -474,7 +467,6 @@ export default function PasskeyNudge() {
 
       // Validate session data structure
       if (typeof sessionData !== 'object') {
-        console.warn('[PasskeyNudge] Invalid session data type:', typeof sessionData)
         return { stable: false, reason: 'invalid-session-data' }
       }
 
@@ -488,7 +480,6 @@ export default function PasskeyNudge() {
           sessionData.user.phone
         )
       } catch (userDataError) {
-        console.warn('[PasskeyNudge] Error checking user data:', userDataError)
         return { stable: false, reason: 'user-data-error' }
       }
 
@@ -526,7 +517,6 @@ export default function PasskeyNudge() {
         
           hasNewCustomerId = Boolean(currentCustomerId && !previousCustomerId)
         } catch (customerIdError) {
-          console.warn('[PasskeyNudge] Error checking customerId changes:', customerIdError)
           // Continue without this check
         }
 
@@ -537,13 +527,11 @@ export default function PasskeyNudge() {
           }
         }
       } catch (stabilityCheckError) {
-        console.warn('[PasskeyNudge] Error in additional stability checks:', stabilityCheckError)
         // Continue with basic stability check
       }
 
       return { stable: true, reason: 'session-stable' }
     } catch (error) {
-      console.error('[PasskeyNudge] Error in session stability check:', error)
       return { stable: false, reason: 'stability-check-error' }
     }
   }
@@ -557,7 +545,6 @@ export default function PasskeyNudge() {
 
       // Validate identifier
       if (!identifier || typeof identifier !== 'string') {
-        console.warn('[PasskeyNudge] Invalid identifier for skip check:', identifier)
         return { skip: true, reason: 'invalid-identifier' }
       }
 
@@ -570,14 +557,12 @@ export default function PasskeyNudge() {
             const hasPasskeySession = sessionStorage.getItem('hasPasskey')
             // If session indicates no passkey, then user has removed it from device
             if (hasPasskeySession === 'false' || hasPasskeySession === null) {
-              console.log('[PasskeyNudge] Passkey policy exists but device has no passkey, showing nudge for:', identifier)
               // Don't skip - show the nudge to allow re-registration
             } else {
               return { skip: true, reason: 'user-has-passkey' }
             }
           }
         } catch (sessionError) {
-          console.warn('[PasskeyNudge] Error checking sessionStorage for passkey status:', sessionError)
           // Continue with policy check only
           return { skip: true, reason: 'user-has-passkey' }
         }
@@ -588,12 +573,10 @@ export default function PasskeyNudge() {
       try {
         stabilityCheck = isSessionStable(sessionData || session)
       } catch (stabilityError) {
-        console.warn('[PasskeyNudge] Error in stability check:', stabilityError)
         return { skip: true, reason: 'stability-check-failed' }
       }
       
       if (!stabilityCheck.stable) {
-        console.log('[PasskeyNudge] Session not stable, skipping nudge:', stabilityCheck.reason)
         return { skip: true, reason: stabilityCheck.reason }
       }
 
@@ -602,7 +585,6 @@ export default function PasskeyNudge() {
       try {
         recentEvent = getRecentAuthEvent(identifier)
       } catch (eventError) {
-        console.warn('[PasskeyNudge] Error getting recent auth event:', eventError)
         // Continue without recent event check
       }
 
@@ -611,9 +593,7 @@ export default function PasskeyNudge() {
         if (status === 'authenticated' && sessionData) {
           // Allow showing nudge for authenticated sessions even without recent events
           // This handles cases where the component mounts after authentication is complete
-          console.log('[PasskeyNudge] No recent auth event, but authenticated session allows nudge')
         } else {
-          console.log('[PasskeyNudge] No recent authentication event and no authenticated session')
           return { skip: true, reason: 'no-authentication-event' }
         }
       } else {
@@ -623,17 +603,14 @@ export default function PasskeyNudge() {
           const maxEventAge = 5 * 60 * 1000 // 5 minutes
           
           if (eventAge > maxEventAge) {
-            console.log('[PasskeyNudge] Authentication event too old:', eventAge)
             return { skip: true, reason: 'authentication-event-expired' }
           }
 
           // Check if event has already been consumed
           if (recentEvent.consumed) {
-            console.log('[PasskeyNudge] Authentication event already consumed')
             return { skip: true, reason: 'authentication-event-consumed' }
           }
         } catch (eventValidationError) {
-          console.warn('[PasskeyNudge] Error validating authentication event:', eventValidationError)
           // Continue with other checks
         }
       }
@@ -648,9 +625,7 @@ export default function PasskeyNudge() {
           tempDismissed = dismissalValue === '1'
         } catch (storageAccessError) {
           if (storageAccessError instanceof DOMException) {
-            console.warn('[PasskeyNudge] SessionStorage access denied for dismissal check:', storageAccessError.message)
           } else {
-            console.warn('[PasskeyNudge] Unexpected error accessing sessionStorage for dismissal:', storageAccessError)
           }
           // Continue without dismissal check - better to show dialog than miss it
         }
@@ -659,7 +634,6 @@ export default function PasskeyNudge() {
           return { skip: true, reason: 'temporarily-dismissed' }
         }
       } catch (dismissalError) {
-        console.warn('[PasskeyNudge] Error in temporary dismissal check:', dismissalError)
         // Continue without dismissal check
       }
 
@@ -672,9 +646,7 @@ export default function PasskeyNudge() {
           lastShown = sessionStorage.getItem(lastShownKey)
         } catch (storageAccessError) {
           if (storageAccessError instanceof DOMException) {
-            console.warn('[PasskeyNudge] SessionStorage access denied for last shown check:', storageAccessError.message)
           } else {
-            console.warn('[PasskeyNudge] Unexpected error accessing sessionStorage for last shown:', storageAccessError)
           }
           // Continue without last shown check - better to show dialog than miss it
         }
@@ -688,31 +660,25 @@ export default function PasskeyNudge() {
                 return { skip: true, reason: 'shown-too-recently' }
               }
             } else {
-              console.warn('[PasskeyNudge] Invalid lastShown timestamp, clearing corrupted data:', lastShown)
               try {
                 sessionStorage.removeItem(lastShownKey)
               } catch (clearError) {
-                console.warn('[PasskeyNudge] Failed to clear corrupted lastShown data:', clearError)
               }
             }
           } catch (parseError) {
-            console.warn('[PasskeyNudge] Failed to parse lastShown timestamp:', parseError)
             // Clear corrupted data
             try {
               sessionStorage.removeItem(lastShownKey)
             } catch (clearError) {
-              console.warn('[PasskeyNudge] Failed to clear corrupted lastShown data:', clearError)
             }
           }
         }
       } catch (lastShownError) {
-        console.warn('[PasskeyNudge] Error in last shown check:', lastShownError)
         // Continue without last shown check
       }
 
       return { skip: false, reason: 'should-show-nudge' }
     } catch (error) {
-      console.error('[PasskeyNudge] Error in shouldSkipNudge:', error)
       return { skip: true, reason: 'skip-check-error' }
     }
   }
@@ -785,12 +751,10 @@ export default function PasskeyNudge() {
       try {
         loginEvent = detectLoginCompletion(previousStatus, currentStatus, currentSession)
       } catch (loginDetectionError) {
-        console.warn('[PasskeyNudge] Error detecting login completion:', loginDetectionError)
         return null
       }
       
       if (loginEvent) {
-        console.log('[PasskeyNudge] Detected login completion event:', loginEvent)
 
         // For first-time authentication, we rely on the detectLoginCompletion function which already
         // checks for existing passkey policies and sets the appropriate event type
@@ -800,7 +764,6 @@ export default function PasskeyNudge() {
 
       return loginEvent
     } catch (error) {
-      console.warn('[PasskeyNudge] Error in first-time authentication detection:', error)
       return null
     }
   }
@@ -907,12 +870,10 @@ export default function PasskeyNudge() {
       try {
         recentEvent = getRecentAuthEvent(identifier)
       } catch (recentEventError) {
-        console.warn('[PasskeyNudge] Error retrieving recent authentication event:', recentEventError)
         // Continue without recent event - may still show dialog based on session state
       }
 
       if (recentEvent && !recentEvent.consumed) {
-        console.log('[PasskeyNudge] Found unconsumed authentication event:', recentEvent.type, 'for identifier:', identifier)
         
         // Check if this is part of a multi-step authentication flow with error handling
         let allRecentEvents: any[] = []
@@ -923,7 +884,6 @@ export default function PasskeyNudge() {
             (Date.now() - event.timestamp) < (2 * 60 * 1000) // Within last 2 minutes
           )
         } catch (storedEventsError) {
-          console.warn('[PasskeyNudge] Error retrieving stored authentication events:', storedEventsError)
           // Fallback to single event handling
           allRecentEvents = [recentEvent]
         }
@@ -935,10 +895,8 @@ export default function PasskeyNudge() {
           const timeSinceLatest = Date.now() - latestEvent.timestamp
           
           if (hasMultipleTypes && timeSinceLatest < TIMING_CONFIG.authEventDelay) {
-            console.log('[PasskeyNudge] Multiple auth events detected, waiting for sequence completion')
             shouldShowNudge = false
           } else {
-            console.log('[PasskeyNudge] Multiple auth events completed, showing nudge')
             consumeEvent = true
           }
         } else {
@@ -950,10 +908,8 @@ export default function PasskeyNudge() {
         // Check if we should show based on session state
         const sessionAge = Date.now() - mountTimestamp.current
         if (sessionAge > TIMING_CONFIG.minTimeBetweenEvaluations) {
-          console.log('[PasskeyNudge] No recent auth event, but session is established - showing nudge')
           shouldShowNudge = true
         } else {
-          console.log('[PasskeyNudge] No recent auth event and recent mount - skipping to prevent duplicates')
           shouldShowNudge = false
         }
       }
@@ -963,9 +919,7 @@ export default function PasskeyNudge() {
         if (consumeEvent && recentEvent) {
           try {
             consumeAuthEvent(identifier, recentEvent.type)
-            console.log('[PasskeyNudge] Consumed authentication event:', recentEvent.type)
           } catch (consumeError) {
-            console.warn('[PasskeyNudge] Error consuming authentication event:', recentEvent.type, consumeError)
             // Continue with showing dialog - consumption failure shouldn't prevent display
           }
         }
@@ -977,7 +931,6 @@ export default function PasskeyNudge() {
         } catch (storageError) {
           if (storageError instanceof DOMException) {
             if (storageError.code === 22 || storageError.name === 'QuotaExceededError') {
-              console.warn('[PasskeyNudge] SessionStorage quota exceeded when recording last shown time')
               // Try to clean up old data and retry
               try {
                 // Import cleanup function dynamically to avoid circular dependencies
@@ -986,28 +939,21 @@ export default function PasskeyNudge() {
                   try {
                     sessionStorage.setItem(lastShownKey, Date.now().toString())
                   } catch (retryError) {
-                    console.warn('[PasskeyNudge] Failed to record last shown time even after cleanup:', retryError)
                   }
                 }).catch(importError => {
-                  console.warn('[PasskeyNudge] Failed to import cleanup function:', importError)
                 })
               } catch (cleanupError) {
-                console.warn('[PasskeyNudge] Failed to cleanup storage for last shown time:', cleanupError)
               }
             } else {
-              console.warn('[PasskeyNudge] SessionStorage access denied when recording last shown time:', storageError.message)
             }
           } else {
-            console.warn('[PasskeyNudge] Unexpected error recording last shown time:', storageError)
           }
           // Continue without recording - this is not critical for functionality
         }
 
         // Show the nudge dialog
-        console.log('[PasskeyNudge] Showing passkey nudge dialog for:', identifier)
         setShow(true)
       } else {
-        console.log('[PasskeyNudge] Delaying nudge display due to authentication sequence')
         setShow(false)
       }
 
@@ -1168,7 +1114,6 @@ export default function PasskeyNudge() {
         
         // If they don't have an existing policy, this might be a first-time login
         if (!hasExistingPolicy) {
-          console.log('[PasskeyNudge] First-time user detected on component mount:', identifier)
           // Evaluate nudge display with a small delay to allow session to stabilize
           evaluateNudgeDisplay(TIMING_CONFIG.remountDelay, 'first-time-user-mount')
         } else {
@@ -1176,7 +1121,6 @@ export default function PasskeyNudge() {
           try {
             const recentEvent = getRecentAuthEvent(identifier)
             if (recentEvent) {
-              console.log('[PasskeyNudge] Found recent authentication event on mount:', recentEvent.type)
               setSessionTracking(prev => ({
                 ...prev,
                 lastAuthEvent: {
@@ -1191,11 +1135,9 @@ export default function PasskeyNudge() {
             } else {
               // For returning users with existing policies, check if we should still show the nudge
               // This handles cases where the user might want to register additional passkeys
-              console.log('[PasskeyNudge] No recent auth event found on mount for returning user:', identifier)
               // We won't show the nudge for returning users in this case
             }
           } catch (recentEventError) {
-            console.warn('[PasskeyNudge] Error retrieving recent authentication event:', recentEventError)
             // Continue without recent event - component will still function
           }
         }
@@ -1209,7 +1151,6 @@ export default function PasskeyNudge() {
   useEffect(() => {
     // Perform initial cleanup and validation on component mount
     try {
-      console.log('[PasskeyNudge] Component mounting, performing initial cleanup')
       
       // Import cleanup functions
       import('../utils/authEventStorage').then(({ cleanupExpiredEvents, validateAndCleanupStorage }) => {
@@ -1217,23 +1158,18 @@ export default function PasskeyNudge() {
           // Validate storage health and cleanup if needed
           const storageHealthy = validateAndCleanupStorage()
           if (!storageHealthy) {
-            console.warn('[PasskeyNudge] Storage validation failed, some features may be limited')
           }
           
           // Clean up any expired events from previous sessions
           cleanupExpiredEvents()
         } catch (cleanupError) {
-          console.warn('[PasskeyNudge] Error during initial cleanup:', cleanupError)
         }
       }).catch(importError => {
-        console.warn('[PasskeyNudge] Failed to import cleanup utilities:', importError)
       })
     } catch (initError) {
-      console.warn('[PasskeyNudge] Error during component initialization:', initError)
     }
 
     return () => {
-      console.log('[PasskeyNudge] Component unmounting, cleaning up all timers')
       clearAllTimers()
       
       // Also clear any timer in session tracking state
@@ -1241,7 +1177,6 @@ export default function PasskeyNudge() {
         try {
           clearTimeout(sessionTracking.stabilizationTimer)
         } catch (trackingTimerError) {
-          console.warn('[PasskeyNudge] Error clearing tracking timer on unmount:', trackingTimerError)
         }
       }
     }
@@ -1267,7 +1202,6 @@ export default function PasskeyNudge() {
           try {
             const identifier = getUserIdentifier()
             if (identifier && e.key === `passkeyRegistered_${identifier}`) {
-              console.log('[PasskeyNudge] Detected passkey registration in another tab, hiding nudge')
               setShow(false)
 
               // Update our cached policy to reflect the new passkey
@@ -1280,18 +1214,15 @@ export default function PasskeyNudge() {
               try {
                 localStorage.setItem(policyKey, JSON.stringify(cacheData))
               } catch (policyUpdateError) {
-                console.warn('[PasskeyNudge] Failed to update policy cache:', policyUpdateError)
                 // Continue without updating cache
               }
             }
           } catch (registrationError) {
-            console.warn('[PasskeyNudge] Error handling passkey registration event:', registrationError)
           }
         }
 
         // Listen for authentication events from other tabs/components
         if (e.key.startsWith('passkeyNudge_broadcast_')) {
-          console.log('[PasskeyNudge] Detected authentication event broadcast from another tab:', e.key)
 
           try {
             const broadcastData = JSON.parse(e.newValue)
@@ -1299,7 +1230,6 @@ export default function PasskeyNudge() {
             // Validate broadcast data structure
             if (!broadcastData || typeof broadcastData !== 'object' ||
                 !broadcastData.type || !broadcastData.identifier || !broadcastData.timestamp) {
-              console.warn('[PasskeyNudge] Invalid broadcast data structure:', broadcastData)
               return
             }
             
@@ -1313,24 +1243,20 @@ export default function PasskeyNudge() {
             // Store the received authentication event
             try {
               storeAuthenticationEvent(authEvent)
-              console.log('[PasskeyNudge] Stored authentication event from broadcast:', authEvent.type, authEvent.identifier)
 
               // Re-evaluate nudge display with cross-tab event delay
               evaluateNudgeDisplay(TIMING_CONFIG.crossTabEventDelay, 'cross-tab-event')
             } catch (storeError) {
-              console.warn('[PasskeyNudge] Failed to store broadcast authentication event:', storeError)
               // Continue without storing - the event might still trigger evaluation
               evaluateNudgeDisplay(TIMING_CONFIG.crossTabEventDelay, 'cross-tab-event-fallback')
             }
           } catch (broadcastParseError) {
-            console.warn('[PasskeyNudge] Error parsing authentication event broadcast:', broadcastParseError)
           }
         }
 
         // NOTE: We don't listen for dismissal events since dismissal is session-only
         // Each tab should show the prompt independently until passkey is registered
       } catch (storageEventError) {
-        console.warn('[PasskeyNudge] Error handling storage event:', storageEventError)
       }
     }
 
@@ -1339,7 +1265,6 @@ export default function PasskeyNudge() {
         window.addEventListener('storage', handler)
       }
     } catch (listenerError) {
-      console.error('[PasskeyNudge] Failed to add storage event listener:', listenerError)
     }
 
     return () => {
@@ -1348,7 +1273,6 @@ export default function PasskeyNudge() {
           window.removeEventListener('storage', handler)
         }
       } catch (removeListenerError) {
-        console.warn('[PasskeyNudge] Error removing storage event listener:', removeListenerError)
       }
     }
   }, [session, sessionTracking])
@@ -1385,7 +1309,6 @@ export default function PasskeyNudge() {
   const dismissNudge = (identifier: string) => {
     try {
       if (!identifier || typeof identifier !== 'string') {
-        console.warn('[PasskeyNudge] Invalid identifier for dismissal:', identifier)
         setShow(false)
         return
       }
@@ -1394,39 +1317,30 @@ export default function PasskeyNudge() {
       const dismissedKey = `passkeyNudgeDismissed_${identifier}`
       try {
         sessionStorage.setItem(dismissedKey, '1')
-        console.log('[PasskeyNudge] Temporarily dismissed for this session:', identifier)
       } catch (storageError) {
         if (storageError instanceof DOMException) {
           if (storageError.code === 22 || storageError.name === 'QuotaExceededError') {
-            console.warn('[PasskeyNudge] SessionStorage quota exceeded when dismissing nudge')
             // Try to clean up old data and retry
             try {
               import('../utils/authEventStorage').then(({ cleanupExpiredEvents }) => {
                 cleanupExpiredEvents()
                 try {
                   sessionStorage.setItem(dismissedKey, '1')
-                  console.log('[PasskeyNudge] Temporarily dismissed after cleanup:', identifier)
                 } catch (retryError) {
-                  console.warn('[PasskeyNudge] Failed to dismiss even after cleanup:', retryError)
                 }
               }).catch(importError => {
-                console.warn('[PasskeyNudge] Failed to import cleanup function for dismissal:', importError)
               })
             } catch (cleanupError) {
-              console.warn('[PasskeyNudge] Failed to cleanup storage for dismissal:', cleanupError)
             }
           } else {
-            console.warn('[PasskeyNudge] SessionStorage access denied when dismissing nudge:', storageError.message)
           }
         } else {
-          console.warn('[PasskeyNudge] Unexpected error dismissing nudge:', storageError)
         }
         // Continue without storing dismissal - user can still close dialog
       }
       
       setShow(false)
     } catch (error) {
-      console.error('[PasskeyNudge] Error in dismissNudge:', error)
       setShow(false) // Always hide the dialog even if there's an error
     }
   }
@@ -1435,7 +1349,6 @@ export default function PasskeyNudge() {
   const markPasskeyRegistered = (identifier: string) => {
     try {
       if (!identifier || typeof identifier !== 'string') {
-        console.warn('[PasskeyNudge] Invalid identifier for passkey registration:', identifier)
         setShow(false)
         return
       }
@@ -1445,7 +1358,6 @@ export default function PasskeyNudge() {
       try {
         localStorage.setItem(registeredKey, JSON.stringify({ timestamp: Date.now() }))
       } catch (registeredStorageError) {
-        console.warn('[PasskeyNudge] Failed to store registration event:', registeredStorageError)
         // Continue with policy update
       }
 
@@ -1459,7 +1371,6 @@ export default function PasskeyNudge() {
       try {
         localStorage.setItem(policyKey, JSON.stringify(cacheData))
       } catch (policyStorageError) {
-        console.warn('[PasskeyNudge] Failed to store passkey policy:', policyStorageError)
         // Continue even if we can't cache the policy
       }
 
@@ -1474,13 +1385,10 @@ export default function PasskeyNudge() {
           }
         }
       } catch (sessionError) {
-        console.warn('[PasskeyNudge] Failed to update session storage:', sessionError)
       }
 
       setShow(false)
-      console.log('[PasskeyNudge] Marked passkey as registered for identifier:', identifier)
     } catch (error) {
-      console.error('[PasskeyNudge] Error in markPasskeyRegistered:', error)
       setShow(false) // Always hide the dialog even if there's an error
     }
   }

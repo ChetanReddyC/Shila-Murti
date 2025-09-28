@@ -112,13 +112,8 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
   try {
     // 1) Update cart with email and shipping/billing addresses
     currentStep = 'update-cart'
-    console.log('[CheckoutOrchestrator] Updating cart with address/email:', { 
-      cartId, 
-      hasEmail: !!cartUpdate.email,
-      hasShippingAddress: !!cartUpdate.shipping_address,
-      customerId: input.customerId // Log separately for customer sync
-    })
     const updatedCart = await client.updateCart(cartId, cartUpdate)
+    try { console.log('[CHECKOUT][update-cart]', { cartId, email: (cartUpdate as any)?.email, shipping_first_name: (cartUpdate as any)?.shipping_address?.first_name }) } catch {}
     logs.push({ step: 'update-cart', details: { 
       cartId: updatedCart.id,
       hasCustomerForSync: !!input.customerId
@@ -127,19 +122,20 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     // 1.5) Associate customer with cart if available (Medusa v2 optimization)
     if (input.customerId) {
       currentStep = 'associate-customer'
-      console.log('[CheckoutOrchestrator] Attempting customer-cart association:', { cartId, customerId: input.customerId })
+      
       try {
         await client.associateCustomerWithCart(cartId, input.customerId)
+        try { console.log('[CHECKOUT][associate-customer][ok]', { cartId, customerId: input.customerId }) } catch {}
         logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: true } })
       } catch (error: any) {
-        console.warn('[CheckoutOrchestrator] Customer association failed (non-blocking):', error.message)
+        try { console.log('[CHECKOUT][associate-customer][fail]', { cartId, customerId: input.customerId, error: error?.message || String(error) }) } catch {}
         logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: false, error: error.message } })
       }
     }
 
     // 2) Fetch shipping options and select one (per profile)
     currentStep = 'fetch-shipping-options'
-    console.log('[CheckoutOrchestrator] Fetching shipping options', { cartId })
+    
     const options = await client.getShippingOptionsForCart(cartId)
     logs.push({ step: 'fetch-shipping-options', details: { count: options.length } })
 
@@ -180,7 +176,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
       }
 
       if (!chosen) continue
-      console.log('[CheckoutOrchestrator] Adding shipping method', { cartId, profileId, optionId: chosen.id, amount: (chosen as any).amount })
+      
       await client.addShippingMethod(cartId, chosen.id)
       added.push({ profile: profileId, optionId: chosen.id })
     }
@@ -212,7 +208,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         const candidates = remainingOptions.filter((o: any) => String((o as any).shipping_profile_id || (o as any).profile_id) === String(target))
         const pick = selectCheapestOption(candidates as any)
         if (pick) {
-          console.log('[CheckoutOrchestrator] Adding missing shipping method for item profile', { cartId, profileId: target, optionId: pick.id })
+          
           await client.addShippingMethod(cartId, pick.id)
           added.push({ profile: target, optionId: pick.id })
         }
@@ -222,22 +218,22 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
     // 3) Initialize and select payment session (manual)
     currentStep = 'create-payment-sessions'
-    console.log('[CheckoutOrchestrator] Creating payment sessions', { cartId, ts: new Date().toISOString() })
+    
     const cartWithSessions = await client.createPaymentSessions(cartId)
     logs.push({ step: 'create-payment-sessions', details: { sessions: cartWithSessions.payment_sessions?.length ?? 0 } })
 
     if (useManual) {
       currentStep = 'select-payment-session'
       const providerId = MedusaApiClient.MANUAL_PAYMENT_PROVIDER_ID
-      console.log('[CheckoutOrchestrator] Selecting payment session', { cartId, providerId, ts: new Date().toISOString() })
+      
       const cartWithSelected = await client.selectPaymentSession(cartId, providerId)
       logs.push({ step: 'select-payment-session', details: { providerId, selected: true } })
     }
 
     // 4) Complete the cart
     currentStep = 'complete-cart'
-    console.log('[CheckoutOrchestrator] Completing cart', { cartId, ts: new Date().toISOString() })
     const completion: CompleteCartResponse = await client.completeCart(cartId)
+    try { console.log('[CHECKOUT][complete-cart][response]', { cartId, hasOrder: Boolean((completion as any)?.order), hasCart: Boolean((completion as any)?.cart) }) } catch {}
     logs.push({ step: 'complete-cart', details: { type: completion.type } })
 
     if (!completion.order) {
@@ -255,11 +251,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     // NEW: Customer profile sync after successful order creation
     if (order && input.customerId && input.checkoutFormData) {
       try {
-        console.log('[CheckoutOrchestrator] Starting customer profile sync:', {
-          customerId: input.customerId,
-          cartId: input.cartId,
-          hasFormData: !!input.checkoutFormData
-        })
+        
         
         // Enhanced sync with timeout and retry logic
         const syncController = new AbortController()
@@ -271,6 +263,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           body: JSON.stringify({
             customerId: input.customerId,
             cartId: input.cartId,
+            orderId: order.id,
             formData: input.checkoutFormData,
             orderCreated: true,
             whatsapp_authenticated: input.identityMethod === 'phone', // Only WhatsApp/phone authentication
@@ -281,6 +274,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         })
         
         clearTimeout(syncTimeout)
+        try { console.log('[CHECKOUT][sync][status]', { status: syncResult.status }) } catch {}
         
         const syncResponse = await syncResult.text()
         let parsedResponse = null
@@ -291,11 +285,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           parsedResponse = { error: 'invalid_response', rawResponse: syncResponse }
         }
         
-        console.log('[CheckoutOrchestrator] Customer sync response:', {
-          ok: syncResult.ok,
-          status: syncResult.status,
-          response: parsedResponse
-        })
+        
         
         if (syncResult.ok && parsedResponse?.ok) {
           logs.push({ 
@@ -306,18 +296,13 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
               attempts: parsedResponse.attempts || 1
             } 
           })
-          console.log('[CheckoutOrchestrator] Customer profile sync completed successfully')
+          try { console.log('[CHECKOUT][sync][ok]', { customerId: input.customerId, attempts: parsedResponse.attempts || 1 }) } catch {}
         } else {
           // Enhanced error categorization
           const errorType = parsedResponse?.error || 'unknown_error'
           const errorMessage = parsedResponse?.message || syncResponse || 'Unknown sync error'
           
-          console.warn('[CheckoutOrchestrator] Customer sync failed (non-blocking):', {
-            status: syncResult.status,
-            errorType,
-            errorMessage,
-            customerId: input.customerId
-          })
+          
           
           logs.push({ 
             step: 'customer-profile-sync-failed', 
@@ -329,17 +314,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
               recoverable: errorType !== 'customer_not_found' && errorType !== 'invalid_request'
             } 
           })
-          
-          // Log specific error metrics
-          if (errorType === 'timeout') {
-            console.info('[Metrics] customer_sync_timeout_total++')
-          } else if (errorType === 'customer_not_found') {
-            console.info('[Metrics] customer_sync_not_found_total++')
-          } else if (errorType === 'configuration_error') {
-            console.info('[Metrics] customer_sync_config_error_total++')
-          } else {
-            console.info('[Metrics] customer_sync_other_error_total++')
-          }
+          try { console.log('[CHECKOUT][sync][fail]', { customerId: input.customerId, status: syncResult.status, errorType, errorMessage }) } catch {}
         }
         
       } catch (error: any) {
@@ -347,11 +322,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         const isTimeout = error.name === 'AbortError' || error.message?.includes('timeout')
         const errorType = isTimeout ? 'network_timeout' : 'network_error'
         
-        console.error('[CheckoutOrchestrator] Customer sync error (non-blocking):', {
-          error: error.message || String(error),
-          type: errorType,
-          customerId: input.customerId
-        })
+        
         
         logs.push({ 
           step: 'customer-profile-sync-error', 
@@ -363,11 +334,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           } 
         })
         
-        if (isTimeout) {
-          console.info('[Metrics] customer_sync_network_timeout_total++')
-        } else {
-          console.info('[Metrics] customer_sync_network_error_total++')
-        }
+        
       }
     } else {
       // Log why sync was skipped
@@ -375,12 +342,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
                         !input.customerId ? 'no_customer_id' : 
                         !input.checkoutFormData ? 'no_form_data' : 'unknown'
       
-      console.log('[CheckoutOrchestrator] Skipping customer sync:', {
-        reason: skipReason,
-        hasOrder: !!order,
-        hasCustomerId: !!input.customerId,
-        hasFormData: !!input.checkoutFormData
-      })
+      
       
       logs.push({ 
         step: 'customer-profile-sync-skipped', 

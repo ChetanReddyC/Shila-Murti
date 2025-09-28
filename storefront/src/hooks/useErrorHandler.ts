@@ -156,13 +156,6 @@ export function useErrorHandler(): UseErrorHandlerReturn {
     setError(errorMessage, type);
     
     // Log error for debugging
-    console.error('[ErrorHandler] Handled error:', {
-      error,
-      message: errorMessage,
-      type,
-      isRetryable: isRetryableError(error),
-      isNetwork: isNetworkError(error)
-    });
     
     return errorMessage;
   }, [getErrorMessage, isNetworkError, isRetryableError, setError]);
