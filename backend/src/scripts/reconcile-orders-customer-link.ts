@@ -1,5 +1,6 @@
 import type { ExecArgs } from "@medusajs/framework/types";
 import { normalizePhoneNumber } from "../utils/phoneNormalization";
+import { buildAdminAuthHeaders } from "../utils/adminAuthHeaders";
 
 type AdminOrder = {
   id: string
@@ -46,11 +47,9 @@ function digits(input?: string | null): string {
 async function adminGet<T>(baseUrl: string, token: string, path: string): Promise<T> {
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'GET',
-    headers: {
+    headers: buildAdminAuthHeaders(token, {
       'Accept': 'application/json',
-      'x-medusa-access-token': token,
-      'Authorization': `Bearer ${token}`,
-    },
+    }),
   })
   const text = await res.text().catch(() => '')
   if (!res.ok) {
@@ -62,12 +61,10 @@ async function adminGet<T>(baseUrl: string, token: string, path: string): Promis
 async function adminPost<T>(baseUrl: string, token: string, path: string, body: any): Promise<T> {
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
-    headers: {
+    headers: buildAdminAuthHeaders(token, {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      'x-medusa-access-token': token,
-      'Authorization': `Bearer ${token}`,
-    },
+    }),
     body: JSON.stringify(body),
   })
   const text = await res.text().catch(() => '')
