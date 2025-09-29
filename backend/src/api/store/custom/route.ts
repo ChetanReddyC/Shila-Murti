@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { Modules } from "@medusajs/framework/utils";
 import { normalizePhoneNumber, generatePlaceholderEmail } from "../../../utils/phoneNormalization";
 import { createEnhancedCustomerService, CustomerLookupRequest } from "../../../utils/enhancedCustomerService";
+import { buildAdminAuthHeaders } from "../../../utils/adminAuthHeaders";
 import { phoneConsistencyMiddleware } from "../../middlewares/phoneConsistency";
 
 export async function GET(
@@ -219,15 +220,37 @@ async function handleCustomerRequest(
         // Attempt to associate cart/order even for existing customers
         try {
           if (cart_id && finalCustomer?.id) {
-            const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
-            if (adminToken) {
-              const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
-              console.log('[ASSOC_BACKEND][cart]', { cart_id, customer_id: finalCustomer.id })
-              await fetch(`${base}/admin/carts/${cart_id}` as any, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
-                body: JSON.stringify({ customer_id: finalCustomer.id })
-              } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][cart][fail]', { error: e?.message }) } catch {} })
+            let cartLinked = false
+            try {
+              const anyScope: any = req.scope
+              const cartModuleService = (anyScope && typeof anyScope.resolve === 'function') ? anyScope.resolve((Modules as any).CART) : null
+              if (cartModuleService && typeof cartModuleService.updateCarts === 'function') {
+                await cartModuleService.updateCarts([{ id: cart_id, customer_id: finalCustomer.id }])
+                cartLinked = true
+              }
+            } catch (e: any) {
+              try { console.log('[ASSOC_BACKEND][cart][module_fail]', { error: e?.message || String(e) }) } catch {}
+            }
+
+            if (!cartLinked) {
+              const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
+              if (adminToken?.trim()) {
+                const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+                console.log('[ASSOC_BACKEND][cart]', { cart_id, customer_id: finalCustomer.id })
+                try {
+                  const response = await fetch(`${base}/admin/carts/${cart_id}` as any, {
+                    method: 'POST',
+                    headers: buildAdminAuthHeaders(adminToken, { 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ customer_id: finalCustomer.id })
+                  } as any)
+                  if (!response.ok) {
+                    const body = await response.text().catch(() => '')
+                    console.log('[ASSOC_BACKEND][cart][fail]', { status: response.status, body: body?.slice(0, 500) })
+                  }
+                } catch (e: any) {
+                  try { console.log('[ASSOC_BACKEND][cart][fail]', { error: e?.message || String(e) }) } catch {}
+                }
+              }
             }
           }
           if (order_id && finalCustomer?.id) {
@@ -242,14 +265,22 @@ async function handleCustomerRequest(
             } catch {}
             if (!linked) {
               const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
-              if (adminToken) {
+              if (adminToken?.trim()) {
                 const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
                 console.log('[ASSOC_BACKEND][order]', { order_id, customer_id: finalCustomer.id })
-                await fetch(`${base}/admin/orders/${order_id}` as any, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
-                  body: JSON.stringify({ customer_id: finalCustomer.id })
-                } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][order][fail]', { error: e?.message }) } catch {} })
+                try {
+                  const response = await fetch(`${base}/admin/orders/${order_id}` as any, {
+                    method: 'POST',
+                    headers: buildAdminAuthHeaders(adminToken, { 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ customer_id: finalCustomer.id })
+                  } as any)
+                  if (!response.ok) {
+                    const body = await response.text().catch(() => '')
+                    console.log('[ASSOC_BACKEND][order][fail]', { status: response.status, body: body?.slice(0, 500) })
+                  }
+                } catch (e: any) {
+                  try { console.log('[ASSOC_BACKEND][order][fail]', { error: e?.message || String(e) }) } catch {}
+                }
               }
             }
             // Persist last order id to aid reconciliation jobs
@@ -364,15 +395,37 @@ async function handleCustomerRequest(
     try {
       if (cart_id && finalCustomer?.id) {
         // Attempt via admin cart update only if an admin token is configured in env at the gateway level
-        const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
-        if (adminToken) {
-          const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
-          console.log('[ASSOC_BACKEND][cart]', { cart_id, customer_id: finalCustomer.id })
-          await fetch(`${base}/admin/carts/${cart_id}` as any, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
-            body: JSON.stringify({ customer_id: finalCustomer.id })
-          } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][cart][fail]', { error: e?.message }) } catch {} })
+        let cartLinked = false
+        try {
+          const anyScope: any = req.scope
+          const cartModuleService = (anyScope && typeof anyScope.resolve === 'function') ? anyScope.resolve((Modules as any).CART) : null
+          if (cartModuleService && typeof cartModuleService.updateCarts === 'function') {
+            await cartModuleService.updateCarts([{ id: cart_id, customer_id: finalCustomer.id }])
+            cartLinked = true
+          }
+        } catch (e: any) {
+          try { console.log('[ASSOC_BACKEND][cart][module_fail]', { error: e?.message || String(e) }) } catch {}
+        }
+
+        if (!cartLinked) {
+          const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
+          if (adminToken?.trim()) {
+            const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+            console.log('[ASSOC_BACKEND][cart]', { cart_id, customer_id: finalCustomer.id })
+            try {
+              const response = await fetch(`${base}/admin/carts/${cart_id}` as any, {
+                method: 'POST',
+                headers: buildAdminAuthHeaders(adminToken, { 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ customer_id: finalCustomer.id })
+              } as any)
+              if (!response.ok) {
+                const body = await response.text().catch(() => '')
+                console.log('[ASSOC_BACKEND][cart][fail]', { status: response.status, body: body?.slice(0, 500) })
+              }
+            } catch (e: any) {
+              try { console.log('[ASSOC_BACKEND][cart][fail]', { error: e?.message || String(e) }) } catch {}
+            }
+          }
         }
       }
       if (order_id && finalCustomer?.id) {
@@ -388,14 +441,22 @@ async function handleCustomerRequest(
         } catch {}
         if (!linked) {
           const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
-          if (adminToken) {
+          if (adminToken?.trim()) {
             const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
             console.log('[ASSOC_BACKEND][order]', { order_id, customer_id: finalCustomer.id })
-            await fetch(`${base}/admin/orders/${order_id}` as any, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-medusa-access-token': adminToken, 'Authorization': `Bearer ${adminToken}` },
-              body: JSON.stringify({ customer_id: finalCustomer.id })
-            } as any).catch((e: any) => { try { console.log('[ASSOC_BACKEND][order][fail]', { error: e?.message }) } catch {} })
+            try {
+              const response = await fetch(`${base}/admin/orders/${order_id}` as any, {
+                method: 'POST',
+                headers: buildAdminAuthHeaders(adminToken, { 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ customer_id: finalCustomer.id })
+              } as any)
+              if (!response.ok) {
+                const body = await response.text().catch(() => '')
+                console.log('[ASSOC_BACKEND][order][fail]', { status: response.status, body: body?.slice(0, 500) })
+              }
+            } catch (e: any) {
+              try { console.log('[ASSOC_BACKEND][order][fail]', { error: e?.message || String(e) }) } catch {}
+            }
           }
         }
         // Store last seen order id on customer metadata for reconciliation jobs
