@@ -3,7 +3,7 @@ import { signBridgeToken } from '@/lib/auth/signing'
 import { storeFetch } from '@/lib/medusaServer'
 import { getCounter, getHistogram } from '@/lib/metrics'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 const BASE_URL = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
 
@@ -16,8 +16,6 @@ function resolveCustomerId(req: NextRequest): string | null {
   return null
 }
 
-async function callStore(path: string, init: RequestInit): Promise<Response> { return fetch(`${BASE_URL}${path}`, init) }
-
 export async function GET(req: NextRequest) {
   const startedAt = Date.now()
   const customerId = resolveCustomerId(req)
@@ -27,7 +25,7 @@ export async function GET(req: NextRequest) {
   }
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
   if (!token) return new Response(JSON.stringify({ ok: false, error: 'signing_not_configured' }), { status: 200 })
-  const res = await storeFetch('/store/addresses', { bearerToken: token })
+  const res = await storeFetch('/store/customers/me/addresses', { bearerToken: token })
   const text = await res.text().catch(() => '')
   try { const h = await getHistogram({ name: 'account_addresses_latency_ms', help: 'Account addresses latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
   return new Response(text, { status: res.status, headers: { 'Content-Type': 'application/json' } })
@@ -43,7 +41,7 @@ export async function POST(req: NextRequest) {
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
   if (!token) return new Response(JSON.stringify({ ok: false, error: 'signing_not_configured' }), { status: 200 })
   const payload = await req.json().catch(() => ({}))
-  const res = await storeFetch('/store/addresses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, bearerToken: token, body: JSON.stringify(payload) as any })
+  const res = await storeFetch('/store/customers/me/addresses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, bearerToken: token, body: JSON.stringify(payload) as any })
   const text = await res.text().catch(() => '')
   try { const h = await getHistogram({ name: 'account_addresses_latency_ms', help: 'Account addresses latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
   return new Response(text, { status: res.status, headers: { 'Content-Type': 'application/json' } })
@@ -59,7 +57,7 @@ export async function PATCH(req: NextRequest) {
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
   if (!token) return new Response(JSON.stringify({ ok: false, error: 'signing_not_configured' }), { status: 200 })
   const payload = await req.json().catch(() => ({}))
-  const res = await storeFetch('/store/addresses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, bearerToken: token, body: JSON.stringify(payload) as any })
+  const res = await storeFetch('/store/customers/me/addresses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, bearerToken: token, body: JSON.stringify(payload) as any })
   const text = await res.text().catch(() => '')
   try { const h = await getHistogram({ name: 'account_addresses_latency_ms', help: 'Account addresses latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
   return new Response(text, { status: res.status, headers: { 'Content-Type': 'application/json' } })
@@ -75,7 +73,7 @@ export async function DELETE(req: NextRequest) {
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
   if (!token) return new Response(JSON.stringify({ ok: false, error: 'signing_not_configured' }), { status: 200 })
   const payload = await req.json().catch(() => ({}))
-  const res = await storeFetch('/store/addresses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, bearerToken: token, body: JSON.stringify(payload) as any })
+  const res = await storeFetch('/store/customers/me/addresses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, bearerToken: token, body: JSON.stringify(payload) as any })
   const text = await res.text().catch(() => '')
   try { const h = await getHistogram({ name: 'account_addresses_latency_ms', help: 'Account addresses latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
   return new Response(text, { status: res.status, headers: { 'Content-Type': 'application/json' } })

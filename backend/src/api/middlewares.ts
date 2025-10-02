@@ -68,6 +68,9 @@ async function authGuard(
     // Attach identity to request context for downstream usage
     ;(req as any).customer_id = claims.sub
     ;(req as any).auth = { customer_id: claims.sub, claims }
+    try {
+      console.log('[authGuard] token valid', { sub: claims.sub, mfaComplete: claims.mfaComplete, purpose: claims.purpose })
+    } catch {}
 
     if (claims.mfaComplete === false) {
       return res.status(403).json({ message: "MFA required" })
@@ -91,8 +94,9 @@ export default defineMiddlewares({
       middlewares: [authGuard],
     },
     {
-      // Enforce elevated session (mfaComplete=true) on custom customer update endpoint
-      matcher: "/store/custom/customer*",
+      // Enforce elevated session (mfaComplete=true) on custom customer UPDATE endpoint only
+      // Find-or-create route will handle auth internally to allow Postman testing via admin token
+      matcher: "/store/custom/customer/update*",
       middlewares: [authGuard],
     },
     {

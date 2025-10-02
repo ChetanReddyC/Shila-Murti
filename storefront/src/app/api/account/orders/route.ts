@@ -3,7 +3,7 @@ import { signBridgeToken } from '@/lib/auth/signing'
 import { storeFetch } from '@/lib/medusaServer'
 import { getCounter, getHistogram } from '@/lib/metrics'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 const BASE_URL = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
 
