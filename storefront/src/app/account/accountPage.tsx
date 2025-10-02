@@ -5,11 +5,21 @@ import Header from '../../components/Header';
 import styles from './accountPage.module.css';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useSession, signIn } from 'next-auth/react';
 const PasskeySection = dynamic(() => import('./PasskeySection'), { ssr: false })
 
 export default function AccountPage() {
   // State to keep track of active tab
   const [activeTab, setActiveTab] = useState('Account Details');
+  // Real data state (UI not changed; just wiring values)
+  const [name, setName] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
+  const [orders, setOrders] = useState<Array<{ id: string; date: string; item: string; status: string }>>([]);
+  const [addressText, setAddressText] = useState<string>('');
+  const [addresses, setAddresses] = useState<Array<{ label: string; value: string }>>([]);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const { data: session } = useSession();
+  const [ensureInFlight, setEnsureInFlight] = useState(false);
 
   // Navigation items
   const navigationItems = [
@@ -21,27 +31,125 @@ export default function AccountPage() {
     'Security'
   ];
 
-  // Order history data
-  const orders = [
-    {
-      id: '#12345',
-      date: '2023-08-15',
-      item: 'Stone Idol of Ganesha',
-      status: 'Shipped'
-    },
-    {
-      id: '#67890',
-      date: '2023-07-20',
-      item: 'Stone Idol of Lakshmi',
-      status: 'Delivered'
-    },
-    {
-      id: '#11223',
-      date: '2023-06-05',
-      item: 'Stone Idol of Shiva',
-      status: 'Delivered'
-    }
-  ];
+  useEffect(() => {
+    try {
+      const cid = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null
+      const normalized = cid && cid !== 'undefined' && cid !== 'null' ? cid : null
+      if (normalized) {
+        setCustomerId(normalized)
+      } else if (cid && (cid === 'undefined' || cid === 'null')) {
+        sessionStorage.removeItem('customerId')
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (customerId || ensureInFlight) return
+    const originalEmail = session?.user?.originalEmail as string | undefined
+    const originalPhone = session?.user?.originalPhone as string | undefined
+    const identifier = originalPhone || originalEmail
+    if (!identifier) return
+
+    setEnsureInFlight(true)
+    ;(async () => {
+      try {
+        const payload: Record<string, any> = {}
+        if (originalPhone) payload.phone = originalPhone
+        if (originalEmail) payload.email = originalEmail
+        const res = await fetch('/api/account/customer/ensure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (res.ok) {
+          const json = await res.json()
+          const ensuredId = json?.customerId
+          if (ensuredId) {
+            if (typeof window !== 'undefined') sessionStorage.setItem('customerId', ensuredId)
+            setCustomerId(ensuredId)
+            try {
+              await signIn('session', { identifier, customerId: ensuredId, redirect: false })
+            } catch {}
+          }
+        }
+      } catch {}
+      setEnsureInFlight(false)
+    })()
+  }, [customerId, ensureInFlight, session?.user?.originalEmail, session?.user?.originalPhone])
+
+  useEffect(() => {
+    if (!customerId) return
+    // Load profile
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/account/profile?customer_id=${encodeURIComponent(customerId)}`)
+        if (res.ok) {
+          const data = await res.json()
+          const c = data?.customer || data || {}
+          const fn = (c.first_name || '').toString().trim()
+          const ln = (c.last_name || '').toString().trim()
+          const nm = [fn, ln].filter(Boolean).join(' ').trim()
+          if (nm) setName(nm)
+          if (c.email) setEmail(String(c.email))
+          if (!customerId && c.id) setCustomerId(String(c.id))
+          const addrList: any[] = Array.isArray(c.addresses) ? c.addresses : []
+          if (addrList.length > 0) {
+            const primary = addrList[0]
+            const line = [primary.address_1, primary.city, primary.postal_code].filter(Boolean).join(', ')
+            if (line) setAddressText(line)
+            const mappedAddresses = addrList.map((addr: any, idx: number) => {
+              const label = addr.address_name || (idx === 0 ? 'Home Address' : 'Address')
+              const value = [addr.address_1, addr.city, addr.postal_code].filter(Boolean).join(', ')
+              return { label, value }
+            })
+            setAddresses(mappedAddresses)
+          }
+        }
+      } catch {}
+    })()
+
+    // Load addresses (fallback to ensure latest data)
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/account/addresses?customer_id=${encodeURIComponent(customerId)}`)
+        if (res.ok) {
+          const json = await res.json()
+          const list: any[] = Array.isArray(json?.addresses) ? json.addresses : []
+          if (list.length > 0) {
+            const a = list[0]
+            const line = [a.address_1, a.city, a.postal_code].filter(Boolean).join(', ')
+            if (line) setAddressText(line)
+            const mappedAddresses = list.map((addr: any) => {
+              const label = addr.address_name || 'Address'
+              const value = [addr.address_1, addr.city, addr.postal_code].filter(Boolean).join(', ')
+              return { label, value }
+            })
+            setAddresses(mappedAddresses)
+          }
+        }
+      } catch {}
+    })()
+    // Load orders
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+        if (res.ok) {
+          const json = await res.json()
+          const list: any[] = Array.isArray(json?.orders) ? json.orders : []
+          const mapped = list.map((o: any) => {
+            const created = o.created_at || o.createdAt
+            const date = created ? new Date(created).toISOString().slice(0, 10) : ''
+            const items = Array.isArray(o.items) ? o.items : []
+            const firstItem = items[0]?.title || (items[0]?.variant?.title) || 'Order items'
+            const id = (o.display_id ? `#${o.display_id}` : (o.id || '')) as string
+            const status = (o.status || o.fulfillment_status || 'Processing') as string
+            return { id, date, item: firstItem, status }
+          })
+          setOrders(mapped)
+        }
+      } catch {}
+    })()
+  }, [customerId])
 
   return (
     <div
@@ -83,6 +191,8 @@ export default function AccountPage() {
                         type="text"
                         className={styles.inputField}
                         placeholder="Your Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                       />
                     </div>
                   </div>
@@ -95,6 +205,8 @@ export default function AccountPage() {
                         type="email"
                         className={styles.inputField}
                         placeholder="Your Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                       />
                     </div>
                   </div>
@@ -163,7 +275,7 @@ export default function AccountPage() {
                   <div className={styles.addressContainer}>
                     <div className={styles.addressDetails}>
                       <span className={styles.addressLabel}>Home Address</span>
-                      <span className={styles.addressValue}>123 Main Street, Anytown, 12345</span>
+                      <span className={styles.addressValue}>{addressText || '—'}</span>
                     </div>
                     <button className={styles.editButton}>Edit</button>
                   </div>
@@ -260,14 +372,15 @@ export default function AccountPage() {
               {activeTab === 'Address Book' && (
                 <>
                   <h2 className={styles.sectionTitle}>Address Book</h2>
-                  
-                  <div className={styles.addressContainer}>
-                    <div className={styles.addressDetails}>
-                      <span className={styles.addressLabel}>Home Address</span>
-                      <span className={styles.addressValue}>123 Main Street, Anytown, 12345</span>
+                  {(addresses.length ? addresses : [{ label: 'Home Address', value: addressText || '—' }]).map((addr, idx) => (
+                    <div key={`${addr.label}-${idx}`} className={styles.addressContainer}>
+                      <div className={styles.addressDetails}>
+                        <span className={styles.addressLabel}>{addr.label}</span>
+                        <span className={styles.addressValue}>{addr.value || '—'}</span>
+                      </div>
+                      <button className={styles.editButton}>Edit</button>
                     </div>
-                    <button className={styles.editButton}>Edit</button>
-                  </div>
+                  ))}
                   
                   <button className={styles.actionButton}>Add New Address</button>
                 </>

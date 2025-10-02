@@ -2,48 +2,50 @@ import type { NextRequest } from 'next/server'
 
 export const runtime = 'edge'
 
-function buildJwks(): { keys: any[] } {
+/**
+ * JWKS (JSON Web Key Set) endpoint that exposes the public key for JWT verification.
+ * The backend uses this endpoint to verify tokens signed by the storefront.
+ */
+export async function GET(req: NextRequest) {
   try {
-    // Prefer explicit public JWKS if provided (useful in tests and certain deployments)
-    const jwksRaw = process.env.AUTH_PUBLIC_JWKS
-    if (jwksRaw) {
-      try {
-        const parsed = JSON.parse(jwksRaw)
-        if (parsed && Array.isArray(parsed.keys)) return { keys: parsed.keys }
-      } catch {}
+    const jwkPrivateRaw = process.env.AUTH_SIGNING_JWK
+    if (!jwkPrivateRaw) {
+      console.error('[JWKS] AUTH_SIGNING_JWK environment variable is not configured')
+      return new Response(
+        JSON.stringify({ error: 'JWKS not configured' }), 
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
-    const jwkPrivateRaw = process.env.AUTH_SIGNING_JWK
-    if (!jwkPrivateRaw) return { keys: [] }
-    const parsed = JSON.parse(jwkPrivateRaw) as Record<string, any>
-    const kid = parsed?.kid || process.env.AUTH_JWKS_KID || 'dev-2024-01-01'
-    // Derive a public JWK from the private one by stripping private params
-    const { kty, n, e } = parsed
-    if (!kty || !n || !e) return { keys: [] }
-    const publicJwk: Record<string, any> = {
-      kty,
-      n,
-      e,
-      kid,
-      alg: parsed?.alg || 'RS256',
-      use: parsed?.use || 'sig',
+    const jwk = JSON.parse(jwkPrivateRaw)
+    
+    // Extract public key components (remove private key material)
+    const publicJwk: any = {
+      kty: jwk.kty,
+      n: jwk.n,
+      e: jwk.e,
+      alg: jwk.alg || 'RS256',
+      use: 'sig',
+      kid: jwk.kid || process.env.AUTH_JWKS_KID || 'dev-2024-01-01',
     }
-    return { keys: [publicJwk] }
-  } catch {
-    return { keys: [] }
+
+    // Return JWKS format (array of keys)
+    const jwks = {
+      keys: [publicJwk]
+    }
+
+    return new Response(JSON.stringify(jwks), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+      },
+    })
+  } catch (error) {
+    console.error('[JWKS] Error generating JWKS:', error)
+    return new Response(
+      JSON.stringify({ error: 'Failed to generate JWKS' }), 
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
   }
 }
-
-export async function GET() {
-  const jwks = buildJwks()
-  return new Response(JSON.stringify(jwks), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      // Allow public caching for a short time; adjust as needed
-      'Cache-Control': 'public, max-age=60',
-    },
-  })
-}
-
-
