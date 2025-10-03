@@ -103,6 +103,8 @@ export default function LoginPage() {
                         body: JSON.stringify(id) 
                       })
                       const ej = await ensure.json().catch(() => ({}))
+                      console.log('[Login][CustomerLookup] Identifier:', id)
+                      console.log('[Login][CustomerLookup] Customer UUID retrieved:', ej?.customerId)
                       if (ej?.customerId && typeof window !== 'undefined') {
                         window.sessionStorage.setItem('customerId', String(ej.customerId))
                       }

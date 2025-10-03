@@ -23,16 +23,32 @@ export async function GET(req: NextRequest) {
     try { const c = await getCounter({ name: 'account_orders_failure_total', help: 'Account orders failures' }); c.inc() } catch {}
     return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
   }
+
+  // Generate bridge token to authenticate as customer
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
-  if (!token) return new Response(JSON.stringify({ ok: false, error: 'signing_not_configured' }), { status: 200 })
+  console.log('[ORDERS_TOKEN_DEBUG]', { hasToken: !!token, tokenPrefix: token?.slice(0, 20) })
+  if (!token) {
+    console.error('[ORDERS_TOKEN_ERROR]', 'Failed to generate bridge token - check AUTH_SIGNING_JWK')
+    try { const c = await getCounter({ name: 'account_orders_failure_total', help: 'Account orders failures' }); c.inc() } catch {}
+    return new Response(JSON.stringify({ ok: false, error: 'auth_failed', message: 'JWT signing not configured' }), { status: 500 })
+  }
 
-  const qs = new URLSearchParams()
-  qs.set('fields', '*')
-
-  const res = await storeFetch(`/store/orders?${qs.toString()}`, { bearerToken: token })
+  // Use custom orders endpoint that verifies JWT
+  const res = await storeFetch('/store/custom/orders', { 
+    bearerToken: token,
+    headers: { 'Accept': 'application/json' }
+  })
+  
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    console.error('[ORDERS_FETCH_ERROR]', { status: res.status, body: text?.slice?.(0, 200) })
+    try { const c = await getCounter({ name: 'account_orders_failure_total', help: 'Account orders failures' }); c.inc() } catch {}
+    return new Response(JSON.stringify({ ok: false, error: 'fetch_failed' }), { status: res.status })
+  }
+  
   const text = await res.text().catch(() => '')
   try { const h = await getHistogram({ name: 'account_orders_latency_ms', help: 'Account orders latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
-  return new Response(text, { status: res.status, headers: { 'Content-Type': 'application/json' } })
+  return new Response(text, { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
 

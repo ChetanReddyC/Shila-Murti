@@ -126,6 +126,8 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
       }).then(async (r) => {
         const json = await r.json().catch(() => ({}))
         const identifierValue = json?.identifier || identifier.email || identifier.phone || 'user'
+        console.log('[MFA][CustomerLookup] Identifier:', identifier)
+        console.log('[MFA][CustomerLookup] Customer UUID retrieved:', json?.customerId)
         // Persist customerId for passkey management & future passkey-first login
         try {
           if (json?.customerId && typeof window !== 'undefined') {
