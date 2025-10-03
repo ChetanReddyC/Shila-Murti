@@ -23,12 +23,25 @@ export async function GET(req: NextRequest) {
     try { const c = await getCounter({ name: 'account_addresses_failure_total', help: 'Account addresses failures' }); c.inc() } catch {}
     return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
   }
+  
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
-  if (!token) return new Response(JSON.stringify({ ok: false, error: 'signing_not_configured' }), { status: 200 })
-  const res = await storeFetch('/store/customers/me/addresses', { bearerToken: token })
+  if (!token) {
+    console.error('[ADDRESSES_TOKEN_ERROR]', 'Failed to generate bridge token')
+    try { const c = await getCounter({ name: 'account_addresses_failure_total', help: 'Account addresses failures' }); c.inc() } catch {}
+    return new Response(JSON.stringify({ ok: false, error: 'auth_failed' }), { status: 401 })
+  }
+
+  // Use custom addresses endpoint that verifies JWT
+  const res = await storeFetch('/store/custom/addresses', { bearerToken: token })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    console.error('[ADDRESSES_FETCH_ERROR]', { status: res.status, body: text?.slice?.(0, 200) })
+    try { const c = await getCounter({ name: 'account_addresses_failure_total', help: 'Account addresses failures' }); c.inc() } catch {}
+    return new Response(JSON.stringify({ ok: false, error: 'fetch_failed' }), { status: res.status })
+  }
   const text = await res.text().catch(() => '')
   try { const h = await getHistogram({ name: 'account_addresses_latency_ms', help: 'Account addresses latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
-  return new Response(text, { status: res.status, headers: { 'Content-Type': 'application/json' } })
+  return new Response(text, { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
 export async function POST(req: NextRequest) {

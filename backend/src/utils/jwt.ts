@@ -35,7 +35,10 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenClaim
       issuer: process.env.AUTH_ISSUER || undefined,
       audience: process.env.AUTH_AUDIENCE || undefined,
     })
-    console.log('[JWT][verifyAccessToken] Token verified successfully for sub:', (payload as any)?.sub)
+    // Only log customer ID in development to avoid exposing sensitive data
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[JWT][verifyAccessToken] Token verified successfully for sub:', (payload as any)?.sub)
+    }
     return payload as unknown as AccessTokenClaims
   } catch (error) {
     const errMsg = (error as any)?.message || String(error)
