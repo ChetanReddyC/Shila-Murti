@@ -87,8 +87,20 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ comboRequired: true, reason: 'invalid_response' }), { status: 200 })
   }
 
-  const auth = await kvGet<{ challenge: string }>(`webauthn:auth:${cid}`)
+  // Try to find challenge using primary ID first, then fall back to candidates
+  let auth = await kvGet<{ challenge: string }>(`webauthn:auth:${cid}`)
   if (!auth?.challenge) {
+    // Try candidates as fallback
+    for (const candidate of rawCandidates) {
+      auth = await kvGet<{ challenge: string }>(`webauthn:auth:${candidate}`)
+      if (auth?.challenge) {
+        console.log('[PASSKEY_VERIFY][CHALLENGE_FOUND_WITH_FALLBACK]', { primaryId: cid, foundWithId: candidate })
+        break
+      }
+    }
+  }
+  if (!auth?.challenge) {
+    console.warn('[PASSKEY_VERIFY][MISSING_CHALLENGE]', { cid, candidates: rawCandidates })
     return new Response(JSON.stringify({ comboRequired: true, reason: 'missing_challenge' }), { status: 200 })
   }
 
@@ -130,7 +142,14 @@ export async function POST(req: NextRequest) {
     requireUserVerification: true,
   })
 
+  // Clean up challenges for all possible IDs
   await kvDel(`webauthn:auth:${cid}`)
+  for (const candidate of rawCandidates) {
+    if (candidate !== cid) {
+      try { await kvDel(`webauthn:auth:${candidate}`) } catch {}
+    }
+  }
+  
   if (!verification.verified) {
     try { const c = await getCounter({ name: 'auth_passkey_failure_total', help: 'Passkey verify failure total' }); c.inc() } catch {}
     return new Response(JSON.stringify({ comboRequired: true, reason: 'verification_failed' }), { status: 200 })
