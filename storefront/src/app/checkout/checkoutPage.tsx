@@ -2346,6 +2346,8 @@ export default function CheckoutPage() {
 
     try {
 
+      console.log('[Checkout Login] Starting login process')
+
       setIdentityError(null)
 
       setLoginProcessing(true)
@@ -2366,6 +2368,8 @@ export default function CheckoutPage() {
 
       const isEmail = identifier.includes('@')
 
+      console.log('[Checkout Login] Identifier:', identifier, 'isEmail:', isEmail)
+
 
 
       // Check if user has a passkey registered
@@ -2384,6 +2388,8 @@ export default function CheckoutPage() {
 
       const policy = await policyRes.json().catch(() => ({}))
 
+      console.log('[Checkout Login] Passkey policy:', policy)
+
 
 
       // If user has a passkey, attempt passkey authentication first
@@ -2397,6 +2403,8 @@ export default function CheckoutPage() {
         if (typeof isAvailable === 'function') {
 
           const available = await isAvailable()
+
+          console.log('[Checkout Login] Platform authenticator available:', available)
 
           if (available) {
 
@@ -2418,11 +2426,15 @@ export default function CheckoutPage() {
 
               const { options, userId: canonicalUserId } = await optionsRes.json()
 
+              console.log('[Checkout Login] Got passkey options, userId:', canonicalUserId)
+
 
 
               // Use the authenticate function from the hook
 
               const { data, error } = await authenticate(options)
+
+              console.log('[Checkout Login] Authenticate result - error:', error, 'data:', !!data)
 
 
 
@@ -2452,31 +2464,23 @@ export default function CheckoutPage() {
 
                 const verifyResult = await verifyRes.json().catch(() => ({}))
 
+                console.log('[Checkout Login] Verify result:', verifyResult, 'status:', verifyRes.status)
 
 
-                if (verifyRes.ok && !verifyResult.comboRequired) {
 
-                  // Successful passkey authentication
+                if (verifyRes.ok) {
 
-                  // Checkout verify with passkey auth flag
+                  // Successful passkey authentication (proceed even if comboRequired for checkout flow)
 
-                  if (!cart?.id) throw new Error('Cart not ready for verification')
+                  // Ensure customer exists (same as login page)
 
-                  const checkoutVerifyRes = await fetch('/api/auth/session/checkout/verify', {
+                  const checkoutVerifyRes = await fetch('/api/account/customer/ensure', {
 
                     method: 'POST',
 
                     headers: { 'Content-Type': 'application/json' },
 
-                    body: JSON.stringify({
-
-                      ...(isEmail ? { email: identifier } : { phone: identifier }),
-
-                      cartId: cart.id,
-
-                      isPasskeyAuth: true // Add this flag to indicate passkey authentication
-
-                    })
+                    body: JSON.stringify(isEmail ? { email: identifier } : { phone: identifier })
 
                   })
 
@@ -2484,9 +2488,11 @@ export default function CheckoutPage() {
 
                   const checkoutVerifyResult = await checkoutVerifyRes.json().catch(() => ({}))
 
+                  console.log('[Checkout Login] Customer ensure result:', checkoutVerifyResult)
 
 
-                  if (checkoutVerifyRes.ok && checkoutVerifyResult?.ok === true) {
+
+                  if (checkoutVerifyRes.ok && checkoutVerifyResult?.customerId) {
 
                     const customerIdValue = String(checkoutVerifyResult.customerId || '')
 
@@ -2511,31 +2517,21 @@ export default function CheckoutPage() {
 
 
 
-                    // Update NextAuth session
+                    // Sign in with NextAuth session (same as login page but no redirect)
 
-                    try {
+                    const { signIn } = await import('next-auth/react')
 
-                      import('next-auth/react').then(({ signIn }) => {
+                    await signIn('session', {
 
-                        signIn('session', {
+                      identifier: identifier,
 
-                          identifier: identifier,
+                      customerId: customerIdValue,
 
-                          customerId: customerIdValue,
+                      hasPasskey: true,
 
-                          redirect: false
+                      redirect: false
 
-                        }).catch((e) => {
-
-
-                        })
-
-                      }).catch(() => { })
-
-                    } catch (sessionError) {
-
-
-                    }
+                    })
 
 
 
@@ -2545,41 +2541,51 @@ export default function CheckoutPage() {
 
                   } else {
 
-                    throw new Error('Checkout verification failed')
+                    throw new Error('Failed to get customer information')
 
                   }
 
+                } else {
+
+                  throw new Error('Passkey verification failed')
+
                 }
+
+              } else {
+
+                throw new Error('Passkey authentication cancelled or failed')
 
               }
 
+            } else {
+
+              throw new Error('Failed to get passkey options')
+
             }
+
+          } else {
+
+            throw new Error('Passkey not available on this device')
 
           }
 
         }
 
-      }
-
-
-
-      // Fallback to OTP/magic link if passkey is not available or fails
-
-      if (isEmail) {
-
-        setEmail(identifier)
-
-        setIdentityMethod('email') // Switch to email method to show the magic link form
-
       } else {
-
-        setPhone(identifier)
-
-        setIdentityMethod('phone') // Switch to phone method to show the OTP form
-
+        // No passkey registered - show OTP/email forms
+        if (isEmail) {
+          setEmail(identifier)
+          setIdentityMethod('email')
+        } else {
+          setPhone(identifier)
+          setIdentityMethod('phone')
+        }
+        return
       }
 
     } catch (e: any) {
+
+      console.error('[Checkout Login] Error:', e)
 
       setIdentityError(e?.message || 'Login failed. Please try again.')
 
@@ -3315,9 +3321,9 @@ export default function CheckoutPage() {
 
               </div>
 
-              {/* Identity Verification Section (Task 2) - Only show for unauthenticated users */}
+              {/* Identity Verification Section (Task 2) - Only show for unauthenticated users who haven't verified */}
 
-              {status !== 'authenticated' && (
+              {status !== 'authenticated' && !purchaseReady && (
 
                 <div className={styles.section}>
 
