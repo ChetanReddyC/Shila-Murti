@@ -826,10 +826,35 @@ export class MedusaApiClient {
   /** Complete the cart and expect an order in response */
   async completeCart(cartId: string): Promise<CompleteCartResponse> {
     const endpoint = `/store/carts/${cartId}/complete`;
-    const response = await this.makeRequestWithRetry<CompleteCartResponse>(endpoint, {
-      method: 'POST',
-    });
-    return response;
+    const maxRetries = 3;
+    let lastError: any;
+    
+    // Custom retry logic for cart completion to handle inventory initialization delays
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.makeRequestWithRetry<CompleteCartResponse>(endpoint, {
+          method: 'POST',
+        });
+        return response;
+      } catch (error: any) {
+        lastError = error;
+        
+        // Retry on 404 errors (inventory location not initialized) or 409 conflicts
+        const isRetryable = error instanceof ApiError && 
+                           (error.status === 404 || error.status === 409);
+        
+        if (isRetryable && attempt < maxRetries) {
+          // Exponential backoff: 500ms, 1000ms, 2000ms
+          const delay = 500 * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        throw error;
+      }
+    }
+    
+    throw lastError;
   }
 
   /** Retrieve an order by id (minimal fields) */
