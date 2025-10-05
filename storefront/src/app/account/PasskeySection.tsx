@@ -5,6 +5,7 @@ import SetupPasskeyButton from '@/components/SetupPasskeyButton'
 
 export default function PasskeySection() {
   const [customerId, setCustomerId] = useState<string>('')
+  const [userIdentifier, setUserIdentifier] = useState<string>('')
   const [creds, setCreds] = useState<Array<{ id: string; counter?: number; credentialDeviceType?: string }>>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
@@ -33,9 +34,35 @@ export default function PasskeySection() {
         if (sid) setCustomerId(sid)
       } catch {}
     }
+    
+    // Get user identifier (phone/email) for passkey display name
+    try {
+      const identifier = window.sessionStorage.getItem('identifier') || ''
+      if (identifier) setUserIdentifier(identifier)
+    } catch {}
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { 
+    refresh()
+    
+    // Fetch customer profile to get phone/email for passkey username
+    if (customerId) {
+      ;(async () => {
+        try {
+          const res = await fetch(`/api/account/profile?customer_id=${encodeURIComponent(customerId)}`)
+          if (res.ok) {
+            const data = await res.json()
+            const customer = data?.customer || data || {}
+            // Prefer phone, fallback to email
+            const phone = customer.phone || customer.metadata?.phone
+            const email = customer.email
+            const identifier = phone || email
+            if (identifier) setUserIdentifier(identifier)
+          }
+        } catch {}
+      })()
+    }
+  }, [refresh, customerId])
   // Auto-prompt registration when entering /account if no credentials exist yet
   useEffect(() => {
     if (!customerId) return
@@ -81,7 +108,7 @@ export default function PasskeySection() {
       <div style={{ marginBottom: 12 }}>
         <SetupPasskeyButton
           userId={customerId || 'user'}
-          username={customerId || 'user'}
+          username={userIdentifier || customerId || 'user'}
           onRegistered={() => {
             // After successful registration, refresh the list to reflect the new credential
             refresh()

@@ -146,9 +146,14 @@ export async function findOrCreateCustomerAccount(
       }
     }
 
+    // Only preserve existing name if it's not the default placeholder
+    const hasRealName = resultCustomer.first_name && 
+                        resultCustomer.first_name !== "Customer" && 
+                        resultCustomer.first_name.trim() !== ""
+    
     const updatePayload: Record<string, any> = {
-      first_name: first_name || resultCustomer.first_name,
-      last_name: last_name || resultCustomer.last_name,
+      first_name: hasRealName ? resultCustomer.first_name : (first_name || "Customer"),
+      last_name: hasRealName ? resultCustomer.last_name : (last_name || ""),
       phone: phone || resultCustomer.phone,
       has_account: true,
     }

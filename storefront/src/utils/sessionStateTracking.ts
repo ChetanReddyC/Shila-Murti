@@ -280,7 +280,7 @@ export function getOriginalIdentifierFromSession(session: Session | null): strin
     
     const original = user.originalPhone || user.originalEmail
     
-    // Try to get customerId from sessionStorage with error handling
+    // Try to get customerId from sessionStorage with error handling (only as fallback)
     let customerId: string | null = null
     try {
       if (typeof window !== 'undefined') {
@@ -294,7 +294,8 @@ export function getOriginalIdentifierFromSession(session: Session | null): strin
       // Continue without customerId
     }
     
-    const identifier = customerId || original || null
+    // Prefer original phone/email over customerId for passkey display name
+    const identifier = original || customerId || null
     
     // Validate final identifier
     if (identifier && typeof identifier !== 'string') {
