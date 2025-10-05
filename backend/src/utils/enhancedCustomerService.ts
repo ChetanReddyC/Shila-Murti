@@ -236,9 +236,14 @@ export class EnhancedCustomerService {
   ): Promise<any> {
     const normalizedPhone = normalizePhoneNumber(request.phone);
     
+    // Only preserve existing name if it's not the default placeholder
+    const hasRealName = existingCustomer.first_name && 
+                        existingCustomer.first_name !== "Customer" && 
+                        existingCustomer.first_name.trim() !== ""
+    
     const updatePayload = {
-      first_name: request.first_name || existingCustomer.first_name,
-      last_name: request.last_name || existingCustomer.last_name,
+      first_name: hasRealName ? existingCustomer.first_name : (request.first_name || "Customer"),
+      last_name: hasRealName ? existingCustomer.last_name : (request.last_name || ""),
       phone: request.phone || existingCustomer.phone,
       has_account: request.whatsapp_authenticated || existingCustomer.has_account || false, // Ensure WhatsApp authenticated customers are marked as registered
       metadata: {
