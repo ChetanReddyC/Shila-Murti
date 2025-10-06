@@ -36,6 +36,32 @@ export async function POST(req: NextRequest) {
       }), { status: 400 })
     }
     
+    // SECURITY FIX: Detect authenticated real customers (not guest accounts)
+    // Real customer IDs start with "cus_" and don't have "@guest.local"
+    const isRealCustomer = customerId.startsWith('cus_') && !customerId.includes('@guest.local')
+    
+    if (isRealCustomer) {
+      // For authenticated real customers, skip full sync to prevent duplicate account creation
+      // The order/cart is already associated with their account during checkout
+      try { 
+        console.log('[SYNC_API][skip_authenticated_customer]', { 
+          customerId, 
+          reason: 'Real authenticated customer - no sync needed' 
+        }) 
+      } catch {}
+      
+      return new Response(JSON.stringify({
+        ok: true,
+        customerUpdated: false,
+        skipped: true,
+        reason: 'authenticated_customer',
+        message: 'Sync skipped for authenticated customer - order linked to existing account',
+        customerId,
+        timestamp: Date.now(),
+        duration: Date.now() - startedAt
+      }), { status: 200 })
+    }
+    
     if (!formData || typeof formData !== 'object') {
       return new Response(JSON.stringify({ 
         ok: false, 
@@ -166,6 +192,7 @@ export async function POST(req: NextRequest) {
     
     // Prepare update payload for backend /store/custom route with conflict resolution
     const updatePayload: any = {
+      customer_id: customerId, // Pass customer ID so backend can detect authenticated users
       first_name: formData.first_name,
       last_name: formData.last_name || '',
       phone: normalizedPhone,

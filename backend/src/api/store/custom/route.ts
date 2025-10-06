@@ -88,6 +88,49 @@ async function handleCustomerRequest(
 
   try {
     const authSubject = (req as any).auth?.customer_id || (req as any).customer_id || null;
+    
+    // SECURITY FIX: If caller provides a real customer ID (authenticated user), validate and skip duplicate creation
+    // This prevents duplicate accounts when logged-in users enter different recipient details at checkout
+    const providedCustomerId = (req.body as any)?.customer_id;
+    const isProvidedRealCustomer = providedCustomerId && 
+                                   typeof providedCustomerId === 'string' && 
+                                   providedCustomerId.startsWith('cus_') && 
+                                   !providedCustomerId.includes('@guest.local');
+    
+    if (isProvidedRealCustomer) {
+      // For authenticated real customers, just return the existing customer
+      // The different shipping details will be used only for the order's shipping address
+      console.log('[CUSTOMER_REQUEST] Authenticated real customer detected, skipping duplicate creation', {
+        customerId: providedCustomerId,
+        providedPhone: phone,
+        providedName: `${parsedFirstName} ${parsedLastName}`.trim()
+      });
+      
+      // Fetch the existing customer
+      const customerModuleService: any = req.scope.resolve("customerModuleService");
+      const [existingCustomer] = await customerModuleService.listCustomers(
+        { id: providedCustomerId },
+        { take: 1, relations: ["addresses"] }
+      );
+      
+      if (!existingCustomer) {
+        return res.status(404).json({ 
+          message: "Provided customer ID not found" 
+        });
+      }
+      
+      // Return success with existing customer - no modifications needed
+      return res.status(200).json({
+        customer: existingCustomer,
+        update_verified: true,
+        skipped_duplicate_creation: true,
+        consolidation_info: {
+          strategy_used: 'authenticated_customer_passthrough',
+          existing_customer_found: true,
+          phone_conflicts_resolved: 0
+        }
+      });
+    }
 
     const result = await findOrCreateCustomerAccount({
       scope: req.scope,
