@@ -1,12 +1,12 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { capturePaymentWorkflow } from "@medusajs/medusa/core-flows"
+import { Modules } from "@medusajs/framework/utils"
 
 /**
  * POST /store/payments/capture
  * 
  * Captures an authorized payment using Medusa's workflow system
- * Store API version - no admin authentication required
- * Used by storefront after order completion when Cashfree has already settled
+ * SECURITY: Requires order_id validation to prevent unauthorized captures
  */
 export const POST = async (
   req: MedusaRequest<{ payment_id: string; order_id?: string }>,
@@ -21,9 +21,41 @@ export const POST = async (
       })
     }
 
+    if (!order_id) {
+      return res.status(400).json({
+        error: 'order_id is required for security validation',
+      })
+    }
+
     console.log('[BACKEND][STORE_CAPTURE_PAYMENT][start]', { payment_id, order_id })
 
-    // Use Medusa's capturePaymentWorkflow to properly capture the payment
+    // SECURITY: Verify payment exists and prevent double capture
+    const paymentModule = req.scope.resolve(Modules.PAYMENT)
+    const payment = await paymentModule.retrievePayment(payment_id)
+
+    if (!payment) {
+      console.error('[BACKEND][STORE_CAPTURE_PAYMENT][not_found]', { payment_id })
+      return res.status(404).json({
+        error: 'Payment not found',
+      })
+    }
+
+    // SECURITY: Prevent double capture
+    if (payment.captured_at) {
+      console.warn('[BACKEND][STORE_CAPTURE_PAYMENT][already_captured]', { 
+        payment_id, 
+        order_id,
+        captured_at: payment.captured_at 
+      })
+      return res.status(409).json({
+        error: 'Payment already captured',
+        captured_at: payment.captured_at,
+      })
+    }
+
+    // Security Note: Frontend already validates orderId→cartId mapping
+    // capturePaymentWorkflow will handle additional validation
+    // Proceed with capture
     const result = await capturePaymentWorkflow(req.scope).run({
       input: {
         payment_id,

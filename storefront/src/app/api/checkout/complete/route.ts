@@ -63,6 +63,37 @@ export async function POST(req: NextRequest) {
 
     // Security: If orderId provided, validate with Cashfree before completing
     if (orderId) {
+      // SECURITY FIX: Verify orderId belongs to this cartId (prevent payment hijacking)
+      const mappedCartId = await kvGet<string>(`cf:order:cart:${orderId}`)
+      if (!mappedCartId) {
+        // Fallback to in-memory map
+        const map: Map<string, string> | undefined = (global as any).orderCartMap
+        const memMappedCartId = map?.get(orderId)
+        if (!memMappedCartId || memMappedCartId !== cartId) {
+          console.error('[COMPLETE_API][security_violation]', { 
+            orderId, 
+            cartId, 
+            mappedCartId: memMappedCartId,
+            reason: 'orderId does not belong to this cartId' 
+          })
+          return NextResponse.json({
+            error: 'invalid_order',
+            message: 'This payment does not belong to your cart',
+          }, { status: 403 })
+        }
+      } else if (mappedCartId !== cartId) {
+        console.error('[COMPLETE_API][security_violation]', { 
+          orderId, 
+          cartId, 
+          mappedCartId,
+          reason: 'orderId belongs to different cartId' 
+        })
+        return NextResponse.json({
+          error: 'invalid_order',
+          message: 'This payment does not belong to your cart',
+        }, { status: 403 })
+      }
+
       const validation = await validateCashfreeOrder(orderId)
       if (!validation.valid) {
         try { console.error('[COMPLETE_API][validation_failed]', { orderId, error: validation.error, status: validation.status }) } catch {}
