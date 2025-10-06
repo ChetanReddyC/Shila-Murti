@@ -236,45 +236,59 @@ export async function POST(req: NextRequest) {
       // If we have a customer and an order, attempt a post-completion sync using order shipping address
       if (customerId && createdOrderId) {
         try {
-          // Fetch order details to get shipping address
-          const orderDetails = await medusaApiClient.getOrder(createdOrderId)
-          const sa: any = (orderDetails as any)?.shipping_address || {}
-          const first_name = (sa?.first_name && String(sa.first_name).trim()) || 'Customer'
-          const last_name = (sa?.last_name && String(sa.last_name).trim()) || ''
-          const phone = (sa?.phone && String(sa.phone).trim()) || ''
-
-          if (phone) {
-            const identityMethod = /@guest\.local$/i.test(customerId) ? 'phone' : 'email'
-            const formData = {
-              first_name,
-              last_name,
-              phone,
-              address: {
-                address_1: sa?.address_1 || '',
-                city: sa?.city || '',
-                postal_code: sa?.postal_code || '',
-                province: sa?.province || '',
-                country_code: (sa?.country_code || 'in').toString().toLowerCase(),
-                phone: phone,
-              },
-            }
-            const syncRes = await fetch(`${new URL(req.url).origin}/api/checkout/customer/sync`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                customerId,
-                cartId,
+          // SECURITY FIX: Skip sync for authenticated real customers to prevent duplicate account creation
+          const isRealCustomer = customerId.startsWith('cus_') && !customerId.includes('@guest.local')
+          
+          if (isRealCustomer) {
+            try { 
+              console.log('[COMPLETE_API][sync][skipped_authenticated]', { 
+                customerId, 
                 orderId: createdOrderId,
-                formData,
-                orderCreated: true,
-                identityMethod,
-                whatsapp_authenticated: identityMethod === 'phone',
-                email_authenticated: identityMethod === 'email',
-              }),
-            })
-            try { console.log('[COMPLETE_API][sync][status]', { status: syncRes.status }) } catch {}
+                reason: 'Real authenticated customer - no sync needed' 
+              }) 
+            } catch {}
           } else {
-            try { console.log('[COMPLETE_API][sync][skipped]', { reason: 'no_phone_in_shipping_address' }) } catch {}
+            // Only sync for guest customers
+            // Fetch order details to get shipping address
+            const orderDetails = await medusaApiClient.getOrder(createdOrderId)
+            const sa: any = (orderDetails as any)?.shipping_address || {}
+            const first_name = (sa?.first_name && String(sa.first_name).trim()) || 'Customer'
+            const last_name = (sa?.last_name && String(sa.last_name).trim()) || ''
+            const phone = (sa?.phone && String(sa.phone).trim()) || ''
+
+            if (phone) {
+              const identityMethod = /@guest\.local$/i.test(customerId) ? 'phone' : 'email'
+              const formData = {
+                first_name,
+                last_name,
+                phone,
+                address: {
+                  address_1: sa?.address_1 || '',
+                  city: sa?.city || '',
+                  postal_code: sa?.postal_code || '',
+                  province: sa?.province || '',
+                  country_code: (sa?.country_code || 'in').toString().toLowerCase(),
+                  phone: phone,
+                },
+              }
+              const syncRes = await fetch(`${new URL(req.url).origin}/api/checkout/customer/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  customerId,
+                  cartId,
+                  orderId: createdOrderId,
+                  formData,
+                  orderCreated: true,
+                  identityMethod,
+                  whatsapp_authenticated: identityMethod === 'phone',
+                  email_authenticated: identityMethod === 'email',
+                }),
+              })
+              try { console.log('[COMPLETE_API][sync][status]', { status: syncRes.status }) } catch {}
+            } else {
+              try { console.log('[COMPLETE_API][sync][skipped]', { reason: 'no_phone_in_shipping_address' }) } catch {}
+            }
           }
         } catch (e: any) {
           try { console.log('[COMPLETE_API][sync][error]', { error: e?.message || String(e) }) } catch {}
