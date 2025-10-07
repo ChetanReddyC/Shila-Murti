@@ -421,25 +421,28 @@ export default function OrderDetailsPage() {
                     <div className={styles.cardHeader}>
                       <p className={styles.itemsTitle}>Items:</p>
                       {orderData.items && orderData.items.length > 0 ? (
-                        orderData.items.map((item) => (
-                          <div key={item.id} className={styles.itemRow}>
-                            <img
-                              src={item.thumbnail || item.variant?.product?.thumbnail || '/placeholder-product.png'}
-                              alt={item.title}
-                              className={styles.itemImage}
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = '/placeholder-product.png';
-                              }}
-                            />
-                            <div className={styles.itemDetails}>
-                              <p className={styles.itemTitle}>{item.title}</p>
-                              <p className={styles.itemMeta}>
-                                Quantity: {item.quantity} | Price: {formatCurrency(item.unit_price || 0, orderData.currency_code || 'inr')}
-                              </p>
+                        <div className={orderData.items.length > 1 ? styles.itemsGrid : styles.itemsSingle}>
+                          {orderData.items.map((item) => (
+                            <div key={item.id} className={orderData.items.length > 1 ? styles.itemRow : styles.itemRowSingle}>
+                              <img
+                                src={item.thumbnail || item.variant?.product?.thumbnail || '/placeholder-product.png'}
+                                alt={item.title}
+                                className={orderData.items.length > 1 ? styles.itemImage : styles.itemImageSingle}
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = '/placeholder-product.png';
+                                }}
+                              />
+                              <div className={styles.itemDetails}>
+                                <p className={styles.itemTitle}>{item.title}</p>
+                                <div className={styles.itemMeta}>
+                                  <span>Quantity: {item.quantity}</span>
+                                  <span>{formatCurrency(item.unit_price || 0, orderData.currency_code || 'inr')}</span>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          ))}
+                        </div>
                       ) : (
                         <p className={styles.itemMeta}>No items found</p>
                       )}
