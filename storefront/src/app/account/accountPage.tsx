@@ -14,7 +14,7 @@ export default function AccountPage() {
   // Real data state (UI not changed; just wiring values)
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [orders, setOrders] = useState<Array<{ id: string; date: string; item: string; status: string }>>([]);
+  const [orders, setOrders] = useState<Array<{ id: string; orderId: string; date: string; item: string; status: string }>>([]);
   const [addressText, setAddressText] = useState<string>('');
   const [addresses, setAddresses] = useState<Array<{ label: string; value: string }>>([]);
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -142,8 +142,9 @@ export default function AccountPage() {
             const items = Array.isArray(o.items) ? o.items : []
             const firstItem = items[0]?.title || (items[0]?.variant?.title) || 'Order items'
             const id = (o.display_id ? `#${o.display_id}` : (o.id || '')) as string
+            const orderId = o.id as string
             const status = (o.status || o.fulfillment_status || 'Processing') as string
-            return { id, date, item: firstItem, status }
+            return { id, orderId, date, item: firstItem, status }
           })
           setOrders(mapped)
         }
@@ -245,7 +246,7 @@ export default function AccountPage() {
                                 <div className={styles.statusBadge}>{order.status}</div>
                               </td>
                               <td className={styles.tableCell}>
-                                <span className={styles.viewDetails}>View Details</span>
+                                <Link href={`/account/orders/${order.orderId}`} className={styles.viewDetails}>View Details</Link>
                               </td>
                             </tr>
                           ))}
@@ -338,7 +339,7 @@ export default function AccountPage() {
                                 <div className={styles.statusBadge}>{order.status}</div>
                               </td>
                               <td className={styles.tableCell}>
-                                <span className={styles.viewDetails}>View Details</span>
+                                <Link href={`/account/orders/${order.orderId}`} className={styles.viewDetails}>View Details</Link>
                               </td>
                             </tr>
                           ))}
