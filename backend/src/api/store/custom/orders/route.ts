@@ -20,13 +20,52 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     // Fetch customer's orders from database
     const orderModuleService: any = req.scope.resolve(Modules.ORDER)
     
-    const orders = await orderModuleService.listOrders({
-      customer_id: customerId,
-    }, {
-      relations: ["items"],
-      take: 100,
-    })
-
+    // Try to fetch orders with relations, fall back if it fails
+    let orders: any[] = []
+    
+    try {
+      // Attempt with relations
+      orders = await orderModuleService.listOrders({
+        customer_id: customerId,
+      }, {
+        relations: [
+          "items",
+          "items.variant",
+          "items.variant.product",
+          "shipping_address",
+          "billing_address",
+          "shipping_methods",
+          "payment_collections",
+          "payment_collections.payments",
+          "fulfillments",
+          "fulfillments.labels"
+        ],
+        take: 100,
+      })
+      console.log("[CUSTOM_ORDERS_ROUTE][WITH_RELATIONS]", `Fetched ${orders?.length || 0} orders`)
+    } catch (relationError: any) {
+      console.warn("[CUSTOM_ORDERS_ROUTE][RELATION_ERROR]", relationError?.message)
+      
+      // Fallback: just get basic orders and let Medusa auto-populate what it can
+      orders = await orderModuleService.listOrders({
+        customer_id: customerId,
+      }, {
+        take: 100,
+      })
+      console.log("[CUSTOM_ORDERS_ROUTE][WITHOUT_RELATIONS]", `Fetched ${orders?.length || 0} orders`)
+    }
+    
+    if (orders && orders.length > 0) {
+      console.log("[CUSTOM_ORDERS_ROUTE][SAMPLE]", JSON.stringify({
+        id: orders[0].id,
+        hasItems: !!orders[0].items,
+        itemsCount: orders[0].items?.length || 0,
+        hasShippingAddress: !!orders[0].shipping_address,
+        hasFulfillments: !!orders[0].fulfillments,
+        keys: Object.keys(orders[0])
+      }, null, 2))
+    }
+    
     return res.status(200).json({ orders: orders || [] })
   } catch (error: any) {
     console.error("[CUSTOM_ORDERS_ROUTE][ERROR]", error)

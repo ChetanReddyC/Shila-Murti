@@ -8,33 +8,140 @@ import styles from './page.module.css';
 type OrderStage = 'Placed' | 'Processed' | 'Shipped' | 'Delivered';
 
 interface OrderItem {
+  id: string;
   title: string;
+  subtitle?: string;
+  thumbnail?: string;
   quantity: number;
   unit_price: number;
+  subtotal: number;
+  total: number;
+  variant?: {
+    id: string;
+    title: string;
+    product?: {
+      id: string;
+      title: string;
+      thumbnail?: string;
+    };
+  };
+}
+
+interface Address {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  address_1: string;
+  address_2?: string;
+  city: string;
+  province?: string;
+  postal_code: string;
+  country_code: string;
+  phone?: string;
+}
+
+interface ShippingMethod {
+  id: string;
+  name: string;
+  amount: number;
+}
+
+interface Payment {
+  id: string;
+  amount: number;
+  provider_id: string;
+  captured_at?: string;
+  currency_code: string;
+}
+
+interface PaymentCollection {
+  id: string;
+  status: string;
+  payments?: Payment[];
+  amount: number;
+}
+
+interface Fulfillment {
+  id: string;
+  packed_at?: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  labels?: Array<{ tracking_number?: string }>;
 }
 
 interface OrderData {
   id: string;
   display_id: string;
   created_at: string;
-  items: OrderItem[];
+  status: string;
+  fulfillment_status: string;
+  payment_status?: string;
+  currency_code: string;
+  
+  // Financial
   subtotal: number;
   shipping_total: number;
   tax_total: number;
   total: number;
-  status: string;
-  fulfillment_status: string;
-  shipping_address?: {
-    address_1: string;
-    city: string;
-    postal_code: string;
-  };
-  billing_address?: {
-    address_1: string;
-    city: string;
-    postal_code: string;
-  };
+  
+  // Relations
+  items: OrderItem[];
+  shipping_address?: Address;
+  billing_address?: Address;
+  shipping_methods?: ShippingMethod[];
+  payment_collections?: PaymentCollection[];
+  fulfillments?: Fulfillment[];
+  
+  metadata?: Record<string, any>;
 }
+
+// Helper functions
+const formatCurrency = (amount: number, currencyCode: string = 'inr') => {
+  // Don't divide - the backend values are already in the correct format
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: currencyCode.toUpperCase(),
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
+const formatAddress = (addr?: Address) => {
+  if (!addr) return '—';
+  const parts = [
+    addr.address_1,
+    addr.address_2,
+    addr.city,
+    addr.province,
+    addr.postal_code
+  ].filter(Boolean);
+  return parts.join(', ');
+};
+
+const getPaymentMethodName = (providerId?: string) => {
+  if (!providerId) return 'Payment Method Not Available';
+  
+  const providerMap: Record<string, string> = {
+    'pp_system_default': 'Manual Payment',
+    'stripe': 'Credit Card',
+    'razorpay': 'Razorpay',
+    'cashfree': 'Cashfree Gateway'
+  };
+  
+  return providerMap[providerId] || providerId;
+};
+
+const getActiveStageFromStatus = (status: string): OrderStage => {
+  const statusMap: Record<string, OrderStage> = {
+    'not_fulfilled': 'Placed',
+    'partially_fulfilled': 'Processed',
+    'fulfilled': 'Shipped',
+    'shipped': 'Shipped',
+    'delivered': 'Delivered'
+  };
+  
+  return statusMap[status] || 'Placed';
+};
 
 export default function OrderDetailsPage() {
   const params = useParams();
@@ -70,14 +177,29 @@ export default function OrderDetailsPage() {
           return;
         }
 
-        const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`);
+        // Fetch the specific order directly instead of all orders
+        const res = await fetch(`/api/account/orders/${orderId}?customer_id=${encodeURIComponent(customerId)}`);
         if (res.ok) {
           const json = await res.json();
-          const orders: any[] = Array.isArray(json?.orders) ? json.orders : [];
-          const order = orders.find(o => o.id === orderId);
+          const order = json?.order;
           if (order) {
+            console.log('[ORDER_DETAILS_DEBUG]', {
+              orderId: order.id,
+              hasItems: !!order.items,
+              itemsCount: order.items?.length || 0,
+              hasShippingAddress: !!order.shipping_address,
+              hasFulfillments: !!order.fulfillments,
+              hasPaymentCollections: !!order.payment_collections,
+              hasShippingMethods: !!order.shipping_methods,
+              keys: Object.keys(order)
+            });
             setOrderData(order);
+          } else {
+            console.error('[ORDER_DETAILS_DEBUG] Order not found in response', { json });
           }
+        } else {
+          const errorText = await res.text().catch(() => '');
+          console.error('[ORDER_DETAILS_DEBUG] Failed to fetch order', { status: res.status, error: errorText });
         }
       } catch (error) {
         console.error('Failed to fetch order:', error);
@@ -88,6 +210,13 @@ export default function OrderDetailsPage() {
 
     fetchOrderData();
   }, [orderId]);
+
+  // Set active stage based on fulfillment status
+  useEffect(() => {
+    if (orderData?.fulfillment_status) {
+      setActiveStage(getActiveStageFromStatus(orderData.fulfillment_status));
+    }
+  }, [orderData]);
 
   // Calculate line heights dynamically
   useEffect(() => {
@@ -154,6 +283,24 @@ export default function OrderDetailsPage() {
     { name: 'Shipped', icon: 'local_shipping' },
     { name: 'Delivered', icon: 'package' },
   ];
+
+  const getTimelineDate = (stage: 'placed' | 'processed' | 'shipped' | 'delivered'): string | null => {
+    if (!orderData) return null;
+    const ful = orderData.fulfillments?.[0];
+    
+    switch(stage) {
+      case 'placed':
+        return orderData.created_at;
+      case 'processed':
+        return ful?.packed_at || null;
+      case 'shipped':
+        return ful?.shipped_at || null;
+      case 'delivered':
+        return ful?.delivered_at || null;
+      default:
+        return null;
+    }
+  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -265,39 +412,55 @@ export default function OrderDetailsPage() {
                 </div>
                 <div className={styles.timelineContent} ref={placedContentRef}>
                   <p className={styles.sectionTitle}>Order Placed</p>
-                  <p className={styles.sectionTime}>August 15, 2023 at 10:00 AM</p>
+                  {getTimelineDate('placed') && (
+                    <p className={styles.sectionTime}>
+                      {formatDate(getTimelineDate('placed')!)} at {formatTime(getTimelineDate('placed')!)}
+                    </p>
+                  )}
                   <div className={styles.card}>
                     <div className={styles.cardHeader}>
                       <p className={styles.itemsTitle}>Items:</p>
-                      <div className={styles.itemRow}>
-                        <img
-                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnu3awfpgr3uSWHku9rc_wmzpjlxrODRpp7uzpt0qikzWTJyP4_ter_FspWxwbtyyO60Zyz9dpwZvYq-Gixi-ySzk6DljLPHd6Rkcn-3tGk5oH0Gu4QTTWunP6quJpqy8ghMO7_EG3q4KkaGeZf4rMXLbvT-k_s7GfB9N0vvHEQd0OBVKvkJVSMeKuuGS7xRe0kSEE7TsiVKEj_b96yqIk--X9gleHauIBi7fS5Vxs81R_Tr9Tx-02FHovgcHBuf7zYKRq5wOT81Br"
-                          alt="Stone Idol of Ganesha"
-                          className={styles.itemImage}
-                        />
-                        <div className={styles.itemDetails}>
-                          <p className={styles.itemTitle}>Stone Idol of Ganesha</p>
-                          <p className={styles.itemMeta}>Quantity: 1 | Price: $150</p>
-                        </div>
-                      </div>
+                      {orderData.items && orderData.items.length > 0 ? (
+                        orderData.items.map((item) => (
+                          <div key={item.id} className={styles.itemRow}>
+                            <img
+                              src={item.thumbnail || item.variant?.product?.thumbnail || '/placeholder-product.png'}
+                              alt={item.title}
+                              className={styles.itemImage}
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = '/placeholder-product.png';
+                              }}
+                            />
+                            <div className={styles.itemDetails}>
+                              <p className={styles.itemTitle}>{item.title}</p>
+                              <p className={styles.itemMeta}>
+                                Quantity: {item.quantity} | Price: {formatCurrency(item.unit_price || 0, orderData.currency_code || 'inr')}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className={styles.itemMeta}>No items found</p>
+                      )}
                     </div>
                     <div className={styles.cardBody}>
                       <div className={styles.summaryContainer}>
                         <div className={styles.summaryRow}>
                           <p className={styles.summaryLabel}>Subtotal</p>
-                          <p className={styles.summaryValue}>$150</p>
+                          <p className={styles.summaryValue}>{formatCurrency(orderData.subtotal || 0, orderData.currency_code || 'inr')}</p>
                         </div>
                         <div className={styles.summaryRow}>
                           <p className={styles.summaryLabel}>Shipping</p>
-                          <p className={styles.summaryValue}>$10</p>
+                          <p className={styles.summaryValue}>{formatCurrency(orderData.shipping_total || 0, orderData.currency_code || 'inr')}</p>
                         </div>
                         <div className={styles.summaryRow}>
                           <p className={styles.summaryLabel}>Taxes</p>
-                          <p className={styles.summaryValue}>$0</p>
+                          <p className={styles.summaryValue}>{formatCurrency(orderData.tax_total || 0, orderData.currency_code || 'inr')}</p>
                         </div>
                         <div className={styles.totalRow}>
                           <p className={styles.totalLabel}>Total</p>
-                          <p className={styles.totalValue}>$160</p>
+                          <p className={styles.totalValue}>{formatCurrency(orderData.total || 0, orderData.currency_code || 'inr')}</p>
                         </div>
                       </div>
                     </div>
@@ -321,25 +484,37 @@ export default function OrderDetailsPage() {
                 </div>
                 <div className={styles.timelineContent} ref={processedContentRef}>
                   <p className={styles.sectionTitle}>Order Processed</p>
-                  <p className={styles.sectionTime}>August 16, 2023 at 09:00 AM</p>
+                  {getTimelineDate('processed') ? (
+                    <p className={styles.sectionTime}>
+                      {formatDate(getTimelineDate('processed')!)} at {formatTime(getTimelineDate('processed')!)}
+                    </p>
+                  ) : (
+                    <p className={styles.sectionTime}>Processing...</p>
+                  )}
                   <div className={styles.card}>
                     <div className={styles.cardBody}>
                       <div className={styles.detailsContainer}>
                         <div className={styles.detailRow}>
                           <p className={styles.detailLabel}>Shipping Address</p>
-                          <p className={styles.detailValue}>123 Main Street, Anytown, 12345</p>
+                          <p className={styles.detailValue}>{formatAddress(orderData.shipping_address)}</p>
                         </div>
                         <div className={styles.detailRow}>
                           <p className={styles.detailLabel}>Shipping Method</p>
-                          <p className={styles.detailValue}>Standard Shipping</p>
+                          <p className={styles.detailValue}>
+                            {orderData.shipping_methods?.[0]?.name || 'Standard Shipping'}
+                          </p>
                         </div>
                         <div className={styles.detailRow}>
                           <p className={styles.detailLabel}>Billing Address</p>
-                          <p className={styles.detailValue}>123 Main Street, Anytown, 12345</p>
+                          <p className={styles.detailValue}>
+                            {formatAddress(orderData.billing_address || orderData.shipping_address)}
+                          </p>
                         </div>
                         <div className={styles.detailRow}>
                           <p className={styles.detailLabel}>Payment Method</p>
-                          <p className={styles.detailValue}>MasterCard ending in 1234</p>
+                          <p className={styles.detailValue}>
+                            {getPaymentMethodName(orderData.payment_collections?.[0]?.payments?.[0]?.provider_id)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -363,14 +538,31 @@ export default function OrderDetailsPage() {
                 </div>
                 <div className={styles.timelineContent} ref={shippedContentRef}>
                   <p className={styles.sectionTitle}>Order Shipped</p>
-                  <p className={styles.sectionTime}>August 17, 2023 at 02:00 PM</p>
+                  {getTimelineDate('shipped') ? (
+                    <p className={styles.sectionTime}>
+                      {formatDate(getTimelineDate('shipped')!)} at {formatTime(getTimelineDate('shipped')!)}
+                    </p>
+                  ) : (
+                    <p className={styles.sectionTime}>Awaiting shipment...</p>
+                  )}
                   <div className={styles.card}>
                     <div className={styles.cardBody}>
-                      <p className={styles.trackingTitle}>Tracking Information:</p>
-                      <p className={styles.trackingNumber}>Tracking Number: 9876543210</p>
-                      <a className={styles.trackingLink} href="#">
-                        Track your order on the carrier's website
-                      </a>
+                      {orderData.fulfillments?.[0]?.labels?.[0]?.tracking_number ? (
+                        <>
+                          <p className={styles.trackingTitle}>Tracking Information:</p>
+                          <p className={styles.trackingNumber}>
+                            Tracking Number: {orderData.fulfillments[0].labels[0].tracking_number}
+                          </p>
+                          <a className={styles.trackingLink} href="#" onClick={(e) => e.preventDefault()}>
+                            Track your order on the carrier&apos;s website
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <p className={styles.trackingTitle}>Tracking Information:</p>
+                          <p className={styles.trackingNumber}>Tracking information not available yet</p>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -388,7 +580,23 @@ export default function OrderDetailsPage() {
                 </div>
                 <div className={styles.timelineContentNoBottom}>
                   <p className={styles.sectionTitle}>Delivered</p>
-                  <p className={styles.sectionTimeBase}>Estimated Delivery: August 20, 2023</p>
+                  {getTimelineDate('delivered') ? (
+                    <p className={styles.sectionTimeBase}>
+                      Delivered on {formatDate(getTimelineDate('delivered')!)}
+                    </p>
+                  ) : (
+                    <p className={styles.sectionTimeBase}>
+                      Estimated Delivery: {(() => {
+                        const shippedDate = getTimelineDate('shipped');
+                        if (shippedDate) {
+                          const estimated = new Date(shippedDate);
+                          estimated.setDate(estimated.getDate() + 3); // Add 3 days for estimated delivery
+                          return formatDate(estimated.toISOString());
+                        }
+                        return 'To be determined';
+                      })()}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
