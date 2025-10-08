@@ -324,9 +324,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Create a new cart
   const createCart = React.useCallback(async (): Promise<void> => {
-    if (isOrderConfirmationActive()) {
-      return;
-    }
+    // Lock removed - backend guard handles duplicate prevention
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     setLastOperation({ type: 'createCart', params: [] });
@@ -343,7 +341,7 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error; // Re-throw so calling components can handle it
     }
-  }, [isOrderConfirmationActive]);
+  }, [handleApiError]);
 
   // Handle cart session expiration and recreation
   const handleCartExpiration = React.useCallback(async (): Promise<void> => {
@@ -356,10 +354,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Load a specific cart by ID (for cross-device recovery)
   const loadSpecificCart = React.useCallback(async (cartId: string): Promise<void> => {
-    if (isOrderConfirmationActive()) {
-      return;
-    }
-
+    // Lock removed - backend guard handles duplicate prevention
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -384,13 +379,11 @@ export function CartProvider({ children }: CartProviderProps) {
         dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
     }
-  }, [handleApiError, isOrderConfirmationActive]);
+  }, [handleApiError]);
 
   // Refresh cart from API with enhanced error handling
   const refreshCart = React.useCallback(async (): Promise<void> => {
-    if (isOrderConfirmationActive()) {
-      return;
-    }
+    // Lock removed - backend guard handles duplicate prevention
     const cartId = state.cartId || getCartIdFromSession();
 
     if (!cartId) {
@@ -422,13 +415,11 @@ export function CartProvider({ children }: CartProviderProps) {
         dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
     }
-  }, [state.cartId, handleCartExpiration, handleApiError, isOrderConfirmationActive]);
+  }, [state.cartId, handleCartExpiration, handleApiError]);
 
   // Add item to cart with enhanced session management
   const addToCart = React.useCallback(async (variantId: string, quantity: number): Promise<void> => {
-    if (isOrderConfirmationActive()) {
-      return;
-    }
+    // Lock removed - backend guard handles duplicate prevention
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     setLastOperation({ type: 'addToCart', params: [variantId, quantity] });
@@ -498,13 +489,11 @@ export function CartProvider({ children }: CartProviderProps) {
 
       throw error; // Re-throw so calling components can handle it
     }
-  }, [state.cart, state.cartId, handleApiError, isOrderConfirmationActive]);
+  }, [state.cart, state.cartId, handleApiError, handleCartExpiration]);
 
   // Remove item from cart
   const removeFromCart = React.useCallback(async (lineItemId: string): Promise<void> => {
-    if (isOrderConfirmationActive()) {
-      return;
-    }
+    // Lock removed - backend guard handles duplicate prevention
     if (!state.cart) {
       throw new Error('No cart available');
     }
@@ -546,13 +535,11 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
     }
-  }, [state.cart, handleApiError, isOrderConfirmationActive]);
+  }, [state.cart, handleApiError]);
 
   // Update item quantity in cart
   const updateQuantity = React.useCallback(async (lineItemId: string, quantity: number): Promise<void> => {
-    if (isOrderConfirmationActive()) {
-      return;
-    }
+    // Lock removed - backend guard handles duplicate prevention
     if (!state.cart) {
       throw new Error('No cart available');
     }
@@ -585,7 +572,7 @@ export function CartProvider({ children }: CartProviderProps) {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
     }
-  }, [state.cart, removeFromCart, handleApiError, isOrderConfirmationActive]);
+  }, [state.cart, removeFromCart, handleApiError]);
 
   // Clear cart (reset state and remove from session)
   const clearCart = React.useCallback(async (): Promise<void> => {
@@ -664,9 +651,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Validate cart session integrity
   const validateCartSession = React.useCallback(async (cartId: string): Promise<boolean> => {
-    if (isOrderConfirmationActive()) {
-      return false;
-    }
+    // Lock removed - backend guard handles duplicate prevention
     try {
       const cart = await medusaApiClient.getCart(cartId);
       if ((cart as any)?.completed_at) {
@@ -676,27 +661,17 @@ export function CartProvider({ children }: CartProviderProps) {
     } catch (error) {
       return false;
     }
-  }, [isOrderConfirmationActive]);
+  }, []);
 
   // Initialize cart on mount and handle session management
   useEffect(() => {
     const initializeCart = async () => {
-      // Check if we're in a post-order state where cart recovery should be blocked
-      if (typeof window !== 'undefined') {
-        const active = isOrderConfirmationActive();
-        if (active) {
-          dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: true });
-          return;
-        }
-      }
-
-      const path = typeof window !== 'undefined' ? window.location.pathname : ''
+      // Lock removed - immediate cart recovery after order completion
       const savedCartId = getCartIdFromSession();
 
-      // On order-confirmation page, do not recover cart to avoid any interference; user just placed an order.
+      // On order-confirmation page, do not recover cart to avoid interference
+      const path = typeof window !== 'undefined' ? window.location.pathname : ''
       if (path && path.startsWith('/order-confirmation')) {
-        // Set a marker to prevent any cart-related redirects for the next 30 seconds
-        setOrderConfirmationProtection(true);
         return
       }
 
@@ -715,21 +690,9 @@ export function CartProvider({ children }: CartProviderProps) {
     };
 
     initializeCart();
-  }, [isOrderConfirmationActive, setOrderConfirmationProtection]);
+  }, []);
 
-  // Handle browser back/forward: if user navigates to order confirmation, refresh protection TTL
-  useEffect(() => {
-    const handlePopState = () => {
-      const path = typeof window !== 'undefined' ? window.location.pathname : '';
-      if (path && path.startsWith('/order-confirmation')) {
-        setOrderConfirmationProtection(true);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [setOrderConfirmationProtection]);
+  // Protection lock removed - browser back/forward handler no longer needed
 
   // Handle cross-tab cart synchronization via localStorage events
   useEffect(() => {
@@ -777,7 +740,6 @@ export function CartProvider({ children }: CartProviderProps) {
         // Do not auto-refresh on order confirmation page to avoid flicker/redirects
         const path = typeof window !== 'undefined' ? window.location.pathname : ''
         if (path && path.startsWith('/order-confirmation')) return
-        if (isOrderConfirmationActive()) return
         await refreshCart();
       }
     };
@@ -787,7 +749,7 @@ export function CartProvider({ children }: CartProviderProps) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [state.cartId, isOrderConfirmationActive, refreshCart]);
+  }, [state.cartId, refreshCart]);
 
   // Handle network connectivity changes to ensure cart persistence
   useEffect(() => {
@@ -795,7 +757,6 @@ export function CartProvider({ children }: CartProviderProps) {
 
       // If we have a cart ID but no cart data, try to refresh
       if (state.cartId && !state.cart) {
-        if (isOrderConfirmationActive()) return
         await refreshCart();
       }
     };
@@ -811,14 +772,11 @@ export function CartProvider({ children }: CartProviderProps) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [state.cartId, state.cart, isOrderConfirmationActive, refreshCart]);
+  }, [state.cartId, state.cart, refreshCart]);
 
   // Periodic cart session validation to ensure persistence
   useEffect(() => {
     if (!state.cartId || !state.cart) {
-      return;
-    }
-    if (isOrderConfirmationActive()) {
       return;
     }
 
@@ -835,7 +793,7 @@ export function CartProvider({ children }: CartProviderProps) {
     return () => {
       clearInterval(validationInterval);
     };
-  }, [state.cartId, state.cart, isOrderConfirmationActive, handleCartExpiration]);
+  }, [state.cartId, state.cart, handleCartExpiration]);
 
   // Context value
   const contextValue: CartContextType = React.useMemo(() => ({

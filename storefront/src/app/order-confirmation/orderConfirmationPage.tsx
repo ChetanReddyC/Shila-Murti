@@ -35,13 +35,8 @@ export default function OrderConfirmationPage() {
   
   // Use useEffect to run date calculations and load order/snapshot on the client side
   useEffect(() => {
-    // Activate order confirmation protection and clear cart silently after mount
-    try { setOrderConfirmationProtection(true) } catch {}
-    // Defer silent clearing until after initial content is prepared to avoid visible empty-cart flash
-    const clearTimer = setTimeout(() => {
-      try { void clearCartSilently() } catch (e) {
-      }
-    }, 1200);
+    // Clear cart immediately (lock removed - backend guard handles protection)
+    try { void clearCartSilently() } catch (e) {}
     // Capture cart once at mount to keep UI stable regardless of later cart updates
     setFallbackCart(cart ?? null);
     
@@ -148,9 +143,8 @@ export default function OrderConfirmationPage() {
 
     return () => {
       clearTimeout(clearSnapshotTimer);
-      clearTimeout(clearTimer);
     };
-  }, [clearCartSilently, setOrderConfirmationProtection]);
+  }, [clearCartSilently]);
 
 
 
