@@ -122,7 +122,7 @@ const getPaymentMethodName = (providerId?: string) => {
   if (!providerId) return 'Payment Method Not Available';
   
   const providerMap: Record<string, string> = {
-    'pp_system_default': 'Manual Payment',
+    'pp_system_default': 'Cashfree Gateway',
     'stripe': 'Credit Card',
     'razorpay': 'Razorpay',
     'cashfree': 'Cashfree Gateway'
@@ -314,6 +314,25 @@ export default function OrderDetailsPage() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  const isStageComplete = (stage: 'placed' | 'processed' | 'shipped' | 'delivered'): boolean => {
+    if (stage === 'processed') {
+      const status = orderData?.fulfillment_status;
+      console.log('[DEBUG] Order Processed check:', { 
+        stage, 
+        status, 
+        allOrderKeys: orderData ? Object.keys(orderData) : [],
+        hasFulfillmentStatus: 'fulfillment_status' in (orderData || {}),
+        orderDataSnippet: {
+          id: orderData?.id,
+          status: orderData?.status,
+          fulfillment_status: orderData?.fulfillment_status
+        }
+      });
+      return status === 'fulfilled' || status === 'shipped' || status === 'delivered';
+    }
+    return getTimelineDate(stage) !== null;
+  };
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -478,7 +497,11 @@ export default function OrderDetailsPage() {
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
-                    <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    {isStageComplete('processed') ? (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    ) : (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>schedule</span>
+                    )}
                   </div>
                   <div 
                     className={styles.timelineLine} 
@@ -532,7 +555,11 @@ export default function OrderDetailsPage() {
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
-                    <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    {isStageComplete('shipped') ? (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    ) : (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>schedule</span>
+                    )}
                   </div>
                   <div 
                     className={styles.timelineLine} 
@@ -578,7 +605,11 @@ export default function OrderDetailsPage() {
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
-                    <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>local_shipping</span>
+                    {isStageComplete('delivered') ? (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    ) : (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>schedule</span>
+                    )}
                   </div>
                 </div>
                 <div className={styles.timelineContentNoBottom}>
