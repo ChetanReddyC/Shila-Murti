@@ -314,22 +314,9 @@ export default function OrderDetailsPage() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  // Check if a stage is complete based on whether it has a timestamp
   const isStageComplete = (stage: 'placed' | 'processed' | 'shipped' | 'delivered'): boolean => {
-    if (stage === 'processed') {
-      const status = orderData?.fulfillment_status;
-      console.log('[DEBUG] Order Processed check:', { 
-        stage, 
-        status, 
-        allOrderKeys: orderData ? Object.keys(orderData) : [],
-        hasFulfillmentStatus: 'fulfillment_status' in (orderData || {}),
-        orderDataSnippet: {
-          id: orderData?.id,
-          status: orderData?.status,
-          fulfillment_status: orderData?.fulfillment_status
-        }
-      });
-      return status === 'fulfilled' || status === 'shipped' || status === 'delivered';
-    }
+    if (stage === 'placed') return true; // Placed is always complete
     return getTimelineDate(stage) !== null;
   };
 
