@@ -131,22 +131,9 @@ const getPaymentMethodName = (providerId?: string) => {
   return providerMap[providerId] || providerId;
 };
 
-const getActiveStageFromStatus = (status: string): OrderStage => {
-  const statusMap: Record<string, OrderStage> = {
-    'not_fulfilled': 'Placed',
-    'partially_fulfilled': 'Processed',
-    'fulfilled': 'Shipped',
-    'shipped': 'Shipped',
-    'delivered': 'Delivered'
-  };
-  
-  return statusMap[status] || 'Placed';
-};
-
 export default function OrderDetailsPage() {
   const params = useParams();
   const orderId = params?.orderId as string;
-  const [activeStage, setActiveStage] = useState<OrderStage>('Placed');
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -211,12 +198,7 @@ export default function OrderDetailsPage() {
     fetchOrderData();
   }, [orderId]);
 
-  // Set active stage based on fulfillment status
-  useEffect(() => {
-    if (orderData?.fulfillment_status) {
-      setActiveStage(getActiveStageFromStatus(orderData.fulfillment_status));
-    }
-  }, [orderData]);
+
 
   // Calculate line heights dynamically
   useEffect(() => {
@@ -365,38 +347,38 @@ export default function OrderDetailsPage() {
 
           {/* Progress Tracker */}
           <div className={styles.progressTracker}>
-            {stages.map((stage, index) => (
-              <React.Fragment key={stage.name}>
-                <div
-                  className={`${styles.stageItem} ${
-                    activeStage === stage.name ? styles.stageItemActive : styles.stageItemInactive
-                  }`}
-                  onClick={() => setActiveStage(stage.name)}
-                >
-                  <div
-                    className={`${styles.stageIcon} ${
-                      activeStage === stage.name
-                        ? styles.stageIconActive
-                        : styles.stageIconInactive
-                    }`}
-                  >
-                    <span className={`material-symbols-outlined ${styles.materialIcon}`}>{stage.icon}</span>
+            {stages.map((stage, index) => {
+              const stageKey = stage.name.toLowerCase() as 'placed' | 'processed' | 'shipped' | 'delivered';
+              const isComplete = isStageComplete(stageKey);
+              
+              return (
+                <React.Fragment key={stage.name}>
+                  <div className={styles.stageItem}>
+                    <div
+                      className={`${styles.stageIcon} ${
+                        isComplete
+                          ? styles.stageIconActive
+                          : styles.stageIconInactive
+                      }`}
+                    >
+                      <span className={`material-symbols-outlined ${styles.materialIcon}`}>{stage.icon}</span>
+                    </div>
+                    <p
+                      className={`${styles.stageName} ${
+                        isComplete
+                          ? styles.stageNameActive
+                          : styles.stageNameInactive
+                      }`}
+                    >
+                      {stage.name}
+                    </p>
                   </div>
-                  <p
-                    className={`${styles.stageName} ${
-                      activeStage === stage.name
-                        ? styles.stageNameActive
-                        : styles.stageNameInactive
-                    }`}
-                  >
-                    {stage.name}
-                  </p>
-                </div>
-                {index < stages.length - 1 && (
-                  <div className={styles.progressLine}></div>
-                )}
-              </React.Fragment>
-            ))}
+                  {index < stages.length - 1 && (
+                    <div className={styles.progressLine}></div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
 
           {/* Stage Details */}
