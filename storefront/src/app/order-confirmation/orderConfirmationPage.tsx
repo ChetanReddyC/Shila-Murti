@@ -7,10 +7,11 @@ import styles from './orderConfirmationPage.module.css';
 import cartStyles from '../cart/cartPage.module.css';
 import { useCart } from '../../contexts/CartContext';
 import { medusaApiClient } from '../../utils/medusaApiClient';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function OrderConfirmationPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   // Use cart context only for protection and silent clearing; capture cart once for fallback display
   const { clearCartSilently, setOrderConfirmationProtection, cart } = useCart();
   const [fallbackCart, setFallbackCart] = useState<any | null>(null);
@@ -335,7 +336,13 @@ export default function OrderConfirmationPage() {
               </div>
             </div>
             <p className={styles.estimatedDelivery}>Estimated Delivery: {deliveryRange}</p>
-            <button className={`${styles.viewButton} ${styles.responsiveButton}`}>View Order Details</button>
+            <button 
+              className={`${styles.viewButton} ${styles.responsiveButton}`}
+              onClick={() => orderId && router.push(`/account/orders/${orderId}`)}
+              disabled={!orderId}
+            >
+              View Order Details
+            </button>
             <p className={styles.contactInfo}>For any questions, please contact our customer support at support@shilamurthi.com</p>
           </div>
         </div>
