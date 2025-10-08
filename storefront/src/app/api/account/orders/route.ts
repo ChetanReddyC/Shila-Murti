@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
     return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
   }
 
-  // Generate bridge token to authenticate as customer
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
   console.log('[ORDERS_TOKEN_DEBUG]', { hasToken: !!token, tokenPrefix: token?.slice(0, 20) })
   if (!token) {
@@ -33,8 +32,18 @@ export async function GET(req: NextRequest) {
     return new Response(JSON.stringify({ ok: false, error: 'auth_failed', message: 'JWT signing not configured' }), { status: 500 })
   }
 
-  // Use custom orders endpoint that verifies JWT
-  const res = await storeFetch('/store/custom/orders', { 
+  const url = new URL(req.url)
+  const cursor = url.searchParams.get('cursor')
+  const limit = url.searchParams.get('limit')
+  const search = url.searchParams.get('search')
+  
+  const queryParams = new URLSearchParams()
+  if (cursor) queryParams.set('cursor', cursor)
+  if (limit) queryParams.set('limit', limit)
+  if (search) queryParams.set('search', search)
+  
+  const endpoint = `/store/custom/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+  const res = await storeFetch(endpoint, { 
     bearerToken: token,
     headers: { 'Accept': 'application/json' }
   })

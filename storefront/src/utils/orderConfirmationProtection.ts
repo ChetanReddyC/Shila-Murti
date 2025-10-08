@@ -1,10 +1,13 @@
 'use client';
 
+// NOTE: Protection disabled - relying on backend Order Completion Guard
+// This file kept for potential future cross-tab state sync needs
+
 // Session storage key for order confirmation protection flag
 export const ORDER_CONFIRMATION_ACTIVE_KEY = 'order_confirmation_active';
 
-// Default TTL: 30 seconds
-export const DEFAULT_TTL_MS = 30_000;
+// Default TTL: Disabled (set to 0)
+export const DEFAULT_TTL_MS = 0;
 
 /**
  * Returns the expiration timestamp (ms since epoch) for the active protection flag, or null if not set/invalid.

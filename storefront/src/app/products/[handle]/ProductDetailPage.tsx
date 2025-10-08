@@ -772,10 +772,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       {/* Success/Error Feedback */}
                       <div className="mt-4">
                         <CartFeedback
-                          loading={state.isAddingToCart || cartLoading}
                           error={state.addToCartError || cartError}
                           success={state.addToCartSuccess ? `Successfully added ${state.selectedQuantity} ${state.selectedQuantity === 1 ? 'item' : 'items'} to cart!` : null}
-                          loadingMessage="Adding to cart..."
                           onDismissError={() => {
                             updateState({ addToCartError: null });
                             clearError();

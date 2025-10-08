@@ -9,9 +9,7 @@ import { useSession, signIn } from 'next-auth/react';
 const PasskeySection = dynamic(() => import('./PasskeySection'), { ssr: false })
 
 export default function AccountPage() {
-  // State to keep track of active tab
   const [activeTab, setActiveTab] = useState('Account Details');
-  // Real data state (UI not changed; just wiring values)
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [orders, setOrders] = useState<Array<{ id: string; orderId: string; date: string; item: string; status: string }>>([]);
@@ -20,6 +18,12 @@ export default function AccountPage() {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const { data: session } = useSession();
   const [ensureInFlight, setEnsureInFlight] = useState(false);
+  
+  const [cursorCache, setCursorCache] = useState<Map<number, string | null>>(new Map([[1, null]]));
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   // Navigation items
   const navigationItems = [
@@ -129,28 +133,238 @@ export default function AccountPage() {
         }
       } catch {}
     })()
-    // Load orders
-    ;(async () => {
-      try {
-        const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
-        if (res.ok) {
-          const json = await res.json()
-          const list: any[] = Array.isArray(json?.orders) ? json.orders : []
-          const mapped = list.map((o: any) => {
-            const created = o.created_at || o.createdAt
-            const date = created ? new Date(created).toISOString().slice(0, 10) : ''
-            const items = Array.isArray(o.items) ? o.items : []
-            const firstItem = items[0]?.title || (items[0]?.variant?.title) || 'Order items'
-            const id = (o.display_id ? `#${o.display_id}` : (o.id || '')) as string
-            const orderId = o.id as string
-            const status = (o.status || o.fulfillment_status || 'Processing') as string
-            return { id, orderId, date, item: firstItem, status }
-          })
-          setOrders(mapped)
-        }
-      } catch {}
-    })()
   }, [customerId])
+
+  const fetchOrders = async (page: number, search: string = '') => {
+    if (!customerId) return
+    
+    setOrdersLoading(true)
+    try {
+      const cursor = cursorCache.get(page)
+      const params = new URLSearchParams({ customer_id: customerId, limit: '6' })
+      if (cursor) params.set('cursor', cursor)
+      if (search) params.set('search', search)
+      
+      const res = await fetch(`/api/account/orders?${params.toString()}`)
+      if (res.ok) {
+        const json = await res.json()
+        const list: any[] = Array.isArray(json?.orders) ? json.orders : []
+        const mapped = list.map((o: any) => {
+          const created = o.created_at || o.createdAt
+          const date = created ? new Date(created).toISOString().slice(0, 10) : ''
+          const items = Array.isArray(o.items) ? o.items : []
+          const firstItem = items[0]?.title || (items[0]?.variant?.title) || 'Order items'
+          const id = (o.display_id ? `#${o.display_id}` : (o.id || '')) as string
+          const orderId = o.id as string
+          const status = (o.status || o.fulfillment_status || 'Processing') as string
+          return { id, orderId, date, item: firstItem, status }
+        })
+        
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
+        setOrders(mapped)
+        setHasMore(json.hasMore || false)
+        
+        if (json.nextCursor && json.hasMore) {
+          setCursorCache(prev => {
+            const newCache = new Map(prev)
+            newCache.set(page + 1, json.nextCursor)
+            return newCache
+          })
+        }
+      }
+    } catch {}
+    setOrdersLoading(false)
+  }
+
+  useEffect(() => {
+    if (customerId) {
+      fetchOrders(1, searchQuery)
+    }
+  }, [customerId])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    fetchOrders(page, searchQuery)
+  }
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query)
+    setCurrentPage(1)
+    setCursorCache(new Map([[1, null]]))
+    setHasMore(false)
+    fetchOrders(1, query)
+  }
+
+  const renderPagination = () => {
+    const pages: number[] = []
+    const maxVisiblePages = 5
+    
+    for (let i = 1; i <= Math.min(currentPage + (hasMore ? 1 : 0), currentPage + 3); i++) {
+      if (cursorCache.has(i) || i === currentPage) {
+        pages.push(i)
+      }
+    }
+    
+    return (
+      <div style={{ 
+        display: 'flex', 
+        gap: '12px', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        marginTop: '24px',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}>
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1 || ordersLoading}
+          style={{
+            padding: '4px 12px',
+            border: '1px solid #E5E7EB',
+            borderRadius: '10px',
+            background: '#F2F2F2',
+            cursor: currentPage === 1 || ordersLoading ? 'not-allowed' : 'pointer',
+            opacity: currentPage === 1 ? 0.5 : 1,
+            fontFamily: '"Public Sans", sans-serif',
+            fontWeight: 500,
+            fontSize: '14px',
+            lineHeight: '1.5em',
+            color: '#000000',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: 'scale(1)'
+          }}
+          onMouseEnter={(e) => !ordersLoading && currentPage !== 1 && (e.currentTarget.style.transform = 'scale(1.05)')}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        >
+          ← Previous
+        </button>
+        
+        <div style={{ 
+          display: 'inline-block',
+          position: 'relative',
+          width: `${pages.length * 60 + (pages.length - 1) * 12}px`,
+          transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflow: 'visible'
+        }}>
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            width: '100%'
+          }}>
+            {pages.map((page, index) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                disabled={ordersLoading}
+                style={{
+                  padding: '4px 12px',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '10px',
+                  background: page === currentPage ? '#000' : '#F2F2F2',
+                  color: page === currentPage ? '#fff' : '#000000',
+                  cursor: ordersLoading ? 'not-allowed' : 'pointer',
+                  fontFamily: '"Public Sans", sans-serif',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  lineHeight: '1.5em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '60px',
+                  height: '32px',
+                  flexShrink: 0,
+                  boxSizing: 'border-box',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: 'scale(1)',
+                  animation: `fadeInSlide 0.45s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.06}s both`
+                }}
+                onMouseEnter={(e) => !ordersLoading && (e.currentTarget.style.transform = 'scale(1.05)')}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        {hasMore && (
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={ordersLoading}
+            style={{
+              padding: '4px 12px',
+              border: '1px solid #E5E7EB',
+              borderRadius: '10px',
+              background: '#F2F2F2',
+              cursor: ordersLoading ? 'not-allowed' : 'pointer',
+              fontFamily: '"Public Sans", sans-serif',
+              fontWeight: 500,
+              fontSize: '14px',
+              lineHeight: '1.5em',
+              color: '#000000',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: 'scale(1)',
+              animation: 'fadeInSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1) both'
+            }}
+            onMouseEnter={(e) => !ordersLoading && (e.currentTarget.style.transform = 'scale(1.05)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            Next →
+          </button>
+        )}
+        
+        <span style={{ 
+          marginLeft: '12px', 
+          color: '#757575', 
+          fontSize: '14px', 
+          fontFamily: '"Public Sans", sans-serif', 
+          fontWeight: 400,
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
+          Page {currentPage}
+        </span>
+        
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes fadeInSlide {
+              from {
+                opacity: 0;
+                transform: translateX(-10px) scale(0.9);
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+              }
+            }
+            @keyframes fadeInTableRow {
+              from {
+                opacity: 0;
+                transform: translateY(-5px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+            @keyframes shimmer {
+              0% {
+                background-position: 200% 0;
+              }
+              100% {
+                background-position: -200% 0;
+              }
+            }
+          `
+        }} />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -212,57 +426,176 @@ export default function AccountPage() {
                     </div>
                   </div>
                   
-                  {/* Update Password Button */}
-                  <button className={styles.actionButton}>Update Password</button>
-                  
                   {/* Order History Section */}
-                  <h2 className={styles.sectionTitle}>Order History</h2>
+                  <h2 className={styles.sectionTitle} style={{ marginBottom: '6px' }}>Order History</h2>
+                  
+                  <div style={{ padding: '0 16px 8px 16px' }}>
+                    <input
+                      type="text"
+                      placeholder="Search orders by number or status..."
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      style={{
+                        width: 'calc(100% - 32px)',
+                        margin: '0 16px',
+                        padding: '12px 16px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontFamily: '"Public Sans", sans-serif',
+                        color: '#141414',
+                        backgroundColor: '#FFFFFF',
+                        outline: 'none',
+                        transition: 'border-color 0.2s ease'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#000'}
+                      onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                    />
+                    <style dangerouslySetInnerHTML={{
+                      __html: `
+                        input::placeholder {
+                          color: #9CA3AF;
+                          opacity: 1;
+                        }
+                      `
+                    }} />
+                  </div>
                   
                   <div className="px-4">
                     <div className={styles.orderHistoryTable}>
-                      <table className="w-full">
+                      <table className="w-full" style={{ tableLayout: 'fixed' }}>
                         <thead>
                           <tr className={styles.tableHeader}>
-                            <th>Order Number</th>
-                            <th>Date</th>
-                            <th>Items</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th style={{ width: '15%' }}>Order Number</th>
+                            <th style={{ width: '15%' }}>Date</th>
+                            <th style={{ width: '35%' }}>Items</th>
+                            <th style={{ width: '15%' }}>Status</th>
+                            <th style={{ width: '20%' }}>Actions</th>
                           </tr>
                         </thead>
-                        <tbody>
-                          {orders.map(order => (
-                            <tr key={order.id} className={styles.tableRow}>
-                              <td className={styles.tableCell}>
-                                <span className={styles.orderNumber}>{order.id}</span>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <span className={styles.orderDate}>{order.date}</span>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <span className={styles.orderItem}>{order.item}</span>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <div className={styles.statusBadge}>{order.status}</div>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <Link href={`/account/orders/${order.orderId}`} className={styles.viewDetails}>View Details</Link>
+                        <tbody style={{ position: 'relative', display: 'table-row-group' }}>
+                          {ordersLoading ? (
+                            <>
+                              {Array.from({ length: 6 }).map((_, idx) => (
+                                <tr key={`skeleton-${idx}`} style={{ height: '60px', backgroundColor: '#fff' }}>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '70%',
+                                      maxWidth: '90px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '65%',
+                                      maxWidth: '85px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.1s'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '60%',
+                                      maxWidth: '180px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.2s'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '70%',
+                                      maxWidth: '85px',
+                                      height: '28px',
+                                      borderRadius: '10px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.3s'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '60%',
+                                      maxWidth: '95px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.4s'
+                                    }} />
+                                  </td>
+                                </tr>
+                              ))}
+                            </>
+                          ) : !ordersLoading && orders.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} style={{ textAlign: 'center', padding: '80px 0', height: '360px' }}>
+                                <div style={{ fontSize: '14px', color: '#666' }}>No orders yet</div>
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            <>
+                              {orders.map((order, idx) => (
+                                <tr 
+                                  key={order.id} 
+                                  className={styles.tableRow} 
+                                  style={{ 
+                                    height: '60px',
+                                    animation: `fadeInTableRow 0.4s cubic-bezier(0.4, 0, 0.2, 1) ${idx * 0.05}s both`
+                                  }}
+                                >
+                                  <td className={styles.tableCell}>
+                                    <span className={styles.orderNumber}>{order.id}</span>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <span className={styles.orderDate}>{order.date}</span>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <span className={styles.orderItem}>{order.item}</span>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div className={styles.statusBadge}>{order.status}</div>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <Link href={`/account/orders/${order.orderId}`} className={styles.viewDetails}>View Details</Link>
+                                  </td>
+                                </tr>
+                              ))}
+                              {Array.from({ length: Math.max(0, 6 - orders.length) }).map((_, idx) => (
+                                <tr key={`empty-${idx}`} style={{ height: '60px' }}>
+                                  <td colSpan={5} style={{ padding: 0, border: 'none' }}>&nbsp;</td>
+                                </tr>
+                              ))}
+                            </>
+                          )}
                         </tbody>
                       </table>
                     </div>
+                    {renderPagination()}
                   </div>
                   
                   {/* Wishlist Section */}
                   <h2 className={styles.sectionTitle}>Wishlist</h2>
                   
                   <div className={styles.emptyWishlist}>
-                    <div 
-                      className={styles.emptyWishlistIcon} 
-                      style={{ backgroundColor: "#f9f9f9" }}
-                    ></div>
+                    <img 
+                      src="/theme_images/whishlistempty.png" 
+                      alt="Empty wishlist"
+                      className={styles.emptyWishlistIcon}
+                    />
                     <div className={styles.emptyWishlistContent}>
                       <h3 className={styles.emptyWishlistTitle}>Your wishlist is empty</h3>
                       <p className={styles.emptyWishlistText}>Save your favorite items to easily find them later.</p>
@@ -309,43 +642,156 @@ export default function AccountPage() {
               {/* Order History Tab Content */}
               {activeTab === 'Order History' && (
                 <>
-                  <h2 className={styles.sectionTitle}>Order History</h2>
+                  <h2 className={styles.sectionTitle} style={{ marginBottom: '12px' }}>Order History</h2>
+                  
+                  <div style={{ padding: '0 16px 24px 16px' }}>
+                    <input
+                      type="text"
+                      placeholder="Search orders by number or status..."
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      style={{
+                        width: 'calc(100% - 32px)',
+                        margin: '0 16px',
+                        padding: '12px 16px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontFamily: '"Public Sans", sans-serif',
+                        color: '#141414',
+                        backgroundColor: '#FFFFFF',
+                        outline: 'none',
+                        transition: 'border-color 0.2s ease'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#000'}
+                      onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                    />
+                  </div>
                   
                   <div className="px-4">
                     <div className={styles.orderHistoryTable}>
-                      <table className="w-full">
+                      <table className="w-full" style={{ tableLayout: 'fixed' }}>
                         <thead>
                           <tr className={styles.tableHeader}>
-                            <th>Order Number</th>
-                            <th>Date</th>
-                            <th>Items</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th style={{ width: '15%' }}>Order Number</th>
+                            <th style={{ width: '15%' }}>Date</th>
+                            <th style={{ width: '35%' }}>Items</th>
+                            <th style={{ width: '15%' }}>Status</th>
+                            <th style={{ width: '20%' }}>Actions</th>
                           </tr>
                         </thead>
-                        <tbody>
-                          {orders.map(order => (
-                            <tr key={order.id} className={styles.tableRow}>
-                              <td className={styles.tableCell}>
-                                <span className={styles.orderNumber}>{order.id}</span>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <span className={styles.orderDate}>{order.date}</span>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <span className={styles.orderItem}>{order.item}</span>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <div className={styles.statusBadge}>{order.status}</div>
-                              </td>
-                              <td className={styles.tableCell}>
-                                <Link href={`/account/orders/${order.orderId}`} className={styles.viewDetails}>View Details</Link>
+                        <tbody style={{ position: 'relative', display: 'table-row-group' }}>
+                          {ordersLoading ? (
+                            <>
+                              {Array.from({ length: 6 }).map((_, idx) => (
+                                <tr key={`skeleton-${idx}`} style={{ height: '60px', backgroundColor: '#fff' }}>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '70%',
+                                      maxWidth: '90px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '65%',
+                                      maxWidth: '85px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.1s'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '60%',
+                                      maxWidth: '180px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.2s'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '70%',
+                                      maxWidth: '85px',
+                                      height: '28px',
+                                      borderRadius: '10px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.3s'
+                                    }} />
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div style={{
+                                      width: '60%',
+                                      maxWidth: '95px',
+                                      height: '20px',
+                                      borderRadius: '6px',
+                                      background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'shimmer 1.5s infinite',
+                                      animationDelay: '0.4s'
+                                    }} />
+                                  </td>
+                                </tr>
+                              ))}
+                            </>
+                          ) : !ordersLoading && orders.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} style={{ textAlign: 'center', padding: '80px 0', height: '360px' }}>
+                                <div style={{ fontSize: '14px', color: '#666' }}>No orders yet</div>
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            <>
+                              {orders.map((order, idx) => (
+                                <tr 
+                                  key={order.id} 
+                                  className={styles.tableRow} 
+                                  style={{ 
+                                    height: '60px',
+                                    animation: `fadeInTableRow 0.4s cubic-bezier(0.4, 0, 0.2, 1) ${idx * 0.05}s both`
+                                  }}
+                                >
+                                  <td className={styles.tableCell}>
+                                    <span className={styles.orderNumber}>{order.id}</span>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <span className={styles.orderDate}>{order.date}</span>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <span className={styles.orderItem}>{order.item}</span>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <div className={styles.statusBadge}>{order.status}</div>
+                                  </td>
+                                  <td className={styles.tableCell}>
+                                    <Link href={`/account/orders/${order.orderId}`} className={styles.viewDetails}>View Details</Link>
+                                  </td>
+                                </tr>
+                              ))}
+                              {Array.from({ length: Math.max(0, 6 - orders.length) }).map((_, idx) => (
+                                <tr key={`empty-${idx}`} style={{ height: '60px' }}>
+                                  <td colSpan={5} style={{ padding: 0, border: 'none' }}>&nbsp;</td>
+                                </tr>
+                              ))}
+                            </>
+                          )}
                         </tbody>
                       </table>
                     </div>
+                    {renderPagination()}
                   </div>
                 </>
               )}
@@ -356,10 +802,11 @@ export default function AccountPage() {
                   <h2 className={styles.sectionTitle}>Wishlist</h2>
                   
                   <div className={styles.emptyWishlist}>
-                    <div 
-                      className={styles.emptyWishlistIcon} 
-                      style={{ backgroundColor: "#f9f9f9" }}
-                    ></div>
+                    <img 
+                      src="/theme_images/whishlistempty.png" 
+                      alt="Empty wishlist"
+                      className={styles.emptyWishlistIcon}
+                    />
                     <div className={styles.emptyWishlistContent}>
                       <h3 className={styles.emptyWishlistTitle}>Your wishlist is empty</h3>
                       <p className={styles.emptyWishlistText}>Save your favorite items to easily find them later.</p>

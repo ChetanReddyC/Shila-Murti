@@ -49,7 +49,7 @@
 .sectionTitle {
   font-family: 'Public Sans', sans-serif;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 22.5px;
   line-height: 1.28em;
   color: #141414;
   margin: 16px 16px 8px;
@@ -85,6 +85,13 @@
   font-size: 14px;
   width: 100%;
   min-width: 300px;
+  color: #000000;
+  font-weight: 500;
+}
+
+.inputField::placeholder {
+  color: #9CA3AF;
+  opacity: 1;
 }
 
 .actionButton {

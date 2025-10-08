@@ -1801,8 +1801,7 @@ export default function CheckoutPage() {
 
   const goToOrderConfirmation = React.useCallback((orderId?: string) => {
 
-
-    try { setOrderConfirmationProtection(true) } catch { }
+    // Protection removed - backend guard handles duplicate prevention
 
     // Clean up form data since order was successful
 
@@ -1810,7 +1809,7 @@ export default function CheckoutPage() {
 
     router.push(orderId ? `/order-confirmation?order_id=${encodeURIComponent(orderId)}` : '/order-confirmation')
 
-  }, [router, setOrderConfirmationProtection, clearCartSilently])
+  }, [router, clearCartSilently])
 
 
 
