@@ -314,6 +314,12 @@ export default function OrderDetailsPage() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  // Check if a stage is complete based on whether it has a timestamp
+  const isStageComplete = (stage: 'placed' | 'processed' | 'shipped' | 'delivered'): boolean => {
+    if (stage === 'placed') return true; // Placed is always complete
+    return getTimelineDate(stage) !== null;
+  };
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -478,7 +484,11 @@ export default function OrderDetailsPage() {
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
-                    <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    {isStageComplete('processed') ? (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    ) : (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>schedule</span>
+                    )}
                   </div>
                   <div 
                     className={styles.timelineLine} 
@@ -532,7 +542,11 @@ export default function OrderDetailsPage() {
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
-                    <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    {isStageComplete('shipped') ? (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    ) : (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>schedule</span>
+                    )}
                   </div>
                   <div 
                     className={styles.timelineLine} 
@@ -578,7 +592,11 @@ export default function OrderDetailsPage() {
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
-                    <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>local_shipping</span>
+                    {isStageComplete('delivered') ? (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>check</span>
+                    ) : (
+                      <span className={`material-symbols-outlined ${styles.timelineIconSmall}`}>schedule</span>
+                    )}
                   </div>
                 </div>
                 <div className={styles.timelineContentNoBottom}>
