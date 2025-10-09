@@ -95,6 +95,74 @@
   margin-top: 0.5rem;
 }
 
+.downloadButtonFixed {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.75rem;
+  background-color: #141414;
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.downloadButtonFixed:hover:not(:disabled) {
+  background-color: #2d2d2d;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+
+.downloadButtonFixed:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.downloadButtonFixed:disabled {
+  background-color: #9e9e9e;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.downloadButtonFixed span {
+  font-size: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .downloadButtonFixed {
+    bottom: 1.5rem;
+    right: 1.5rem;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+  }
+  
+  .downloadButtonFixed span {
+    font-size: 1.125rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .downloadButtonFixed {
+    bottom: 1rem;
+    right: 1rem;
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+  }
+  
+  .downloadButtonFixed span {
+    font-size: 1rem;
+  }
+}
+
 .spacer {
   height: 0.5rem;
 }

@@ -69,6 +69,14 @@ interface Fulfillment {
   labels?: Array<{ tracking_number?: string }>;
 }
 
+interface Customer {
+  id: string;
+  email?: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
 interface OrderData {
   id: string;
   display_id: string;
@@ -77,12 +85,14 @@ interface OrderData {
   fulfillment_status: string;
   payment_status?: string;
   currency_code: string;
+  email?: string;
   
   // Financial
   subtotal: number;
   shipping_total: number;
   tax_total: number;
   total: number;
+  discount_total?: number;
   
   // Relations
   items: OrderItem[];
@@ -91,6 +101,7 @@ interface OrderData {
   shipping_methods?: ShippingMethod[];
   payment_collections?: PaymentCollection[];
   fulfillments?: Fulfillment[];
+  customer?: Customer;
   
   metadata?: Record<string, any>;
 }
@@ -131,11 +142,35 @@ const getPaymentMethodName = (providerId?: string) => {
   return providerMap[providerId] || providerId;
 };
 
+const getPaymentStatusBadge = (paymentStatus?: string): { label: string; color: string } => {
+  const normalizedStatus = paymentStatus?.toLowerCase();
+  
+  switch (normalizedStatus) {
+    case 'captured':
+    case 'paid':
+    case 'completed':
+      return { label: 'Paid', color: '#10b981' }; // green
+    case 'awaiting':
+    case 'pending':
+    case 'not_paid':
+      return { label: 'Awaiting', color: '#f59e0b' }; // yellow
+    case 'refunded':
+    case 'partially_refunded':
+      return { label: 'Refunded', color: '#ef4444' }; // red
+    case 'canceled':
+    case 'cancelled':
+      return { label: 'Cancelled', color: '#6b7280' }; // gray
+    default:
+      return { label: 'Unknown', color: '#6b7280' }; // gray
+  }
+};
+
 export default function OrderDetailsPage() {
   const params = useParams();
   const orderId = params?.orderId as string;
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // Refs for timeline content sections
   const placedContentRef = React.useRef<HTMLDivElement>(null);
@@ -170,16 +205,6 @@ export default function OrderDetailsPage() {
           const json = await res.json();
           const order = json?.order;
           if (order) {
-            console.log('[ORDER_DETAILS_DEBUG]', {
-              orderId: order.id,
-              hasItems: !!order.items,
-              itemsCount: order.items?.length || 0,
-              hasShippingAddress: !!order.shipping_address,
-              hasFulfillments: !!order.fulfillments,
-              hasPaymentCollections: !!order.payment_collections,
-              hasShippingMethods: !!order.shipping_methods,
-              keys: Object.keys(order)
-            });
             setOrderData(order);
           } else {
             console.error('[ORDER_DETAILS_DEBUG] Order not found in response', { json });
@@ -300,6 +325,139 @@ export default function OrderDetailsPage() {
   const isStageComplete = (stage: 'placed' | 'processed' | 'shipped' | 'delivered'): boolean => {
     if (stage === 'placed') return true; // Placed is always complete
     return getTimelineDate(stage) !== null;
+  };
+
+  // Download invoice handler
+  const downloadInvoice = async () => {
+    if (!orderId) return;
+    
+    const customerId = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null;
+    if (!customerId) {
+      alert('Unable to download invoice: Customer not found');
+      return;
+    }
+    
+    setIsDownloading(true);
+    
+    // Method 1: Direct iframe download (most reliable, bypasses ad blockers)
+    const tryDirectDownload = () => {
+      try {
+        const url = `/api/account/orders/${orderId}/invoices?customer_id=${encodeURIComponent(customerId)}`;
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        
+        // Remove iframe after download starts
+        setTimeout(() => {
+          try {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }, 2000);
+        
+        return true;
+      } catch (e) {
+        console.error('Direct download failed:', e);
+        return false;
+      }
+    };
+    
+    // Method 2: Blob download (better UX when it works)
+    const tryBlobDownload = async () => {
+      const response = await fetch(`/api/account/orders/${orderId}/invoices?customer_id=${encodeURIComponent(customerId)}`, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/pdf',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      
+      if (blob.size === 0) {
+        throw new Error('Received empty PDF file');
+      }
+
+      // Use modern API if available
+      if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: `invoice-${orderData?.display_id || orderId}.pdf`,
+            types: [{
+              description: 'PDF Document',
+              accept: { 'application/pdf': ['.pdf'] }
+            }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return true;
+        } catch (e) {
+          // User cancelled or browser doesn't support, fall through to blob URL
+        }
+      }
+
+      // Fallback: blob URL download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${orderData?.display_id || orderId}.pdf`;
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      
+      setTimeout(() => {
+        try {
+          a.click();
+        } catch (e) {
+          // If click fails, try opening in new tab
+          window.open(url, '_blank');
+        }
+        
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          if (document.body.contains(a)) {
+            document.body.removeChild(a);
+          }
+        }, 150);
+      }, 50);
+      
+      return true;
+    };
+    
+    let downloadSuccess = false;
+    
+    try {
+      // Try blob download first (better UX with save dialog)
+      downloadSuccess = await tryBlobDownload();
+    } catch (error: any) {
+      // Check if it's a fetch error (likely ad blocker or CORS)
+      const errorMessage = error?.message || '';
+      const isFetchError = errorMessage.includes('fetch') || 
+                          errorMessage.includes('blocked') || 
+                          errorMessage.includes('ERR_BLOCKED') ||
+                          error?.name === 'TypeError';
+      
+      if (isFetchError) {
+        // Silently fall back to iframe method (expected behavior with ad blockers)
+        downloadSuccess = tryDirectDownload();
+      } else {
+        // Actual server error - show to user
+        console.error('Download failed with server error:', error);
+        alert(`Failed to download invoice: ${errorMessage}. Please try again or contact support.`);
+      }
+    } finally {
+      // Keep loading state a bit longer for iframe downloads
+      setTimeout(() => setIsDownloading(false), downloadSuccess ? 500 : 100);
+    }
   };
 
   if (loading) {
@@ -445,6 +603,12 @@ export default function OrderDetailsPage() {
                           <p className={styles.summaryLabel}>Shipping</p>
                           <p className={styles.summaryValue}>{formatCurrency(orderData.shipping_total || 0, orderData.currency_code || 'inr')}</p>
                         </div>
+                        {orderData.discount_total > 0 && (
+                          <div className={styles.summaryRow}>
+                            <p className={styles.summaryLabel}>Discount</p>
+                            <p className={styles.summaryValue} style={{ color: '#10b981' }}>-{formatCurrency(orderData.discount_total, orderData.currency_code || 'inr')}</p>
+                          </div>
+                        )}
                         <div className={styles.summaryRow}>
                           <p className={styles.summaryLabel}>Taxes</p>
                           <p className={styles.summaryValue}>{formatCurrency(orderData.tax_total || 0, orderData.currency_code || 'inr')}</p>
@@ -489,6 +653,26 @@ export default function OrderDetailsPage() {
                   <div className={styles.card}>
                     <div className={styles.cardBody}>
                       <div className={styles.detailsContainer}>
+                        {orderData.shipping_address && (orderData.shipping_address.first_name || orderData.shipping_address.last_name) && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Customer Name</p>
+                            <p className={styles.detailValue}>
+                              {[orderData.shipping_address.first_name, orderData.shipping_address.last_name].filter(Boolean).join(' ')}
+                            </p>
+                          </div>
+                        )}
+                        {(orderData.customer?.email || orderData.email) && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Email</p>
+                            <p className={styles.detailValue}>{orderData.customer?.email || orderData.email}</p>
+                          </div>
+                        )}
+                        {(orderData.customer?.phone || orderData.shipping_address?.phone) && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Phone</p>
+                            <p className={styles.detailValue}>{orderData.customer?.phone || orderData.shipping_address?.phone}</p>
+                          </div>
+                        )}
                         <div className={styles.detailRow}>
                           <p className={styles.detailLabel}>Shipping Address</p>
                           <p className={styles.detailValue}>{formatAddress(orderData.shipping_address)}</p>
@@ -500,17 +684,25 @@ export default function OrderDetailsPage() {
                           </p>
                         </div>
                         <div className={styles.detailRow}>
-                          <p className={styles.detailLabel}>Billing Address</p>
-                          <p className={styles.detailValue}>
-                            {formatAddress(orderData.billing_address || orderData.shipping_address)}
-                          </p>
-                        </div>
-                        <div className={styles.detailRow}>
                           <p className={styles.detailLabel}>Payment Method</p>
                           <p className={styles.detailValue}>
                             {getPaymentMethodName(orderData.payment_collections?.[0]?.payments?.[0]?.provider_id)}
                           </p>
                         </div>
+                        <div className={styles.detailRow}>
+                          <p className={styles.detailLabel}>Payment Status</p>
+                          <p className={styles.detailValue}>
+                            {getPaymentStatusBadge(orderData.payment_status).label}
+                          </p>
+                        </div>
+                        {orderData.payment_collections?.[0]?.payments?.[0]?.captured_at && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Payment Captured</p>
+                            <p className={styles.detailValue}>
+                              {formatDate(orderData.payment_collections[0].payments[0].captured_at)}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -607,6 +799,25 @@ export default function OrderDetailsPage() {
 
         </div>
       </div>
+
+      {/* Fixed Download Invoice Button - Bottom Right */}
+      <button
+        className={styles.downloadButtonFixed}
+        onClick={downloadInvoice}
+        disabled={isDownloading}
+      >
+        {isDownloading ? (
+          <>
+            <span className="material-symbols-outlined">hourglass_empty</span>
+            Downloading...
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined">download</span>
+            Download Invoice
+          </>
+        )}
+      </button>
     </div>
   );
 }
