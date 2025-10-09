@@ -72,12 +72,12 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
           "items.variant.*",
           "items.variant.product.*",
           "shipping_address.*",
-          "billing_address.*",
           "shipping_methods.*",
           "fulfillments.*",
           "fulfillments.labels.*",
           "payment_collections.*",
-          "payment_collections.payments.*"
+          "payment_collections.payments.*",
+          "customer.*"
         ],
         variables: {
           filters: { id: orderId }
@@ -110,65 +110,68 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         // Replace items with full data from remoteQuery
         if (fullOrder.items && fullOrder.items.length > 0) {
           order.items = fullOrder.items
-          console.log("[CUSTOM_ORDER_BY_ID][ITEMS_FETCHED_VIA_RQ]", { 
-            itemCount: fullOrder.items.length,
-            firstItem: {
-              id: fullOrder.items[0].id,
-              title: fullOrder.items[0].title,
-              thumbnail: fullOrder.items[0].thumbnail,
-              unit_price: fullOrder.items[0].unit_price,
-              quantity: fullOrder.items[0].quantity,
-              hasVariant: !!fullOrder.items[0].variant,
-              variantTitle: fullOrder.items[0].variant?.title,
-              productTitle: fullOrder.items[0].variant?.product?.title,
-              productThumbnail: fullOrder.items[0].variant?.product?.thumbnail,
-              keys: Object.keys(fullOrder.items[0])
-            }
-          })
         }
         
         // Merge the additional data into our order object
         if (fullOrder.shipping_methods) {
           order.shipping_methods = fullOrder.shipping_methods
-          console.log("[CUSTOM_ORDER_BY_ID][SHIPPING_FETCHED_VIA_RQ]", { count: fullOrder.shipping_methods.length })
         }
         
         if (fullOrder.fulfillments) {
           order.fulfillments = fullOrder.fulfillments
-          console.log("[CUSTOM_ORDER_BY_ID][FULFILLMENTS_FETCHED_VIA_RQ]", { count: fullOrder.fulfillments.length })
         }
         
         if (fullOrder.payment_collections) {
           order.payment_collections = fullOrder.payment_collections
-          console.log("[CUSTOM_ORDER_BY_ID][PAYMENTS_FETCHED_VIA_RQ]", { count: fullOrder.payment_collections.length })
+        }
+        
+        if (fullOrder.customer) {
+          order.customer = fullOrder.customer
+        }
+        
+        // Derive payment_status from payment_collections
+        if (order.payment_collections && order.payment_collections.length > 0) {
+          const paymentCollection = order.payment_collections[0]
+          const payment = paymentCollection.payments?.[0]
+          
+          if (payment?.captured_at) {
+            order.payment_status = "captured"
+          } else if (paymentCollection.status === "completed") {
+            order.payment_status = "captured"
+          } else if (paymentCollection.status === "awaiting" || paymentCollection.status === "pending") {
+            order.payment_status = "awaiting"
+          } else if (payment?.canceled_at) {
+            order.payment_status = "canceled"
+          } else {
+            order.payment_status = "not_paid"
+          }
+
+        }
+        
+        // Derive fulfillment_status from fulfillments
+        if (order.fulfillments && order.fulfillments.length > 0) {
+          const fulfillment = order.fulfillments[0]
+          
+          if (fulfillment.delivered_at) {
+            order.fulfillment_status = "delivered"
+          } else if (fulfillment.shipped_at) {
+            order.fulfillment_status = "shipped"
+          } else if (fulfillment.canceled_at) {
+            order.fulfillment_status = "canceled"
+          } else if (fulfillment.packed_at) {
+            order.fulfillment_status = "partially_fulfilled"
+          } else {
+            order.fulfillment_status = "not_fulfilled"
+          }
+        } else {
+          order.fulfillment_status = "not_fulfilled"
         }
       }
     } catch (remoteQueryError: any) {
       console.warn("[CUSTOM_ORDER_BY_ID][REMOTE_QUERY_ERROR]", remoteQueryError?.message)
     }
     
-    console.log("[CUSTOM_ORDER_BY_ID][FOUND]", {
-      orderId: order.id,
-      customerId: order.customer_id,
-      hasItems: !!order.items,
-      itemCount: order.items?.length || 0,
-      hasFulfillments: !!order.fulfillments,
-      fulfillmentCount: order.fulfillments?.length || 0,
-      hasPaymentCollections: !!order.payment_collections,
-      paymentCount: order.payment_collections?.length || 0,
-      hasShippingMethods: !!order.shipping_methods,
-      shippingMethodCount: order.shipping_methods?.length || 0,
-      hasShippingAddress: !!order.shipping_address,
-      hasBillingAddress: !!order.billing_address,
-      financials: {
-        subtotal: order.subtotal,
-        shipping_total: order.shipping_total,
-        tax_total: order.tax_total,
-        total: order.total,
-        currency_code: order.currency_code
-      },
-      keys: Object.keys(order).slice(0, 30) // Limit keys output
-    })
+
 
     return res.status(200).json({ order })
   } catch (error: any) {

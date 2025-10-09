@@ -32,9 +32,11 @@
     "@mikro-orm/knex": "6.4.3",
     "@mikro-orm/migrations": "6.4.3",
     "@mikro-orm/postgresql": "6.4.3",
+    "@types/pdfkit": "^0.17.3",
     "awilix": "^8.0.1",
     "jose": "^5.9.3",
     "medusa-payment-manual": "^1.0.25",
+    "pdfkit": "^0.17.2",
     "pg": "^8.13.0"
   },
   "devDependencies": {
