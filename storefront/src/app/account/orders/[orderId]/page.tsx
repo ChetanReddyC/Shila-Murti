@@ -171,6 +171,10 @@ export default function OrderDetailsPage() {
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
   
   // Refs for timeline content sections
   const placedContentRef = React.useRef<HTMLDivElement>(null);
@@ -325,6 +329,61 @@ export default function OrderDetailsPage() {
   const isStageComplete = (stage: 'placed' | 'processed' | 'shipped' | 'delivered'): boolean => {
     if (stage === 'placed') return true; // Placed is always complete
     return getTimelineDate(stage) !== null;
+  };
+
+  // Check if order can be cancelled
+  const canCancelOrder = (order: OrderData | null): boolean => {
+    if (!order) return false;
+    if (order.status === 'canceled') return false;
+    if (order.fulfillment_status === 'delivered') return false;
+    if (order.fulfillment_status === 'shipped') return false;
+    if (order.payment_status === 'captured' && order.fulfillment_status === 'fulfilled') return false;
+    return true;
+  };
+
+  // Handle cancel order
+  const handleCancelOrder = async () => {
+    if (!orderId) return;
+    
+    const customerId = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null;
+    if (!customerId) {
+      setCancelError('Unable to cancel order: Customer not found');
+      return;
+    }
+    
+    setIsCancelling(true);
+    setCancelError(null);
+    setShowCancelModal(false);
+    
+    try {
+      const response = await fetch(`/api/account/orders/${orderId}/cancel?customer_id=${encodeURIComponent(customerId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.reason || 'Failed to cancel order');
+      }
+
+      const result = await response.json();
+      
+      if (result.order) {
+        setOrderData(result.order);
+        setCancelSuccess(true);
+        
+        setTimeout(() => {
+          setCancelSuccess(false);
+        }, 5000);
+      }
+    } catch (error: any) {
+      console.error('Failed to cancel order:', error);
+      setCancelError(error.message || 'Failed to cancel order. Please try again.');
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   // Download invoice handler
@@ -800,24 +859,102 @@ export default function OrderDetailsPage() {
         </div>
       </div>
 
-      {/* Fixed Download Invoice Button - Bottom Right */}
-      <button
-        className={styles.downloadButtonFixed}
-        onClick={downloadInvoice}
-        disabled={isDownloading}
-      >
-        {isDownloading ? (
-          <>
-            <span className="material-symbols-outlined">hourglass_empty</span>
-            Downloading...
-          </>
-        ) : (
-          <>
-            <span className="material-symbols-outlined">download</span>
-            Download Invoice
-          </>
+      {/* Fixed Action Buttons - Bottom Right */}
+      <div className={styles.fixedButtonsContainer}>
+        {canCancelOrder(orderData) && (
+          <button
+            className={styles.cancelButtonFixed}
+            onClick={() => setShowCancelModal(true)}
+            disabled={isCancelling}
+          >
+            {isCancelling ? (
+              <>
+                <span className="material-symbols-outlined">hourglass_empty</span>
+                Cancelling...
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined">cancel</span>
+                Cancel Order
+              </>
+            )}
+          </button>
         )}
-      </button>
+        
+        <button
+          className={styles.downloadButtonFixed}
+          onClick={downloadInvoice}
+          disabled={isDownloading}
+        >
+          {isDownloading ? (
+            <>
+              <span className="material-symbols-outlined">hourglass_empty</span>
+              Downloading...
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined">download</span>
+              Download Invoice
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowCancelModal(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <span className="material-symbols-outlined" style={{ fontSize: '32px', color: '#ef4444' }}>warning</span>
+              <h2 className={styles.modalTitle}>Cancel Order?</h2>
+            </div>
+            <p className={styles.modalMessage}>
+              Are you sure you want to cancel this order? This action cannot be undone.
+              {orderData?.payment_status === 'captured' && (
+                <span className={styles.modalWarning}>
+                  <br /><br />
+                  Your payment will be refunded to the original payment method.
+                </span>
+              )}
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalButtonSecondary}
+                onClick={() => setShowCancelModal(false)}
+                disabled={isCancelling}
+              >
+                Keep Order
+              </button>
+              <button
+                className={styles.modalButtonDanger}
+                onClick={handleCancelOrder}
+                disabled={isCancelling}
+              >
+                {isCancelling ? 'Cancelling...' : 'Yes, Cancel Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {cancelSuccess && (
+        <div className={styles.successToast}>
+          <span className="material-symbols-outlined">check_circle</span>
+          <span>Order cancelled successfully</span>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {cancelError && (
+        <div className={styles.errorToast}>
+          <span className="material-symbols-outlined">error</span>
+          <span>{cancelError}</span>
+          <button onClick={() => setCancelError(null)} className={styles.toastClose}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
