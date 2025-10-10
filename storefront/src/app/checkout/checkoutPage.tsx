@@ -479,11 +479,53 @@ export default function CheckoutPage() {
 
           // Trigger the checkout verification process
 
+          // Parse form name for customer creation
+
+          const fullName = (formData.name || '').trim()
+
+          const nameParts = fullName.split(/\s+/).filter(Boolean)
+
+          const firstName = nameParts[0] || 'Customer'
+
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+
+          
+
           const payload: any = { email: emailParam };
 
           if (cartIdParam) payload.cartId = cartIdParam;
 
           if (phoneParam) payload.phone = phoneParam;
+
+          
+
+          // Include form data for account creation
+
+          payload.formData = {
+
+            first_name: firstName,
+
+            last_name: lastName,
+
+            phone: formData.contactNumber || phoneParam || '',
+
+            address: {
+
+              address_1: formData.address,
+
+              city: formData.city,
+
+              postal_code: formData.postalCode,
+
+              province: formData.state,
+
+              country_code: 'in',
+
+              phone: formData.contactNumber || phoneParam || ''
+
+            }
+
+          };
 
 
 
@@ -1287,11 +1329,55 @@ export default function CheckoutPage() {
 
       if (!cart?.id) throw new Error('Cart not ready for verification')
 
+      // Parse form name for customer creation
+
+      const fullName = (formData.name || '').trim()
+
+      const nameParts = fullName.split(/\s+/).filter(Boolean)
+
+      const firstName = nameParts[0] || 'Customer'
+
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+
+      
+
       const cr = await fetch('/api/auth/session/checkout/verify', {
 
         method: 'POST', headers: { 'Content-Type': 'application/json' },
 
-        body: JSON.stringify({ phone, cartId: cart.id })
+        body: JSON.stringify({ 
+
+          phone, 
+
+          cartId: cart.id,
+
+          formData: {
+
+            first_name: firstName,
+
+            last_name: lastName,
+
+            phone: formData.contactNumber || phone,
+
+            address: {
+
+              address_1: formData.address,
+
+              city: formData.city,
+
+              postal_code: formData.postalCode,
+
+              province: formData.state,
+
+              country_code: 'in',
+
+              phone: formData.contactNumber || phone
+
+            }
+
+          }
+
+        })
 
       })
 

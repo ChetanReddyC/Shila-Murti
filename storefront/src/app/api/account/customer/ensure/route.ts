@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({} as any))
     const rawEmail: string | undefined = body?.email
     const rawPhone: string | undefined = body?.phone
+    const formData: any = body?.formData // Checkout form data with customer name and address
 
     let email = normalizeEmail(rawEmail)
     const phone = normalizePhone(rawPhone)
@@ -38,16 +39,22 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ ok: false, error: 'identifier_required', message: 'Provide an email or phone to continue.' }), { status: 400 })
     }
 
+    // Use form data if available, otherwise use defaults
+    const firstName = formData?.first_name || 'Customer'
+    const lastName = formData?.last_name || ''
+    const addresses = formData?.address ? [formData.address] : []
+
     // Call the backend find-or-create endpoint with admin token for authentication
     const payload: Record<string, any> = {
-      first_name: 'Customer',
-      last_name: 'User',
+      first_name: firstName,
+      last_name: lastName,
       whatsapp_authenticated: Boolean(phone),
       email_authenticated: Boolean(email && !phone),
       identity_method: phone ? 'phone' : 'email',
     }
     if (phone) payload.phone = phone
     if (email) payload.email = email
+    if (addresses.length > 0) payload.addresses = addresses
 
     const adminToken = process.env.MEDUSA_ADMIN_TOKEN || ''
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
