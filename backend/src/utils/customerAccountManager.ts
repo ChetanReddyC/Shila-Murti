@@ -146,14 +146,25 @@ export async function findOrCreateCustomerAccount(
       }
     }
 
-    // Only preserve existing name if it's not the default placeholder
-    const hasRealName = resultCustomer.first_name && 
-                        resultCustomer.first_name !== "Customer" && 
-                        resultCustomer.first_name.trim() !== ""
+    // Only preserve existing name if it's not a default placeholder
+    // Check for common placeholder values: "Customer" first name or "User" last name
+    const hasPlaceholderName = 
+      !resultCustomer.first_name ||
+      resultCustomer.first_name === "Customer" || 
+      resultCustomer.first_name.trim() === "" ||
+      resultCustomer.last_name === "User"
+    
+    const hasRealNameInRequest = 
+      first_name && 
+      first_name !== "Customer" && 
+      first_name.trim() !== ""
+    
+    // Use request name if: (1) existing has placeholder, OR (2) request has real name and existing doesn't
+    const shouldUpdateName = hasPlaceholderName || (hasRealNameInRequest && !resultCustomer.first_name)
     
     const updatePayload: Record<string, any> = {
-      first_name: hasRealName ? resultCustomer.first_name : (first_name || "Customer"),
-      last_name: hasRealName ? resultCustomer.last_name : (last_name || ""),
+      first_name: shouldUpdateName ? (first_name || "Customer") : resultCustomer.first_name,
+      last_name: shouldUpdateName ? (last_name || "") : resultCustomer.last_name,
       phone: phone || resultCustomer.phone,
       has_account: true,
     }

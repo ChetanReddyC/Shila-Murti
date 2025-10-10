@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const rawEmail: string | undefined = body?.email
     const cartId: string | undefined = body?.cartId
     const isPasskeyAuth: boolean | undefined = body?.isPasskeyAuth
+    const formData: any = body?.formData // Checkout form data for account creation
 
     const email = normalizeEmail(rawEmail)
     const phoneKey = normalizePhoneDigits(rawPhone)
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
       const ensureRes = await fetch(`${base}/api/account/customer/ensure`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, phone: rawPhone }),
+        body: JSON.stringify({ email, phone: rawPhone, formData }),
       })
       const ej = await ensureRes.json().catch(() => ({}))
 
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
     const ensureRes = await fetch(`${base}/api/account/customer/ensure`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, phone: rawPhone }),
+      body: JSON.stringify({ email, phone: rawPhone, formData }),
     })
     const ej = await ensureRes.json().catch(() => ({}))
 
