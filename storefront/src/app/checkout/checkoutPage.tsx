@@ -1863,6 +1863,26 @@ export default function CheckoutPage() {
 
       }
 
+      
+
+      // CRITICAL: Store cart ID mapping before redirecting to Cashfree
+
+      // This allows the return page to complete the order
+
+      try {
+
+        sessionStorage.setItem(`cashfree:${orderId}:cartId`, cart.id);
+
+        localStorage.setItem(`cashfree:${orderId}:cartId`, cart.id);
+
+        console.log('[CHECKOUT] Stored cart ID mapping:', { orderId, cartId: cart.id });
+
+      } catch (e) {
+
+        console.error('[CHECKOUT] Failed to store cart ID mapping:', e);
+
+      }
+
 
 
       const cashfree = (window as any).Cashfree({ mode: (process.env.NEXT_PUBLIC_CASHFREE_ENV as any) || 'sandbox' })

@@ -429,6 +429,18 @@ export class MedusaApiClient {
               const errorText = await response.text().catch(() => '');
               let errorData: any = {}
               try { errorData = errorText ? JSON.parse(errorText) : {} } catch {}
+              
+              // Enhanced error logging
+              console.error('[MedusaApiClient] API Error:', {
+                url,
+                status: response.status,
+                statusText: response.statusText,
+                errorData,
+                errorText: errorText.substring(0, 500), // Limit length
+                method,
+                attempt
+              });
+              
               if (response.status === 401 || response.status === 403) {
               }
               try {
@@ -542,11 +554,17 @@ export class MedusaApiClient {
       sorted.forEach(id => queryParams.append('category_id[]', id));
     }
 
-    // For Medusa v2, try using fields parameter to include related data
-    queryParams.append('fields', '*variants,*variants.prices,*images,*variants.inventory_items,*variants.inventory_items.inventory,*variants.inventory_items.inventory.location_levels');
+    // For Medusa v2 Store API, only inventory_quantity is available (not deep inventory_items)
+    queryParams.append('fields', '+variants.inventory_quantity');
 
     const endpoint = `/store/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
+    console.log('[MedusaApiClient] Fetching products with params:', {
+      endpoint,
+      region_id: params.region_id,
+      sales_channel_id: params.sales_channel_id,
+      category_id: params.category_id
+    });
     
     return this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
   }
@@ -723,11 +741,13 @@ export class MedusaApiClient {
     // For Medusa v2, we can use the handle parameter directly
     const queryParams = new URLSearchParams();
     queryParams.append('handle', handle);
-    queryParams.append('fields', '*variants,*variants.prices,*images,*variants.inventory_items,*variants.inventory_items.inventory,*variants.inventory_items.inventory.location_levels');
+    // For Medusa v2 Store API, only inventory_quantity is available
+    queryParams.append('fields', '+variants.inventory_quantity');
     // Do not append sales_channel_id by default; rely on key mapping. If needed, callers
     // can include it explicitly.
 
     const endpoint = `/store/products?${queryParams.toString()}`;
+    console.log('[MedusaApiClient] Fetching product by handle:', { handle, endpoint });
     const response = await this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
     
     if (!response.products || response.products.length === 0) {

@@ -170,6 +170,19 @@ export class ProductDataMapper {
    * and backorder settings across all variants
    */
   static extractInventoryInfo(product: Product): AggregatedInventoryInfo {
+    console.log('[ProductDataMapper] Extracting inventory info:', {
+      productId: product.id,
+      productTitle: product.title,
+      variantCount: product.variants?.length,
+      firstVariant: product.variants?.[0] ? {
+        id: product.variants[0].id,
+        inventory_quantity: product.variants[0].inventory_quantity,
+        manage_inventory: product.variants[0].manage_inventory,
+        allow_backorder: product.variants[0].allow_backorder,
+        variantKeys: Object.keys(product.variants[0])
+      } : null
+    });
+
     if (!product.variants || product.variants.length === 0) {
       return {
         inStock: false,
@@ -197,34 +210,36 @@ export class ProductDataMapper {
       let variantQuantity = 0; // raw available sum (for legacy displays)
       let variantEffectiveUnits = 0; // effective purchasable units considering required_quantity
 
-      // v1: single number at variant level (no required_quantity concept)
-      if (typeof variant.inventory_quantity === 'number' && variant.manage_inventory) {
+      console.log('[ProductDataMapper] Processing variant:', {
+        variantId: variant.id,
+        inventory_quantity: variant.inventory_quantity,
+        manage_inventory: variant.manage_inventory,
+        allow_backorder: variant.allow_backorder
+      });
+
+      // Medusa v2 Store API approach (per official docs):
+      // - If manage_inventory is false, always available
+      // - If manage_inventory is true, check inventory_quantity
+      if (!variant.manage_inventory) {
+        // Unmanaged inventory = always available
+        variantQuantity = Infinity;
+        variantEffectiveUnits = Infinity;
+        hasUnmanagedVariants = true;
+        console.log('[ProductDataMapper] Unmanaged inventory - always available');
+      } else if (typeof variant.inventory_quantity === 'number') {
+        // Use inventory_quantity from Store API (calculated by Medusa for the sales channel)
         variantQuantity = Math.max(0, variant.inventory_quantity);
         variantEffectiveUnits = variantQuantity;
-      } else if (variant.inventory_items && variant.inventory_items.length > 0) {
-        // v2: compute per inventory item available units and take the min across required components
-        let minUnitsAcrossComponents: number | null = null;
-        for (const inventoryItem of variant.inventory_items) {
-          const required = Math.max(1, Number(inventoryItem.required_quantity) || 1);
-          const levels = inventoryItem.inventory?.location_levels || [];
-
-          let availableForItem = 0;
-          for (const level of levels) {
-            availableForItem += Math.max(0, level?.available_quantity || 0);
-          }
-
-          // legacy aggregate of raw quantity for visibility
-          variantQuantity += availableForItem;
-
-          const unitsForThisComponent = Math.floor(availableForItem / required);
-          if (minUnitsAcrossComponents === null) {
-            minUnitsAcrossComponents = unitsForThisComponent;
-          } else {
-            minUnitsAcrossComponents = Math.min(minUnitsAcrossComponents, unitsForThisComponent);
-          }
+        console.log('[ProductDataMapper] Using inventory_quantity:', variantQuantity);
+        
+        // WARNING: If this is 0 but you have stock in admin, check:
+        // 1. Is your publishable API key associated with a sales channel?
+        // 2. Does that sales channel have access to the inventory location?
+        if (variantQuantity === 0) {
+          console.warn('[ProductDataMapper] inventory_quantity is 0. If you have stock in admin, check publishable key sales channel configuration.');
         }
-
-        variantEffectiveUnits = Math.max(0, minUnitsAcrossComponents ?? 0);
+      } else {
+        console.warn('[ProductDataMapper] No inventory data available for variant:', variant.id);
       }
 
       totalQuantity += variantQuantity;
@@ -258,7 +273,7 @@ export class ProductDataMapper {
         ? 'backorder'
         : 'out_of_stock';
 
-    return {
+    const result = {
       inStock,
       // quantity reflects effective purchasable units where possible
       quantity: totalEffectiveUnits > 0 ? totalEffectiveUnits : totalQuantity,
@@ -269,6 +284,9 @@ export class ProductDataMapper {
       availableVariants,
       totalVariants
     };
+
+    console.log('[ProductDataMapper] Final inventory result:', result);
+    return result;
   }
 
   /**
@@ -368,26 +386,53 @@ export class ProductDataMapper {
   private static extractPricesFromVariants(variants: ProductVariant[]): Array<{amount: number, currency_code: string}> {
     const prices: Array<{amount: number, currency_code: string}> = [];
 
+    console.log('[ProductDataMapper] Extracting prices from variants:', {
+      variantCount: variants?.length,
+      firstVariant: variants?.[0] ? {
+        id: variants[0].id,
+        title: variants[0].title,
+        prices: variants[0].prices,
+        calculated_price: (variants[0] as any).calculated_price,
+        variantKeys: Object.keys(variants[0])
+      } : null
+    });
 
     for (const variant of variants) {
+      // Medusa v2 might use calculated_price instead of prices array
+      const variantAny = variant as any;
+      
+      // Try calculated_price first (Medusa v2)
+      if (variantAny.calculated_price) {
+        const calculatedPrice = variantAny.calculated_price;
+        if (calculatedPrice.calculated_amount !== undefined) {
+          prices.push({
+            amount: calculatedPrice.calculated_amount, // Price is already in correct currency units
+            currency_code: calculatedPrice.currency_code || 'inr'
+          });
+          console.log('[ProductDataMapper] Using calculated_price:', calculatedPrice);
+          continue;
+        }
+      }
 
+      // Fallback to prices array (Medusa v1 style)
       if (!variant.prices || variant.prices.length === 0) {
+        console.warn('[ProductDataMapper] No prices found for variant:', variant.id);
         continue;
       }
 
       // Try all prices, not just the first one
       for (const price of variant.prices) {
-
         if (price && typeof price.amount === 'number' && price.amount > 0) {
           prices.push({
-            amount: price.amount,
+            amount: price.amount, // Price is already in correct currency units
             currency_code: price.currency_code
           });
-        } else {
+          console.log('[ProductDataMapper] Using prices array:', price);
         }
       }
     }
 
+    console.log('[ProductDataMapper] Final extracted prices:', prices);
     return prices;
   }
 

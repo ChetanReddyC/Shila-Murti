@@ -16,7 +16,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({})) as any
     const orderId = typeof body?.orderId === 'string' ? body.orderId : undefined
     const customerId = typeof body?.customerId === 'string' ? body.customerId : undefined
-    try { console.log('[COMPLETE_API][start]', { cartId, orderId, customerIdPresent: Boolean(customerId) }) } catch {}
+    
+    // DEBUG: Log received parameters
+    console.log('[COMPLETE_API][start]', { 
+      cartId, 
+      orderId, 
+      customerIdPresent: Boolean(customerId),
+      bodyKeys: Object.keys(body || {}),
+      rawBody: JSON.stringify(body)
+    })
 
     // Best-effort: if we have both cartId and customerId, try to associate before completing
     if (cartId && customerId) {
@@ -37,13 +45,13 @@ export async function POST(req: NextRequest) {
       const map: Map<string, string> | undefined = (global as any).orderCartMap
       const mapped = map?.get(orderId)
       if (mapped) {
-        return await handleComplete(mapped)
+        return await handleComplete(mapped, orderId)
       }
       // Try KV-backed mapping
       try {
         const kvMapped = await kvGet<string>(`cf:order:cart:${orderId}`)
         if (kvMapped) {
-          return await handleComplete(kvMapped)
+          return await handleComplete(kvMapped, orderId)
         }
       } catch (err) {
       }
@@ -130,6 +138,55 @@ export async function POST(req: NextRequest) {
       if (createdOrderId) {
         await markCompletionSuccess(cartId, createdOrderId)
         try { console.log('[COMPLETE_API][marked_success]', { cartId, orderId: createdOrderId }) } catch {}
+      }
+
+      // Store Cashfree order ID in Medusa order metadata for future refunds
+      if (createdOrderId && orderId) {
+        console.log('[COMPLETE_API][metadata_storage_attempt]', {
+          createdOrderId,
+          cashfreeOrderId: orderId
+        })
+        
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
+          const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+          
+          const metadataUpdateResponse = await fetch(
+            `${baseUrl}/store/custom/orders/${createdOrderId}/metadata`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-publishable-api-key': publishableKey || '',
+                'x-internal-call': process.env.INTERNAL_API_SECRET || '',
+              },
+              body: JSON.stringify({
+                cashfree_order_id: orderId,
+              })
+            }
+          )
+
+          if (metadataUpdateResponse.ok) {
+            console.log('[COMPLETE_API][metadata_stored]', { 
+              medusaOrderId: createdOrderId, 
+              cashfreeOrderId: orderId 
+            })
+          } else {
+            const errorText = await metadataUpdateResponse.text().catch(() => '')
+            console.error('[COMPLETE_API][metadata_store_failed]', {
+              medusaOrderId: createdOrderId,
+              cashfreeOrderId: orderId,
+              status: metadataUpdateResponse.status,
+              error: errorText
+            })
+          }
+        } catch (metadataError: any) {
+          console.error('[COMPLETE_API][metadata_store_exception]', {
+            medusaOrderId: createdOrderId,
+            cashfreeOrderId: orderId,
+            error: metadataError?.message || String(metadataError)
+          })
+        }
       }
 
       // Auto-capture payment after successful order creation
@@ -304,11 +361,69 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function handleComplete(cartId: string) {
-  // Legacy helper retained for compatibility; not used in new flow above.
+async function handleComplete(cartId: string, cashfreeOrderId?: string) {
+  // Legacy helper retained for compatibility
   try {
     const result = await medusaApiClient.completeCart(cartId)
-    try { console.log('[COMPLETE_API][complete][response]', { cartId, hasOrder: Boolean((result as any)?.order), hasCart: Boolean((result as any)?.cart) }) } catch {}
+    const createdOrder = (result as any)?.order
+    const createdOrderId = createdOrder?.id as string | undefined
+    
+    console.log('[COMPLETE_API][handleComplete]', { 
+      cartId, 
+      createdOrderId,
+      cashfreeOrderId,
+      hasOrder: Boolean(createdOrder)
+    })
+    
+    // Store Cashfree order ID in metadata if provided
+    if (createdOrderId && cashfreeOrderId) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
+        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+        
+        console.log('[COMPLETE_API][handleComplete_metadata_attempt]', {
+          createdOrderId,
+          cashfreeOrderId
+        })
+        
+        const metadataUpdateResponse = await fetch(
+          `${baseUrl}/store/custom/orders/${createdOrderId}/metadata`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-publishable-api-key': publishableKey || '',
+              'x-internal-call': process.env.INTERNAL_API_SECRET || '',
+            },
+            body: JSON.stringify({
+              cashfree_order_id: cashfreeOrderId,
+            })
+          }
+        )
+
+        if (metadataUpdateResponse.ok) {
+          console.log('[COMPLETE_API][handleComplete_metadata_stored]', { 
+            medusaOrderId: createdOrderId, 
+            cashfreeOrderId 
+          })
+        } else {
+          const errorText = await metadataUpdateResponse.text().catch(() => '')
+          console.error('[COMPLETE_API][handleComplete_metadata_failed]', {
+            medusaOrderId: createdOrderId,
+            cashfreeOrderId,
+            status: metadataUpdateResponse.status,
+            error: errorText
+          })
+        }
+      } catch (metadataError: any) {
+        console.error('[COMPLETE_API][handleComplete_metadata_exception]', {
+          medusaOrderId: createdOrderId,
+          cashfreeOrderId,
+          error: metadataError?.message || String(metadataError)
+        })
+      }
+    }
+    
     return NextResponse.json({ ok: true, result })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'complete_failed' }, { status: 400 })

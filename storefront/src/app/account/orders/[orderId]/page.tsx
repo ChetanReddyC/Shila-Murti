@@ -210,6 +210,27 @@ export default function OrderDetailsPage() {
           const order = json?.order;
           if (order) {
             setOrderData(order);
+            
+            // Auto-check refund status if order cancelled and has pending refund
+            if (order.status === 'canceled' && 
+                order.metadata?.refund_id && 
+                order.metadata?.refund_status !== 'SUCCESS') {
+              console.log('[ORDER_DETAILS] Auto-checking refund status...');
+              
+              // Check refund status in background
+              fetch(`/api/account/orders/${orderId}/refund-status?customer_id=${encodeURIComponent(customerId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              })
+              .then(res => res.json())
+              .then(result => {
+                if (result.order) {
+                  console.log('[ORDER_DETAILS] Refund status updated:', result.refund?.status);
+                  setOrderData(result.order);
+                }
+              })
+              .catch(err => console.error('[ORDER_DETAILS] Refund check failed:', err));
+            }
           } else {
             console.error('[ORDER_DETAILS_DEBUG] Order not found in response', { json });
           }
@@ -762,6 +783,45 @@ export default function OrderDetailsPage() {
                             </p>
                           </div>
                         )}
+                        {/* Refund Status Display - Only show if refund actually initiated with Cashfree */}
+                        {orderData.status === 'canceled' && orderData.metadata?.cf_refund_id && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Refund Status</p>
+                            <p className={styles.detailValue} style={{ 
+                              color: orderData.metadata.refund_status?.toUpperCase() === 'SUCCESS' ? '#10b981' : 
+                                     ['PENDING', 'PROCESSING'].includes(orderData.metadata.refund_status?.toUpperCase() || '') ? '#f59e0b' : 
+                                     '#6b7280' 
+                            }}>
+                              {orderData.metadata.refund_status?.toUpperCase() === 'SUCCESS' ? '✓ Refund Processed' :
+                               ['PENDING', 'PROCESSING'].includes(orderData.metadata.refund_status?.toUpperCase() || '') ? 'Refund Processing...' :
+                               orderData.metadata.refund_status ? String(orderData.metadata.refund_status) : 'Refund Initiated'}
+                            </p>
+                          </div>
+                        )}
+                        {orderData.status === 'canceled' && orderData.metadata?.refund_amount && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Refund Amount</p>
+                            <p className={styles.detailValue}>
+                              {formatCurrency(orderData.metadata.refund_amount as number, orderData.currency_code || 'inr')}
+                            </p>
+                          </div>
+                        )}
+                        {orderData.status === 'canceled' && orderData.metadata?.refund_initiated_at && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Refund Initiated</p>
+                            <p className={styles.detailValue}>
+                              {formatDate(orderData.metadata.refund_initiated_at as string)}
+                            </p>
+                          </div>
+                        )}
+                        {orderData.status === 'canceled' && orderData.metadata?.refund_error && (
+                          <div className={styles.detailRow}>
+                            <p className={styles.detailLabel}>Refund Note</p>
+                            <p className={styles.detailValue} style={{ color: '#ef4444' }}>
+                              {orderData.metadata.refund_error as string}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -881,6 +941,7 @@ export default function OrderDetailsPage() {
           </button>
         )}
         
+
         <button
           className={styles.downloadButtonFixed}
           onClick={downloadInvoice}
