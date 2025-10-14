@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../../../../components/Header';
 import { useParams } from 'next/navigation';
+import SessionGuard from '@/components/SessionGuard';
 import styles from './page.module.css';
 
 type OrderStage = 'Placed' | 'Processed' | 'Shipped' | 'Delivered';
@@ -165,7 +166,7 @@ const getPaymentStatusBadge = (paymentStatus?: string): { label: string; color: 
   }
 };
 
-export default function OrderDetailsPage() {
+function OrderDetailsPageContent() {
   const params = useParams();
   const orderId = params?.orderId as string;
   const [orderData, setOrderData] = useState<OrderData | null>(null);
@@ -204,7 +205,7 @@ export default function OrderDetailsPage() {
         }
 
         // Fetch the specific order directly instead of all orders
-        const res = await fetch(`/api/account/orders/${orderId}?customer_id=${encodeURIComponent(customerId)}`);
+        const res = await fetch(`/api/account/orders/${orderId}`);
         if (res.ok) {
           const json = await res.json();
           const order = json?.order;
@@ -218,7 +219,7 @@ export default function OrderDetailsPage() {
               console.log('[ORDER_DETAILS] Auto-checking refund status...');
               
               // Check refund status in background
-              fetch(`/api/account/orders/${orderId}/refund-status?customer_id=${encodeURIComponent(customerId)}`, {
+              fetch(`/api/account/orders/${orderId}/refund-status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
               })
@@ -377,7 +378,7 @@ export default function OrderDetailsPage() {
     setShowCancelModal(false);
     
     try {
-      const response = await fetch(`/api/account/orders/${orderId}/cancel?customer_id=${encodeURIComponent(customerId)}`, {
+      const response = await fetch(`/api/account/orders/${orderId}/cancel`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -422,7 +423,7 @@ export default function OrderDetailsPage() {
     // Method 1: Direct iframe download (most reliable, bypasses ad blockers)
     const tryDirectDownload = () => {
       try {
-        const url = `/api/account/orders/${orderId}/invoices?customer_id=${encodeURIComponent(customerId)}`;
+        const url = `/api/account/orders/${orderId}/invoices`;
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
         iframe.src = url;
@@ -448,7 +449,7 @@ export default function OrderDetailsPage() {
     
     // Method 2: Blob download (better UX when it works)
     const tryBlobDownload = async () => {
-      const response = await fetch(`/api/account/orders/${orderId}/invoices?customer_id=${encodeURIComponent(customerId)}`, {
+      const response = await fetch(`/api/account/orders/${orderId}/invoices`, {
         method: 'GET',
         headers: {
           'accept': 'application/pdf',
@@ -1017,5 +1018,13 @@ export default function OrderDetailsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function OrderDetailsPage() {
+  return (
+    <SessionGuard>
+      <OrderDetailsPageContent />
+    </SessionGuard>
   );
 }

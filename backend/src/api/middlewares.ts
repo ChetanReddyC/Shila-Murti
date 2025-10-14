@@ -63,7 +63,7 @@ async function authGuard(
       return res.status(401).json({ message: "Missing bearer token" })
     }
 
-    const claims = await verifyAccessToken(token)
+    const claims = await verifyAccessToken(token, req.scope)
 
     // Attach identity to request context for downstream usage
     ;(req as any).customer_id = claims.sub

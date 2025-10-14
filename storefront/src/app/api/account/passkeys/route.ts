@@ -1,20 +1,28 @@
 import type { NextRequest } from 'next/server'
 import { kvListKeys, kvGet, kvDel, kvSet } from '@/lib/kv'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
-function resolveCustomerId(req: NextRequest): string | null {
-  const url = new URL(req.url)
-  const qp = url.searchParams.get('customer_id')
-  if (qp) return qp
-  const hdr = req.headers.get('x-customer-id')
-  if (hdr) return hdr
-  return null
+async function getCustomerIdFromSession(): Promise<string | null> {
+  try {
+    const session = await getServerSession(authOptions as any)
+    if (!session || !(session as any)?.customerId) {
+      return null
+    }
+    return (session as any).customerId
+  } catch {
+    return null
+  }
 }
 
 export async function GET(req: NextRequest) {
-  const customerId = resolveCustomerId(req)
-  if (!customerId) return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
+  const customerId = await getCustomerIdFromSession()
+  if (!customerId) {
+    console.error('[account/passkeys] Session expired or not authenticated')
+    return new Response(JSON.stringify({ ok: false, error: 'session_expired' }), { status: 401 })
+  }
   try {
     const prefix = `webauthn:cred:${customerId}:`
     const names = await kvListKeys(prefix, 1000)
@@ -30,8 +38,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const customerId = resolveCustomerId(req)
-  if (!customerId) return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
+  const customerId = await getCustomerIdFromSession()
+  if (!customerId) {
+    console.error('[account/passkeys] Session expired or not authenticated')
+    return new Response(JSON.stringify({ ok: false, error: 'session_expired' }), { status: 401 })
+  }
   const { credentialId } = await req.json().catch(() => ({}))
   if (!credentialId) return new Response(JSON.stringify({ ok: false, error: 'credential_id_required' }), { status: 400 })
   try {

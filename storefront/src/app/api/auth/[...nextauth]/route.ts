@@ -6,11 +6,11 @@ import type { NextRequest } from 'next/server'
 // Minimal credentials-like providers to flip session flags according to the spec
 import Credentials from 'next-auth/providers/credentials'
 
-// Session lifetime: env-driven with a sane default of 10 minutes in development
+// Session lifetime: env-driven with a default of 1 hour
 const parsedMaxAge = Number(process.env.SESSION_MAX_AGE_SEC)
 const sessionMaxAge = Number.isFinite(parsedMaxAge) && parsedMaxAge > 0
   ? Math.floor(parsedMaxAge)
-  : (process.env.NODE_ENV === 'development' ? 10 * 60 : 15 * 60)
+  : 3600 // 1 hour
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt', maxAge: sessionMaxAge },

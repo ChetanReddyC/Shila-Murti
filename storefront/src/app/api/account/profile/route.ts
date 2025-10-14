@@ -9,23 +9,13 @@ export const runtime = 'nodejs'
 
 const BASE_URL = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
 
-function normalizeId(value: string | null | undefined): string | null {
-  if (!value) return null
-  const trimmed = String(value).trim()
-  if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null
-  return trimmed
-}
-
-async function resolveCustomerId(req: NextRequest): Promise<string | null> {
+async function getCustomerIdFromSession(): Promise<string | null> {
   try {
-    const url = req.nextUrl || new URL(req.url)
-    const qp = normalizeId(url.searchParams.get('customer_id'))
-    if (qp) return qp
-    const headerId = normalizeId(req.headers.get('x-customer-id'))
-    if (headerId) return headerId
     const session = await getServerSession(authOptions as any)
-    const cid = normalizeId((session as any)?.customerId)
-    return cid
+    if (!session || !(session as any)?.customerId) {
+      return null
+    }
+    return (session as any).customerId
   } catch {
     return null
   }
@@ -35,11 +25,11 @@ async function callStore(path: string, init: RequestInit): Promise<Response> { r
 
 export async function GET(req: NextRequest) {
   const startedAt = Date.now()
-  const customerId = await resolveCustomerId(req)
+  const customerId = await getCustomerIdFromSession()
   if (!customerId) {
-    console.error('[account/profile][GET] No customer ID found in request')
+    console.error('[account/profile][GET] Session expired or not authenticated')
     try { const c = await getCounter({ name: 'account_profile_failure_total', help: 'Account profile failures' }); c.inc() } catch {}
-    return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401 })
+    return new Response(JSON.stringify({ ok: false, error: 'session_expired' }), { status: 401 })
   }
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true, purpose: 'account.profile' })
   if (!token) {
@@ -58,11 +48,11 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const startedAt = Date.now()
-  const customerId = await resolveCustomerId(req)
+  const customerId = await getCustomerIdFromSession()
   if (!customerId) {
-    console.error('[account/profile][PATCH] No customer ID found in request')
+    console.error('[account/profile][PATCH] Session expired or not authenticated')
     try { const c = await getCounter({ name: 'account_profile_failure_total', help: 'Account profile failures' }); c.inc() } catch {}
-    return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401 })
+    return new Response(JSON.stringify({ ok: false, error: 'session_expired' }), { status: 401 })
   }
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true, purpose: 'account.profile' })
   if (!token) {

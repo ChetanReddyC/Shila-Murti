@@ -13,7 +13,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     try {
       const bearer = extractBearerToken(req.headers.authorization as string | undefined)
       if (bearer) {
-        const claims = await verifyAccessToken(bearer)
+        const claims = await verifyAccessToken(bearer, req.scope)
         authSubject = claims.sub || null
       }
     } catch {}

@@ -22,7 +22,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(401).json({ message: "Missing bearer token" });
     }
 
-    const claims = await verifyAccessToken(token);
+    const claims = await verifyAccessToken(token, req.scope);
     const customerId = claims.sub;
     if (!customerId) {
       return res.status(401).json({ message: "Invalid token" });

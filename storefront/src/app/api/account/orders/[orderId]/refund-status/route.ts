@@ -1,4 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { signBridgeToken } from '@/lib/auth/signing'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+async function getCustomerIdFromSession(): Promise<string | null> {
+  try {
+    const session = await getServerSession(authOptions as any)
+    if (!session || !(session as any)?.customerId) {
+      return null
+    }
+    return (session as any).customerId
+  } catch {
+    return null
+  }
+}
 
 export async function POST(
   req: NextRequest,
@@ -6,15 +21,18 @@ export async function POST(
 ) {
   try {
     const { orderId } = params
-    const { searchParams } = new URL(req.url)
-    const customerId = searchParams.get('customer_id')
+    const customerId = await getCustomerIdFromSession()
 
     if (!customerId) {
-      return NextResponse.json({ message: 'Customer ID required' }, { status: 400 })
+      console.error('[account/orders/refund-status] Session expired or not authenticated')
+      return NextResponse.json({ message: 'Session expired' }, { status: 401 })
     }
 
-    // Get auth token from session
-    const authHeader = req.headers.get('authorization')
+    // Generate bridge token
+    const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
+    if (!token) {
+      return NextResponse.json({ message: 'Auth failed' }, { status: 500 })
+    }
     
     // Forward request to backend
     const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
@@ -24,7 +42,7 @@ export async function POST(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': authHeader || '',
+          'Authorization': `Bearer ${token}`,
         },
       }
     )

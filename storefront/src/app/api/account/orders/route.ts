@@ -2,26 +2,32 @@ import type { NextRequest } from 'next/server'
 import { signBridgeToken } from '@/lib/auth/signing'
 import { storeFetch } from '@/lib/medusaServer'
 import { getCounter, getHistogram } from '@/lib/metrics'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export const runtime = 'nodejs'
 
 const BASE_URL = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
 
-function resolveCustomerId(req: NextRequest): string | null {
-  const url = new URL(req.url)
-  const qp = url.searchParams.get('customer_id')
-  if (qp) return qp
-  const hdr = req.headers.get('x-customer-id')
-  if (hdr) return hdr
-  return null
+async function getCustomerIdFromSession(): Promise<string | null> {
+  try {
+    const session = await getServerSession(authOptions as any)
+    if (!session || !(session as any)?.customerId) {
+      return null
+    }
+    return (session as any).customerId
+  } catch {
+    return null
+  }
 }
 
 export async function GET(req: NextRequest) {
   const startedAt = Date.now()
-  const customerId = resolveCustomerId(req)
+  const customerId = await getCustomerIdFromSession()
   if (!customerId) {
+    console.error('[account/orders][GET] Session expired or not authenticated')
     try { const c = await getCounter({ name: 'account_orders_failure_total', help: 'Account orders failures' }); c.inc() } catch {}
-    return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
+    return new Response(JSON.stringify({ ok: false, error: 'session_expired' }), { status: 401 })
   }
 
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
