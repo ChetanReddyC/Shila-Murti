@@ -86,7 +86,7 @@ export default function AccountPage() {
     // Load profile
     ;(async () => {
       try {
-        const res = await fetch(`/api/account/profile?customer_id=${encodeURIComponent(customerId)}`)
+        const res = await fetch(`/api/account/profile`)
         if (res.ok) {
           const data = await res.json()
           const c = data?.customer || data || {}
@@ -115,7 +115,7 @@ export default function AccountPage() {
     // Load addresses (fallback to ensure latest data)
     ;(async () => {
       try {
-        const res = await fetch(`/api/account/addresses?customer_id=${encodeURIComponent(customerId)}`)
+        const res = await fetch(`/api/account/addresses`)
         if (res.ok) {
           const json = await res.json()
           const list: any[] = Array.isArray(json?.addresses) ? json.addresses : []
@@ -141,11 +141,11 @@ export default function AccountPage() {
     setOrdersLoading(true)
     try {
       const cursor = cursorCache.get(page)
-      const params = new URLSearchParams({ customer_id: customerId, limit: '6' })
+      const params = new URLSearchParams({ limit: '6' })
       if (cursor) params.set('cursor', cursor)
       if (search) params.set('search', search)
       
-      const res = await fetch(`/api/account/orders?${params.toString()}`)
+      const res = await fetch(`/api/account/orders${params.toString() ? '?' + params.toString() : ''}`)
       if (res.ok) {
         const json = await res.json()
         const list: any[] = Array.isArray(json?.orders) ? json.orders : []

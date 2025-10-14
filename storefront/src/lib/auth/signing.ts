@@ -27,7 +27,7 @@ async function importPrivateKey(): Promise<{ key: CryptoKey; kid: string } | nul
   }
 }
 
-export async function signBridgeToken(claims: BridgeClaims, expiresInSeconds = 15 * 60): Promise<string | null> {
+export async function signBridgeToken(claims: BridgeClaims, expiresInSeconds = 3600): Promise<string | null> {
   const signer = await importPrivateKey()
   if (!signer) {
     console.error('[signing] Failed to get signer for bridge token')

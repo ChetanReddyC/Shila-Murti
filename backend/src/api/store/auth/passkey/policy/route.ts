@@ -32,7 +32,7 @@ export async function GET(
 
     let tokenPayload;
     try {
-      tokenPayload = await verifyAccessToken(token);
+      tokenPayload = await verifyAccessToken(token, req.scope);
     } catch (error) {
       return res.status(401).json({
         error: "Unauthorized", 
@@ -133,7 +133,7 @@ export async function POST(
 
     let tokenPayload;
     try {
-      tokenPayload = await verifyAccessToken(token);
+      tokenPayload = await verifyAccessToken(token, req.scope);
     } catch (error) {
       return res.status(401).json({
         error: "Unauthorized",

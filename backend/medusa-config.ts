@@ -28,5 +28,9 @@ module.exports = defineConfig({
         name: "Indian Rupee",
       },
     ],
-  }
+  },
+  jobs: {
+    // Enable scheduled job processing (works without Redis)
+    enabled: true,
+  },
 })

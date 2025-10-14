@@ -1966,7 +1966,7 @@ export default function CheckoutPage() {
 
         if (customerId) {
 
-          const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+          const res = await fetch(`/api/account/orders`)
 
           const data = await res.json().catch(() => ({}))
 
@@ -2338,7 +2338,7 @@ export default function CheckoutPage() {
 
           if (customerId) {
 
-            const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+            const res = await fetch(`/api/account/orders`)
 
             const data = await res.json().catch(() => ({}))
 
@@ -2394,7 +2394,7 @@ export default function CheckoutPage() {
 
         if (customerId) {
 
-          const res = await fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+          const res = await fetch(`/api/account/orders`)
 
           const data = await res.json().catch(() => ({}))
 
@@ -2796,7 +2796,7 @@ export default function CheckoutPage() {
 
                           if (customerId) {
 
-                            fetch(`/api/account/orders?customer_id=${encodeURIComponent(customerId)}`)
+                            fetch(`/api/account/orders`)
 
                               .then(res => res.json())
 

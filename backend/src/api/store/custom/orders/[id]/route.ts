@@ -10,7 +10,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       return res.status(401).json({ message: "Authorization token required" })
     }
 
-    const claims = await verifyAccessToken(bearer)
+    const claims = await verifyAccessToken(bearer, req.scope)
     const customerId = claims.sub
 
     if (!customerId) {

@@ -1,8 +1,22 @@
 import type { NextRequest } from 'next/server'
 import { signBridgeToken } from '@/lib/auth/signing'
 import { storeFetch } from '@/lib/medusaServer'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export const runtime = 'nodejs'
+
+async function getCustomerIdFromSession(): Promise<string | null> {
+  try {
+    const session = await getServerSession(authOptions as any)
+    if (!session || !(session as any)?.customerId) {
+      return null
+    }
+    return (session as any).customerId
+  } catch {
+    return null
+  }
+}
 
 export async function POST(
   req: NextRequest,
@@ -14,11 +28,11 @@ export async function POST(
     return new Response(JSON.stringify({ ok: false, error: 'order_id_required' }), { status: 400 })
   }
 
-  const url = new URL(req.url)
-  const customerId = url.searchParams.get('customer_id')
+  const customerId = await getCustomerIdFromSession()
   
   if (!customerId) {
-    return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
+    console.error('[account/orders/cancel] Session expired or not authenticated')
+    return new Response(JSON.stringify({ ok: false, error: 'session_expired' }), { status: 401 })
   }
 
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })

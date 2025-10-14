@@ -18,7 +18,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       try {
-        const claims = await verifyAccessToken(bearer)
+        const claims = await verifyAccessToken(bearer, req.scope)
         authenticatedCustomerId = claims.sub
 
         if (!authenticatedCustomerId) {

@@ -31,7 +31,7 @@ export async function POST() {
     magicOK: true,
     mfaComplete: true,
     iat: now,
-    exp: now + 15 * 60,
+    exp: now + 3600, // 1 hour
     jti: crypto.randomUUID(),
   }
 
@@ -41,7 +41,7 @@ export async function POST() {
     .setIssuer(process.env.AUTH_ISSUER || 'storefront')
     .setAudience(process.env.AUTH_AUDIENCE || 'medusa')
     .setIssuedAt(now)
-    .setExpirationTime('15m')
+    .setExpirationTime('1h')
     .sign(signer.key)
 
   return new Response(JSON.stringify({ token }), { status: 200 })

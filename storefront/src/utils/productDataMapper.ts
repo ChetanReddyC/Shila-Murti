@@ -168,6 +168,9 @@ export class ProductDataMapper {
   /**
    * Extracts comprehensive inventory information including stock status, quantities,
    * and backorder settings across all variants
+   * 
+   * NOTE: This is a preliminary check based on API data.
+   * For real-time inventory, use getProductInventory() utility instead.
    */
   static extractInventoryInfo(product: Product): AggregatedInventoryInfo {
     console.log('[ProductDataMapper] Extracting inventory info:', {
@@ -217,9 +220,7 @@ export class ProductDataMapper {
         allow_backorder: variant.allow_backorder
       });
 
-      // Medusa v2 Store API approach (per official docs):
-      // - If manage_inventory is false, always available
-      // - If manage_inventory is true, check inventory_quantity
+      // Check if inventory is managed
       if (!variant.manage_inventory) {
         // Unmanaged inventory = always available
         variantQuantity = Infinity;
@@ -231,15 +232,15 @@ export class ProductDataMapper {
         variantQuantity = Math.max(0, variant.inventory_quantity);
         variantEffectiveUnits = variantQuantity;
         console.log('[ProductDataMapper] Using inventory_quantity:', variantQuantity);
-        
-        // WARNING: If this is 0 but you have stock in admin, check:
-        // 1. Is your publishable API key associated with a sales channel?
-        // 2. Does that sales channel have access to the inventory location?
-        if (variantQuantity === 0) {
-          console.warn('[ProductDataMapper] inventory_quantity is 0. If you have stock in admin, check publishable key sales channel configuration.');
-        }
       } else {
-        console.warn('[ProductDataMapper] No inventory data available for variant:', variant.id);
+        // Medusa v2 doesn't provide inventory_quantity by default
+        // Assume available for now - will be updated by real-time check
+        console.warn('[ProductDataMapper] No inventory_quantity in API response');
+        console.warn('[ProductDataMapper] Product will fetch real-time inventory separately');
+        // Optimistic: assume 1 available so product shows as potentially in stock
+        // Real check happens in ProductDetailPage
+        variantQuantity = 1;
+        variantEffectiveUnits = 1;
       }
 
       totalQuantity += variantQuantity;

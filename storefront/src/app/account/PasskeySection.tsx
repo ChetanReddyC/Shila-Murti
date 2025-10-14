@@ -14,14 +14,18 @@ export default function PasskeySection() {
     if (!customerId) return
     setLoading(true); setError('')
     try {
-      const res = await fetch(`/api/account/passkeys?customer_id=${encodeURIComponent(customerId)}`)
+      const res = await fetch(`/api/account/passkeys`)
       const json = await res.json()
       if (res.ok) setCreds(Array.isArray(json.credentials) ? json.credentials : [])
+      else if (checkSessionExpired(res, json)) {
+        handleSessionExpiry(router, 'PASSKEY')
+        return
+      }
       else setError(json?.error || 'Unable to load credentials')
     } catch {
       setError('Unable to load credentials')
     } finally { setLoading(false) }
-  }, [customerId])
+  }, [customerId, router])
 
   useEffect(() => {
     // In a full implementation, this would come from session or a prior ensure step
@@ -49,7 +53,7 @@ export default function PasskeySection() {
     if (customerId) {
       ;(async () => {
         try {
-          const res = await fetch(`/api/account/profile?customer_id=${encodeURIComponent(customerId)}`)
+          const res = await fetch(`/api/account/profile`)
           if (res.ok) {
             const data = await res.json()
             const customer = data?.customer || data || {}
@@ -68,7 +72,7 @@ export default function PasskeySection() {
     if (!customerId) return
     ;(async () => {
       try {
-        const res = await fetch(`/api/account/passkeys?customer_id=${encodeURIComponent(customerId)}`)
+        const res = await fetch(`/api/account/passkeys`)
         const json = await res.json().catch(() => ({}))
         const count = Array.isArray(json?.credentials) ? json.credentials.length : 0
         if (count === 0) {
@@ -128,7 +132,7 @@ export default function PasskeySection() {
               <button
                 onClick={async () => {
                   try {
-                    await fetch('/api/account/passkeys', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credentialId: c.id, customer_id: customerId }) })
+                    await fetch('/api/account/passkeys', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credentialId: c.id }) })
                     refresh()
                   } catch {}
                 }}
