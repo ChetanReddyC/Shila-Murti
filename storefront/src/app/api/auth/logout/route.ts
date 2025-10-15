@@ -3,27 +3,41 @@ import { kvDel } from '@/lib/kv'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { signBridgeToken } from '@/lib/auth/signing'
+import { blacklistJWT } from '@/lib/auth/jwtBlacklist'
+import { getToken } from 'next-auth/jwt'
 
 export async function POST(req: NextRequest) {
   try {
-    // Get current session
+    // Get current session and token
     const session = await getServerSession(authOptions)
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
     const customerId = (session as any)?.customerId
     const email = (session as any)?.user?.email
+    
+    // CRITICAL: Blacklist the JWT jti to prevent reuse
+    const jti = (token as any)?.jti
+    if (jti) {
+      const parsedMaxAge = Number(process.env.SESSION_MAX_AGE_SEC)
+      const sessionMaxAge = Number.isFinite(parsedMaxAge) && parsedMaxAge > 0
+        ? Math.floor(parsedMaxAge)
+        : 3600
+      await blacklistJWT(jti, sessionMaxAge)
+      console.log('[LOGOUT] Blacklisted JWT:', jti)
+    }
     
     // Revoke JWT token on backend if customer is authenticated
     if (customerId) {
       const body = await req.json().catch(() => ({ revokeAll: false }))
       const revokeAll = body?.revokeAll === true
       
-      const token = await signBridgeToken({ sub: customerId, mfaComplete: true })
-      if (token) {
+      const bridgeToken = await signBridgeToken({ sub: customerId, mfaComplete: true })
+      if (bridgeToken) {
         const BASE_URL = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
         try {
           await fetch(`${BASE_URL}/store/auth/logout`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Bearer ${bridgeToken}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({ revokeAll })

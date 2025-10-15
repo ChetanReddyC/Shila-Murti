@@ -1,5 +1,6 @@
 import NextAuth, { NextAuthOptions } from 'next-auth'
 import type { NextRequest } from 'next/server'
+import { isJWTBlacklisted } from '@/lib/auth/jwtBlacklist'
 
 // NOTE: Using placeholder provider implementations. In later tasks we'll wire real Passkey, OTP, and Magic providers.
 
@@ -105,10 +106,20 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account, user }) {
       
+      // CRITICAL: Check if JWT is blacklisted (revoked during logout)
+      const jti = (token as any)?.jti
+      if (jti) {
+        const isBlacklisted = await isJWTBlacklisted(jti)
+        if (isBlacklisted) {
+          console.log('[AUTH] JWT is blacklisted, terminating session:', jti)
+          return {} as any // Return empty token to force logout
+        }
+      }
+      
       // Rotate jti on sign-in
       if (user) {
-        const jti = (globalThis as any)?.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
-        ;(token as any).jti = jti
+        const newJti = (globalThis as any)?.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
+        ;(token as any).jti = newJti
       }
 
       // Factor flags
