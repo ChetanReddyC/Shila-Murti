@@ -1,30 +1,16 @@
 'use client';
 
-
-
 import React, { useState, useEffect, useRef } from 'react';
-
 import Script from 'next/script';
-
 import Header from '../../components/Header';
-
 import styles from './checkoutPage.module.css';
-
 import Link from 'next/link';
-
 import { useRouter } from 'next/navigation';
-
 import { useCart } from '../../contexts/CartContext';
-
 import { processCheckout } from '../../utils/checkoutOrchestrator';
-
 import { useSession } from 'next-auth/react';
-
 import { usePasskey } from '../../hooks/usePasskey';
-
 import { PriceCalculationService } from '../../services/PriceCalculationService';
-
-
 
 export default function CheckoutPage() {
 
@@ -359,31 +345,103 @@ export default function CheckoutPage() {
 
   const { data: session, status } = useSession();
 
-  const isAuthenticated = status === 'authenticated'
+  const [sessionValidated, setSessionValidated] = useState(false);
 
-  const isReadyToPay = isAuthenticated || purchaseReady
+  const isAuthenticated = status === 'authenticated' && sessionValidated;
+
+  const isReadyToPay = isAuthenticated || purchaseReady;
 
 
 
   useEffect(() => {
 
-    // If user is already authenticated, bypass identity verification
+    // CRITICAL: Validate session is still active (not blacklisted after logout)
 
-    if (status === 'authenticated') {
+    const validateSession = async () => {
 
-      setPurchaseReady(true);
+      if (status === 'authenticated') {
 
-      // Extract customerId from session if available
+        try {
 
-      const sessionCustomerId = (session as any)?.customerId;
+          const response = await fetch('/api/auth/session/validate', {
 
-      if (sessionCustomerId) {
+            method: 'GET',
 
-        setCustomerId(sessionCustomerId);
+            credentials: 'include',
+
+            cache: 'no-store',
+
+          });
+
+          
+
+          if (!response.ok) {
+
+            setSessionValidated(false);
+
+            setPurchaseReady(false);
+
+            return;
+
+          }
+
+          
+
+          const data = await response.json();
+
+          
+
+          if (data?.valid === true) {
+
+            setSessionValidated(true);
+
+            setPurchaseReady(true);
+
+            
+
+            // Extract customerId from session if available
+
+            const sessionCustomerId = (session as any)?.customerId;
+
+            if (sessionCustomerId) {
+
+              setCustomerId(sessionCustomerId);
+
+            }
+
+          } else {
+
+            // Session is invalid (blacklisted or expired)
+
+            setSessionValidated(false);
+
+            setPurchaseReady(false);
+
+            console.log('[CHECKOUT] Session validation failed:', data?.reason);
+
+          }
+
+        } catch (error) {
+
+          console.error('[CHECKOUT] Session validation error:', error);
+
+          setSessionValidated(false);
+
+          setPurchaseReady(false);
+
+        }
+
+      } else {
+
+        setSessionValidated(false);
 
       }
 
-    }
+    };
+
+    
+
+    validateSession();
 
   }, [status, session]);
 
@@ -2989,880 +3047,423 @@ export default function CheckoutPage() {
                   />
 
                 </div>
-
-
-
                 <div className={styles.formGroup}>
-
                   <label htmlFor="address" className={styles.label}>Address</label>
-
                   <input
-
                     type="text"
-
                     id="address"
-
                     name="address"
-
                     className={styles.input}
-
                     value={formData.address}
-
                     onChange={handleInputChange}
-
                     placeholder="Enter your address"
-
                     required
-
                   />
-
                 </div>
-
-
-
                 <div className={styles.formRow}>
-
                   <div className={styles.formGroup}>
-
                     <label htmlFor="city" className={styles.label}>City</label>
-
                     <input
-
                       type="text"
-
                       id="city"
-
                       name="city"
-
                       className={styles.input}
-
                       value={formData.city}
-
                       onChange={handleInputChange}
-
                       placeholder="Enter your city"
-
                       required
-
                     />
-
                   </div>
-
                   <div className={styles.formGroup}>
-
                     <label htmlFor="state" className={styles.label}>State</label>
-
                     <input
-
                       type="text"
-
                       id="state"
-
                       name="state"
-
                       className={styles.input}
-
                       value={formData.state}
-
                       onChange={handleInputChange}
-
                       placeholder="Enter your state"
-
                       required
-
                     />
-
                   </div>
-
                 </div>
-
-
-
                 <div className={styles.formRow}>
-
                   <div className={styles.formGroup}>
-
                     <label htmlFor="postalCode" className={styles.label}>Postal Code</label>
-
                     <input
-
                       type="text"
-
                       id="postalCode"
-
                       name="postalCode"
-
                       className={styles.input}
-
                       value={formData.postalCode}
-
                       onChange={handleInputChange}
-
                       placeholder="Enter your postal code"
-
                       required
-
                     />
-
                   </div>
-
                   <div className={styles.formGroup}>
-
                     <label htmlFor="contactNumber" className={styles.label}>Contact Number</label>
-
                     <input
-
                       type="text"
-
                       id="contactNumber"
-
                       name="contactNumber"
-
                       className={styles.input}
-
                       value={formData.contactNumber}
-
                       onChange={handleInputChange}
-
                       placeholder="Enter your contact number"
-
                       required
-
                     />
-
                   </div>
-
                 </div>
-
               </div>
-
-
-
               {/* Shipping Method Section */}
-
               <div className={styles.section}>
-
                 <h2 className={styles.sectionTitle}>Shipping Method</h2>
-
-
-
                 <div className={styles.shippingOptions}>
-
                   {(shippingOptions || []).map((opt) => (
-
                     <div key={opt.id} className={styles.shippingOption}>
-
                       <input
-
                         type="radio"
-
                         id={`ship_${opt.id}`}
-
                         name="shippingOptionId"
-
                         value={opt.id}
-
                         checked={selectedShippingOptionId === opt.id}
-
                         onChange={handleShippingOptionIdChange}
-
                         className={styles.radioInput}
-
                       />
-
                       <label htmlFor={`ship_${opt.id}`} className={styles.radioLabel}>
-
                         <div className={styles.shippingOptionDetails}>
-
                           <div className={styles.shippingOptionName}>
-
                             {opt.name || 'Shipping'}{opt.estimate ? ` (${opt.estimate})` : ''}
-
                           </div>
-
                           <div className={styles.shippingOptionPrice}>
-
                             {opt.amount > 0 ?
-
                               new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(Number(opt.amount))
-
                               : 'Free'}
-
                           </div>
-
                         </div>
-
                       </label>
-
                     </div>
-
                   ))}
-
                 </div>
-
               </div>
-
-
-
               {/* Payment Information Section */}
-
               <div className={styles.section}>
-
                 <h2 className={styles.sectionTitle}>Payment Information</h2>
-
-
-
                 <div className={styles.paymentOptions}>
-
                   <div className={styles.paymentOption}>
-
                     <input
-
                       type="radio"
-
                       id="creditCard"
-
                       name="paymentMethod"
-
                       value="creditCard"
-
                       checked={paymentMethod === 'creditCard'}
-
                       onChange={handlePaymentMethodChange}
-
                       className={styles.radioInput}
-
                     />
-
                     <label htmlFor="creditCard" className={styles.radioLabel}>
-
                       Credit Card
-
                     </label>
-
                   </div>
-
-
-
                   <div className={styles.paymentOption}>
-
                     <input
-
                       type="radio"
-
                       id="paypal"
-
                       name="paymentMethod"
-
                       value="paypal"
-
                       checked={paymentMethod === 'paypal'}
-
                       onChange={handlePaymentMethodChange}
-
                       className={styles.radioInput}
-
                     />
-
                     <label htmlFor="paypal" className={styles.radioLabel}>
-
                       PayPal
-
                     </label>
-
                   </div>
-
                   <div className={styles.paymentOption}>
-
                     <input
-
                       type="radio"
-
                       id="upi"
-
                       name="paymentMethod"
-
                       value="upi"
-
                       checked={paymentMethod === 'upi'}
-
                       onChange={handlePaymentMethodChange}
-
                       className={styles.radioInput}
-
                     />
-
                     <label htmlFor="upi" className={styles.radioLabel}>
-
                       UPI
-
                     </label>
-
                   </div>
-
                   <div className={styles.paymentOption}>
-
                     <input
-
                       type="radio"
-
                       id="cashfree"
-
                       name="paymentMethod"
-
                       value="cashfree"
-
                       checked={paymentMethod === 'cashfree'}
-
                       onChange={handlePaymentMethodChange}
-
                       className={styles.radioInput}
-
                     />
-
                     <label htmlFor="cashfree" className={styles.radioLabel}>
-
                       Cashfree (Hosted Checkout)
-
                     </label>
-
                   </div>
-
                 </div>
-
-
-
                 {paymentMethod === 'creditCard' && (
-
                   <div className={styles.paymentDetails}>
-
                     <div className={styles.formGroup}>
-
                       <label htmlFor="cardNumber" className={styles.label}>Card Number</label>
-
                       <input
-
                         type="text"
-
                         id="cardNumber"
-
                         name="cardNumber"
-
                         className={styles.input}
-
                         value={paymentDetails.cardNumber}
-
                         onChange={handlePaymentDetailsChange}
-
                         placeholder="Enter card number"
-
                         required
-
                       />
-
                     </div>
-
-
-
                     <div className={styles.formRow}>
-
                       <div className={styles.formGroup}>
-
                         <label htmlFor="expiryDate" className={styles.label}>Expiration Date</label>
-
                         <input
-
                           type="text"
-
                           id="expiryDate"
-
                           name="expiryDate"
-
                           className={styles.input}
-
                           value={paymentDetails.expiryDate}
-
                           onChange={handlePaymentDetailsChange}
-
                           placeholder="MM/YY"
-
                           required
-
                         />
-
                       </div>
-
                       <div className={styles.formGroup}>
-
                         <label htmlFor="cvv" className={styles.label}>CVV</label>
-
                         <input
-
                           type="text"
-
                           id="cvv"
-
                           name="cvv"
-
                           className={styles.input}
-
                           value={paymentDetails.cvv}
-
                           onChange={handlePaymentDetailsChange}
-
                           placeholder="Enter CVV"
-
                           required
-
                         />
-
                       </div>
-
                     </div>
-
                   </div>
-
                 )}
-
               </div>
-
               {/* Identity Verification Section (Task 2) - Only show for unauthenticated users who haven't verified */}
-
               {status !== 'authenticated' && !purchaseReady && (
-
                 <div className={styles.section}>
-
                   <h2 className={styles.sectionTitle}>Identity Verification</h2>
-
                   {purchaseReady && (
-
                     <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-md">
-
                       <div className="text-green-800 font-medium">✅ Identity verified successfully!</div>
-
                       <div className="text-green-600 text-sm mt-1">You can now place your order.</div>
-
                     </div>
-
                   )}
-
                   {identityError && (
-
                     <div className={`mb-3 p-3 rounded-md ${identityError.startsWith('✅') ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
-
                       {identityError}
-
                     </div>
-
                   )}
-
                   <div className={styles.formRow}>
-
                     <div className={styles.paymentOption}>
-
                       <input
-
                         type="radio"
-
                         id="identity_login"
-
                         name="identityMethod"
-
                         value="login"
-
                         checked={identityMethod === 'login'}
-
                         onChange={() => onIdentityMethodChange('login')}
-
                         className={styles.radioInput}
-
                       />
-
                       <label htmlFor="identity_login" className={styles.radioLabel}>Login - Log in if you have already account</label>
-
                     </div>
-
                     <div className={styles.paymentOption}>
-
                       <input
-
                         type="radio"
-
                         id="identity_phone"
-
                         name="identityMethod"
-
                         value="phone"
-
                         checked={identityMethod === 'phone'}
-
                         onChange={() => onIdentityMethodChange('phone')}
-
                         className={styles.radioInput}
-
                       />
-
                       <label htmlFor="identity_phone" className={styles.radioLabel}>WhatsApp Phone</label>
-
                     </div>
-
                     <div className={styles.paymentOption}>
-
                       <input
-
                         type="radio"
-
                         id="identity_email"
-
                         name="identityMethod"
-
                         value="email"
-
                         checked={identityMethod === 'email'}
-
                         onChange={() => onIdentityMethodChange('email')}
-
                         className={styles.radioInput}
-
                       />
-
                       <label htmlFor="identity_email" className={styles.radioLabel}>Email</label>
-
                     </div>
-
                   </div>
-
-
-
                   {identityMethod === 'login' ? (
-
                     <div>
-
                       <div className={styles.formGroup}>
-
                         <label htmlFor="loginIdentifier" className={styles.label}>Email or Phone Number</label>
-
                         <input
-
                           type="text"
-
                           id="loginIdentifier"
-
                           name="loginIdentifier"
-
                           className={styles.input}
-
                           value={loginIdentifier}
-
                           onChange={(e) => setLoginIdentifier(e.target.value)}
-
                           placeholder="Enter your email or phone number"
-
                         />
-
                       </div>
-
                       <div className="flex gap-2 mb-2">
-
                         <button
-
                           type="button"
-
                           className={styles.placeOrderButton}
-
                           onClick={handleLoginSubmit}
-
                           disabled={loginProcessing || !loginIdentifier.trim()}
-
                         >
-
                           {loginProcessing ? 'Processing...' : 'Login'}
-
                         </button>
-
                       </div>
-
                     </div>
-
                   ) : identityMethod === 'phone' ? (
-
                     <div>
-
                       <div className={styles.formGroup}>
-
                         <label htmlFor="phone" className={styles.label}>Phone Number (WhatsApp)</label>
-
                         <input
-
                           type="text"
-
                           id="phone"
-
                           name="phone"
-
                           className={styles.input}
-
                           value={phone}
-
                           onChange={(e) => setPhone(e.target.value)}
-
                           placeholder="e.g., +1 555 123 4567"
-
                         />
-
                       </div>
-
                       <div className="flex gap-2 mb-2">
-
                         <button type="button" className={styles.placeOrderButton} onClick={sendOtp} disabled={otpSending || !phone.trim()}>
-
                           {otpSending ? 'Sending...' : (otpSent ? 'Resend OTP' : 'Send OTP')}
-
                         </button>
-
                       </div>
-
                       {otpSent && (
-
                         <div className={styles.formGroup}>
-
                           <label htmlFor="otp" className={styles.label}>Enter OTP</label>
-
                           <input
-
                             type="text"
-
                             id="otp"
-
                             name="otp"
-
                             className={styles.input}
-
                             value={otpCode}
-
                             onChange={(e) => setOtpCode(e.target.value)}
-
                             placeholder="6-digit code"
-
                           />
-
                           <div className="mt-2">
-
                             <button type="button" className={styles.placeOrderButton} onClick={verifyOtp} disabled={otpVerifying || !otpCode}>
-
                               {otpVerifying ? 'Verifying...' : 'Verify'}
-
                             </button>
-
                           </div>
-
                         </div>
-
                       )}
-
                     </div>
-
                   ) : (
-
                     <div>
-
                       <div className={styles.formGroup}>
-
                         <label htmlFor="email" className={styles.label}>Email</label>
-
                         <input
-
                           type="email"
-
                           id="email"
-
                           name="email"
-
                           className={styles.input}
-
                           value={email}
-
                           onChange={(e) => setEmail(e.target.value)}
-
                           placeholder="you@example.com"
-
                         />
-
                       </div>
-
                       <div className="flex gap-2 mb-2">
-
                         <button type="button" className={styles.placeOrderButton} onClick={sendMagic} disabled={magicSending || !email.trim()}>
-
                           {magicSending ? 'Sending...' : (magicSent ? 'Resend Magic Link' : 'Send Magic Link')}
-
                         </button>
-
                       </div>
-
                       {magicSent && !magicVerified && (
-
                         <div className="text-gray-600">We sent a link to your email. Click it and return here; we are checking every few seconds...</div>
-
                       )}
-
                       {magicVerified && (
-
                         <div className="text-green-600">Email verified.</div>
-
                       )}
-
                     </div>
-
                   )}
-
                 </div>
-
               )}
-
-
-
               {/* Order Summary Section */}
-
               <div className={styles.section}>
-
                 <h2 className={styles.sectionTitle}>Order Summary</h2>
-
-
-
                 {/* Order items */}
-
                 <div className={styles.orderItems}>
-
                   {cartItems.map(item => (
-
                     <div key={item.id} className={styles.orderItem}>
-
                       <div className={styles.orderItemDetails}>
-
                         <img
-
                           src={(item?.thumbnail ?? item?.variant?.product?.thumbnail ?? '/placeholder-image.jpg')}
-
                           alt={(item?.title ?? 'Cart item')}
-
                           className={styles.orderItemImage}
-
                         />
-
                         <div>
-
                           <p className={styles.orderItemName}>{item?.title ?? 'Item'}</p>
-
                           <p className={styles.orderItemQuantity}>Quantity: {item.quantity}</p>
-
                         </div>
-
                       </div>
-
                     </div>
-
                   ))}
-
                 </div>
-
-
-
                 {/* Price summary */}
-
                 <div className={styles.priceSummary}>
-
                   <div className={styles.summaryRow}>
-
                     <span className={styles.summaryLabel}>Subtotal</span>
-
                     <span className={styles.summaryValue}>{PriceCalculationService.formatCurrency(subtotal, cart?.currency_code)}</span>
-
                   </div>
-
-
-
                   <div className={styles.summaryRow}>
-
                     <span className={styles.summaryLabel}>Shipping</span>
-
                     <span className={styles.summaryValue}>{shipping}</span>
-
                   </div>
-
-
-
                   <div className={styles.summaryRow}>
-
                     <span className={styles.summaryLabel}>Taxes</span>
-
                     <span className={styles.summaryValue}>{PriceCalculationService.formatCurrency(taxes, cart?.currency_code)}</span>
-
                   </div>
-
-
-
                   <div className={styles.totalRow}>
-
                     <span className={styles.totalLabel}>Total</span>
-
                     <span className={styles.totalValue}>{PriceCalculationService.formatCurrency(total, cart?.currency_code)}</span>
-
                   </div>
-
                 </div>
-
-
-
                 {paymentMethod === 'cashfree' ? (
-
                   <button
-
                     type="button"
-
                     className={styles.placeOrderButton}
-
                     onClick={handleCashfreePay}
-
                     disabled={!cashfreeSdkLoaded || cashfreeLoading}
-
                   >
-
                     Secure Payment – {PriceCalculationService.formatCurrency(total, cart?.currency_code)}
-
                   </button>
-
                 ) : (
-
                   <button
-
                     type="submit"
-
                     className={styles.placeOrderButton}
-
                     disabled={!isReadyToPay}
-
                   >
-
                     Place Order
-
                   </button>
-
                 )}
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       </div>
-
     </div>
-
   );
-
 }
-
