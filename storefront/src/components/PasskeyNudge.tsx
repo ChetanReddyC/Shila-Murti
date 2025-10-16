@@ -548,6 +548,24 @@ export default function PasskeyNudge() {
         return { skip: true, reason: 'invalid-identifier' }
       }
 
+      // CRITICAL: Check if user authenticated with passkey in current session
+      // This prevents showing the prompt to users who just logged in with a passkey
+      try {
+        if (sessionData && typeof sessionData === 'object') {
+          const sessionHasPasskey = (sessionData as any)?.hasPasskey
+          if (sessionHasPasskey === true) {
+            logger.current.info('SKIP_CHECK', 'User authenticated with passkey in current session', {
+              identifier,
+              sessionHasPasskey
+            })
+            return { skip: true, reason: 'authenticated-with-passkey' }
+          }
+        }
+      } catch (sessionCheckError) {
+        logger.current.logErrorContext('shouldSkipNudge-sessionCheck', sessionCheckError, { identifier })
+        // Continue with other checks
+      }
+
       // Primary check: Skip if user has already registered a passkey on this device
       // But also check if the passkey actually exists on the device
       if (hasExistingPasskeyPolicy(identifier)) {
