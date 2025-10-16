@@ -177,15 +177,32 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
                 body: JSON.stringify({ userId, credential: payload }) 
               })
               
-              // If passkey registration was successful, update session storage
+              // If passkey registration was successful, update session storage and policy cache
               if (verifyRes.ok) {
                 try {
                   if (typeof window !== 'undefined') {
+                    const identifierValue = identifier.email || identifier.phone || ''
+                    
+                    // Set sessionStorage flags
                     sessionStorage.setItem('hasPasskey', 'true')
                     sessionStorage.setItem('passkeyUserId', userId)
                     sessionStorage.setItem('lastPasskeyCredential', cred.id)
+                    sessionStorage.setItem('currentPasskeyCredential', cred.id)
+                    
+                    // Update localStorage policy cache to prevent nudge
+                    const policyKey = `passkeyPolicy_${identifierValue}`
+                    const cacheData = {
+                      hasPasskey: true,
+                      expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour
+                    }
+                    localStorage.setItem(policyKey, JSON.stringify(cacheData))
+                    
+                    // Mark as registered for this user
+                    const registeredKey = `passkeyRegistered_${identifierValue}`
+                    localStorage.setItem(registeredKey, JSON.stringify({ timestamp: Date.now() }))
                   }
                 } catch (sessionError) {
+                  console.warn('[ComboMFA] Failed to update passkey storage flags:', sessionError)
                 }
               }
             }

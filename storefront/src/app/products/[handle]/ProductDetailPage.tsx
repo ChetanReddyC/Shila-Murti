@@ -11,7 +11,6 @@ import { useRetry } from '../../../hooks/useRetry';
 import { isValidHandle, generateProductHandle } from '../../../utils/productHandleGenerator';
 import { useCart } from '../../../contexts/CartContext';
 import { medusaApiClient } from '../../../utils/medusaApiClient';
-import { getProductInventory } from '../../../utils/getProductInventory';
 import styles from './ProductDetailPage.module.css'
 import FeaturesSection from './FeaturesSection';
 import ReviewsSection from './ReviewsSection';
@@ -170,82 +169,25 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         ]);
 
         if (isMountedRef.current) {
-          // Fetch real-time inventory
-          console.log('🔄 [ProductDetailPage SUCCESS PATH] Starting real-time inventory fetch');
-          console.log('🔄 [ProductDetailPage SUCCESS PATH] Product ID:', productData.id);
-          console.log('🔄 [ProductDetailPage SUCCESS PATH] Product before inventory update:', {
+          // Product data already contains inventory info from ProductDataMapper
+          // No need to fetch from non-existent custom endpoint
+          console.log('✅ [ProductDetailPage] Using inventory from product data:', {
             inStock: productData.inStock,
             inventory: productData.inventory
           });
           
-          let updatedProductData = productData;
-          let updatedRawProduct = rawProduct;
-          
-          if (productData.id) {
-            const inventoryData = await getProductInventory(productData.id);
-            console.log('🔄 [ProductDetailPage SUCCESS PATH] Inventory data received:', inventoryData);
-            
-            if (inventoryData && inventoryData.inventory) {
-              const firstVariant = Object.values(inventoryData.inventory)[0];
-              console.log('🔄 [ProductDetailPage SUCCESS PATH] First variant inventory:', firstVariant);
-              
-              if (firstVariant) {
-                updatedProductData = {
-                  ...productData,
-                  inStock: firstVariant.in_stock,
-                  inventory: {
-                    quantity: firstVariant.available,
-                    allowBackorder: firstVariant.allow_backorder,
-                    managed: firstVariant.manage_inventory,
-                    inStock: firstVariant.in_stock,
-                    status: firstVariant.in_stock ? 'in_stock' : 'out_of_stock',
-                    totalQuantity: firstVariant.available,
-                    availableVariants: firstVariant.in_stock ? 1 : 0,
-                    totalVariants: 1
-                  }
-                };
-                
-                // Update raw product variants with real inventory_quantity
-                if (rawProduct?.variants) {
-                  updatedRawProduct = {
-                    ...rawProduct,
-                    variants: rawProduct.variants.map(v => {
-                      const variantInventory = inventoryData.inventory[v.id];
-                      if (variantInventory) {
-                        return {
-                          ...v,
-                          inventory_quantity: variantInventory.inventory_quantity,
-                          allow_backorder: variantInventory.allow_backorder,
-                          manage_inventory: variantInventory.manage_inventory
-                        };
-                      }
-                      return v;
-                    })
-                  };
-                }
-                
-                console.log('✅ [ProductDetailPage SUCCESS PATH] Product updated with real inventory:', {
-                  inStock: updatedProductData.inStock,
-                  available: firstVariant.available,
-                  inventory: updatedProductData.inventory,
-                  variantInventoryQuantity: updatedRawProduct?.variants?.[0]?.inventory_quantity
-                });
-              }
-            }
-          }
-          
           updateState({
-            productData: updatedProductData,
-            product: updatedRawProduct,
+            productData: productData,
+            product: rawProduct,
             loading: false
           });
           
-          console.log('✅ [ProductDetailPage SUCCESS PATH] State updated');
+          console.log('✅ [ProductDetailPage] State updated');
           
           // Reset retry state on successful fetch
           reset();
           // Add to recently viewed
-          addToRecentlyViewed(updatedProductData);
+          addToRecentlyViewed(productData);
         }
       } catch (handleError) {
         // If handle-based fetch fails, fall back to searching all products
@@ -270,97 +212,25 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         }
 
         if (isMountedRef.current) {
-          // Fetch real-time inventory
-          console.log('🔄 [ProductDetailPage] Starting real-time inventory fetch');
-          console.log('🔄 [ProductDetailPage] Product ID:', matchingProduct.id);
-          console.log('🔄 [ProductDetailPage] Product before inventory update:', {
+          // Product data already contains inventory info from ProductDataMapper
+          // No need to fetch from non-existent custom endpoint
+          console.log('✅ [ProductDetailPage] Using inventory from product data:', {
             inStock: matchingProduct.inStock,
             inventory: matchingProduct.inventory
           });
           
-          let updatedProductData = matchingProduct;
-          let updatedRawProduct = rawProduct;
-          
-          if (matchingProduct.id) {
-            const inventoryData = await getProductInventory(matchingProduct.id);
-            console.log('🔄 [ProductDetailPage] Inventory data received:', inventoryData);
-            
-            if (inventoryData && inventoryData.inventory) {
-              // Update inStock status based on real inventory
-              const firstVariant = Object.values(inventoryData.inventory)[0];
-              console.log('🔄 [ProductDetailPage] First variant inventory:', firstVariant);
-              
-              if (firstVariant) {
-                updatedProductData = {
-                  ...matchingProduct,
-                  inStock: firstVariant.in_stock,
-                  inventory: {
-                    quantity: firstVariant.available,
-                    allowBackorder: firstVariant.allow_backorder,
-                    managed: firstVariant.manage_inventory,
-                    inStock: firstVariant.in_stock,
-                    status: firstVariant.in_stock ? 'in_stock' : 'out_of_stock',
-                    totalQuantity: firstVariant.available,
-                    availableVariants: firstVariant.in_stock ? 1 : 0,
-                    totalVariants: 1
-                  }
-                };
-                
-                // Update raw product variants with real inventory_quantity
-                if (rawProduct?.variants) {
-                  updatedRawProduct = {
-                    ...rawProduct,
-                    variants: rawProduct.variants.map(v => {
-                      const variantInventory = inventoryData.inventory[v.id];
-                      if (variantInventory) {
-                        return {
-                          ...v,
-                          inventory_quantity: variantInventory.inventory_quantity,
-                          allow_backorder: variantInventory.allow_backorder,
-                          manage_inventory: variantInventory.manage_inventory
-                        };
-                      }
-                      return v;
-                    })
-                  };
-                }
-                
-                console.log('✅ [ProductDetailPage] Product updated with real inventory:', {
-                  inStock: updatedProductData.inStock,
-                  available: firstVariant.available,
-                  inventory: updatedProductData.inventory,
-                  variantInventoryQuantity: updatedRawProduct?.variants?.[0]?.inventory_quantity
-                });
-              } else {
-                console.warn('⚠️ [ProductDetailPage] No variant found in inventory data');
-              }
-            } else {
-              console.warn('⚠️ [ProductDetailPage] No inventory data received or invalid format');
-            }
-          } else {
-            console.warn('⚠️ [ProductDetailPage] No product ID available for inventory fetch');
-          }
-
-          console.log('🎯 [ProductDetailPage] Final product data to render:', {
-            inStock: updatedProductData.inStock,
-            inventory: updatedProductData.inventory,
-            productId: updatedProductData.id
-          });
-          
           updateState({
-            productData: updatedProductData,
-            product: updatedRawProduct,
+            productData: matchingProduct,
+            product: rawProduct,
             loading: false
           });
           
-          console.log('✅ [ProductDetailPage] State updated - product should now render with:', {
-            inStock: updatedProductData.inStock
-          });
+          console.log('✅ [ProductDetailPage] State updated');
           
           // Reset retry state on successful fetch
           reset();
           // Add to recently viewed
-          addToRecentlyViewed(updatedProductData);
+          addToRecentlyViewed(matchingProduct);
         }
       }
     } catch (err) {

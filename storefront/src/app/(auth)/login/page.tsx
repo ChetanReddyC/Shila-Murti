@@ -89,12 +89,39 @@ export default function LoginPage() {
                   const result = await verifyPasskey({ ...data, userId: canonicalUserId }, id, canonicalUserId)
                   if (!result.comboRequired) {
                     setStatus('Authenticated with passkey.')
-                    // If we got a credential id back, trigger a background refresh of passkey list later
-                    try { 
-                      if (result?.credentialId && typeof window !== 'undefined') {
-                        window.sessionStorage.setItem('lastPasskeyCredential', result.credentialId) 
+                    
+                    // CRITICAL: Mark that user has successfully authenticated with passkey
+                    // This prevents the PasskeyNudge from showing after passkey login
+                    try {
+                      if (typeof window !== 'undefined') {
+                        const identifierValue = id.email || id.phone || ''
+                        
+                        // Set sessionStorage flag to indicate passkey authentication
+                        sessionStorage.setItem('hasPasskey', 'true')
+                        
+                        // Store the credential ID for reference
+                        if (result?.credentialId) {
+                          sessionStorage.setItem('lastPasskeyCredential', result.credentialId)
+                          sessionStorage.setItem('currentPasskeyCredential', result.credentialId)
+                        }
+                        
+                        // Update localStorage policy cache to prevent nudge
+                        const policyKey = `passkeyPolicy_${identifierValue}`
+                        const cacheData = {
+                          hasPasskey: true,
+                          expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour
+                        }
+                        localStorage.setItem(policyKey, JSON.stringify(cacheData))
+                        
+                        // Mark as registered for this user
+                        const registeredKey = `passkeyRegistered_${identifierValue}`
+                        localStorage.setItem(registeredKey, JSON.stringify({ timestamp: Date.now() }))
                       }
-                    } catch {}
+                    } catch (storageError) {
+                      console.warn('[Login] Failed to update passkey storage flags:', storageError)
+                      // Continue with login even if storage fails
+                    }
+                    
                     // Ensure we have a Medusa customer and persist its id for account features
                     try {
                       const ensure = await fetch('/api/account/customer/ensure', { 
@@ -109,6 +136,7 @@ export default function LoginPage() {
                         window.sessionStorage.setItem('customerId', String(ej.customerId))
                       }
                     } catch {}
+                    
                     // Bind session to the identifier, include customerId when available in sessionStorage
                     let customerId: string | undefined
                     try { 

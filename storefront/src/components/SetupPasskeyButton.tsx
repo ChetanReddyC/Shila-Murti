@@ -65,14 +65,28 @@ export default function SetupPasskeyButton({ userId, username, onRegistered }: {
             await registerPasskey(userId, username)
             setStatus('Passkey registered on this device.')
             
-            // Update session storage to indicate passkey registration
+            // Update session storage and policy cache to indicate passkey registration
             try {
               if (typeof window !== 'undefined') {
+                // Set sessionStorage flags
                 sessionStorage.setItem('hasPasskey', 'true')
-                // Store the user ID for future reference
                 sessionStorage.setItem('passkeyUserId', userId)
+                
+                // Update localStorage policy cache to prevent nudge
+                const identifierValue = username || userId
+                const policyKey = `passkeyPolicy_${identifierValue}`
+                const cacheData = {
+                  hasPasskey: true,
+                  expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour
+                }
+                localStorage.setItem(policyKey, JSON.stringify(cacheData))
+                
+                // Mark as registered for this user
+                const registeredKey = `passkeyRegistered_${identifierValue}`
+                localStorage.setItem(registeredKey, JSON.stringify({ timestamp: Date.now() }))
               }
             } catch (sessionError) {
+              console.warn('[SetupPasskeyButton] Failed to update passkey storage flags:', sessionError)
             }
             
             try { onRegistered && onRegistered() } catch {}
