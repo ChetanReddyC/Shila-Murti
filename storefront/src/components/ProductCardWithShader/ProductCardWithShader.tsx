@@ -57,11 +57,22 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
   // Generate handle from product title
   const productHandle = generateProductHandle(product.title);
 
-  // Debug: Log the product data received by the component
-  useEffect(() => {
+  // Determine title size class based on character count
+  const getTitleSizeClass = () => {
+    const length = product.title.length;
+    if (length <= 18) return styles.titleLarge;
+    if (length <= 30) return styles.titleMedium;
+    return styles.titleSmall;
+  };
 
-    // If price is 0, we keep logs minimal to avoid noisy direct API calls in production
-  }, [product]);
+  // Determine subtitle size class based on character count
+  const getSubtitleSizeClass = () => {
+    if (!product.subtitle) return '';
+    const length = product.subtitle.length;
+    if (length <= 25) return styles.subtitleLarge;
+    if (length <= 40) return styles.subtitleMedium;
+    return styles.subtitleSmall;
+  };
 
   // Helper function to format price with proper currency
   const formatPrice = (price: number, currency: string = 'USD') => {
@@ -173,7 +184,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
                 src={product.backgroundImage}
                 alt={`${product.title} background`}
                 fallbackSrc="/images/placeholder-background.svg"
-                className={`${styles.backgroundImage} ${isHovering ? styles.backgroundImageHovered : ''}`}
+                className={styles.backgroundImage}
                 priority={false}
                 showRetryButton={false}
               />
@@ -192,8 +203,6 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
               />
             </div>
           </div>
-
-          {/* Effects are rendered by shared overlay; per-card canvases removed */}
         </div>
 
         {/* Product details section - keep overlay active on hover to show shader */}
@@ -206,9 +215,9 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
           }}
           onMouseMove={(e) => overlayRef?.current?.updatePointer?.(e.clientX, e.clientY)}
         >
-          <h3 className={styles.productTitle}>{product.title}</h3>
+          <h3 className={`${styles.productTitle} ${getTitleSizeClass()}`}>{product.title}</h3>
           {product.subtitle && (
-            <p className={styles.productSubtitle}>{product.subtitle}</p>
+            <p className={`${styles.productSubtitle} ${getSubtitleSizeClass()}`}>{product.subtitle}</p>
           )}
 
           {/* Price information */}
@@ -221,12 +230,6 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
             {product.originalPrice && product.originalPrice > (product.price || 0) && (
               <span className={styles.originalPrice}>
                 {formatPrice(product.originalPrice, product.currency)}
-              </span>
-            )}
-            {/* Debug: Show when price is missing */}
-            {(!product.price || product.price <= 0) && (
-              <span style={{ color: 'red', fontSize: '12px' }}>
-                [DEBUG: Price missing - {JSON.stringify({ price: product.price, currency: product.currency })}]
               </span>
             )}
           </div>
