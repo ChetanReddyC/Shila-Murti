@@ -98,10 +98,6 @@
   border-top-right-radius: 8px;
 }
 
-.backgroundImageHovered {
-  /* Add any hover effects for background image if needed */
-}
-
 .foregroundWrapper {
   position: absolute;
   top: 0;
@@ -136,23 +132,7 @@
 .foregroundImageHovered {
   transform: translateY(-35px) scale(1.15);
   z-index: 2100;
-  /* Extremely high z-index to ensure it appears above all other elements */
   filter: drop-shadow(0 12px 22px rgba(0,0,0,0.18));
-}
-
-.effectsWrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  /* Changed from visible to hidden to prevent overflow */
-  z-index: 50; /* shader layer below foreground */
-  /* Position between card content and foreground image */
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-  /* Match the card's border radius */
 }
 
 /* Product details section */
@@ -174,31 +154,65 @@
 }
 
 .productTitle {
-  font-size: 1.1rem;
   font-weight: 600;
   color: #141414;
   margin: 0 0 8px 0;
   text-align: left;
-  line-height: 1.4;
-  /* Simple ellipsis truncation */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-wrap: break-word;
+}
+
+.titleLarge {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  min-height: 3.9rem;
+}
+
+.titleMedium {
+  font-size: 1.2rem;
+  line-height: 1.3;
+  min-height: 3.12rem;
+}
+
+.titleSmall {
+  font-size: 1rem;
+  line-height: 1.4;
+  min-height: 2.8rem;
 }
 
 .productSubtitle {
-  font-size: 0.9rem;
   font-weight: 400;
   color: #666;
   margin: 0 0 12px 0;
   text-align: left;
-  line-height: 1.4;
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
-  /* Simple ellipsis truncation */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-wrap: break-word;
+}
+
+.subtitleLarge {
+  font-size: 1.05rem;
+  line-height: 1.4;
+  min-height: 2.94rem;
+}
+
+.subtitleMedium {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  min-height: 2.66rem;
+}
+
+.subtitleSmall {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  min-height: 2.55rem;
 }
 
 /* Price styling */
