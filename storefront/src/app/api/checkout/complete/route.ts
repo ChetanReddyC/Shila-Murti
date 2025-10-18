@@ -17,13 +17,12 @@ export async function POST(req: NextRequest) {
     const orderId = typeof body?.orderId === 'string' ? body.orderId : undefined
     const customerId = typeof body?.customerId === 'string' ? body.customerId : undefined
     
-    // DEBUG: Log received parameters
-    console.log('[COMPLETE_API][start]', { 
-      cartId, 
-      orderId, 
+    // DEBUG: Log received parameters without sensitive payloads
+    console.log('[COMPLETE_API][start]', {
+      cartId,
+      orderId,
       customerIdPresent: Boolean(customerId),
-      bodyKeys: Object.keys(body || {}),
-      rawBody: JSON.stringify(body)
+      bodyKeys: Object.keys(body || {})
     })
 
     // Best-effort: if we have both cartId and customerId, try to associate before completing
@@ -201,7 +200,7 @@ export async function POST(req: NextRequest) {
             const orderTotal = createdOrder?.total
             if (orderTotal) {
               const captureResult = await captureCashfreePayment(orderId, orderTotal / 100)
-              try { console.log('[COMPLETE_API][cashfree_capture]', { orderId, success: captureResult.success, data: captureResult.data }) } catch {}
+              try { console.log('[COMPLETE_API][cashfree_capture]', { orderId, success: captureResult.success }) } catch {}
               
               if (captureResult.success) {
                 capturedViaCashfree = true

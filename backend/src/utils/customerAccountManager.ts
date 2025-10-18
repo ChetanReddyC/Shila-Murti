@@ -352,6 +352,31 @@ async function linkCart(scope: Scope, cartId: string, customerId: string): Promi
     const cartModuleService = safeResolve(scope, Modules.CART)
 
     if (cartModuleService && typeof cartModuleService.updateCarts === "function") {
+      if (typeof cartModuleService.listCarts === "function") {
+        const [existingCart] = await cartModuleService.listCarts(
+          { id: cartId },
+          { take: 1 }
+        )
+
+        if (!existingCart) {
+          return {
+            attempted: true,
+            linked: false,
+            method: "module",
+            error: "cart_not_found",
+          }
+        }
+
+        if (existingCart.customer_id && existingCart.customer_id !== customerId) {
+          return {
+            attempted: true,
+            linked: false,
+            method: "module",
+            error: "cart_already_owned",
+          }
+        }
+      }
+
       await cartModuleService.updateCarts([{ id: cartId, customer_id: customerId }])
       return { attempted: true, linked: true, method: "module" }
     }
@@ -390,6 +415,15 @@ async function fallbackCartAssociation(
   customerId: string,
   moduleError?: string
 ): Promise<AssociationResult> {
+  if (moduleError === "cart_already_owned") {
+    return {
+      attempted: true,
+      linked: false,
+      skipped: true,
+      error: moduleError,
+    }
+  }
+
   if (!ADMIN_TOKEN.trim()) {
     return {
       attempted: Boolean(moduleError),

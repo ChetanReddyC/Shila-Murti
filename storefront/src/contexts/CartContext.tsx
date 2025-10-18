@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { MedusaCart } from '../types/medusa';
 import { medusaApiClient, ApiError } from '../utils/medusaApiClient';
 import { useErrorHandler } from '../hooks/useErrorHandler';
@@ -148,6 +149,26 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
 // Storage keys - use localStorage for cross-tab cart sharing
 const CART_ID_KEY = 'medusa_cart_id';
+const CART_BINDING_KEY = 'medusa_cart_binding';
+const GUEST_BINDING_KEY = 'medusa_guest_binding';
+
+const hashIdentifier = (value: string): string => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return `h${Math.abs(hash)}`;
+};
+
+const safeParseJSON = <T,>(payload: string | null): T | null => {
+  if (!payload) return null;
+  try {
+    return JSON.parse(payload) as T;
+  } catch {
+    return null;
+  }
+};
 import {
   ORDER_CONFIRMATION_ACTIVE_KEY,
   DEFAULT_TTL_MS as ORDER_CONFIRMATION_TTL_MS,
@@ -167,6 +188,17 @@ interface CartProviderProps {
 export function CartProvider({ children }: CartProviderProps) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const { errorState, handleApiError, clearError: clearErrorHandler, isRetryableError } = useErrorHandler();
+  const { data: session, status: sessionStatus } = useSession();
+
+  const sessionIdentifier = React.useMemo(() => {
+    if (sessionStatus === 'authenticated') {
+      const idSource = session?.user?.email || session?.user?.id || session?.user?.name;
+      if (idSource) {
+        return hashIdentifier(String(idSource));
+      }
+    }
+    return null;
+  }, [sessionStatus, session?.user?.email, session?.user?.id, session?.user?.name]);
 
 
 
@@ -177,16 +209,42 @@ export function CartProvider({ children }: CartProviderProps) {
   } | null>(null);
 
   // Storage helpers with enhanced error handling - using localStorage for cross-tab sharing
+  const getCurrentSessionBinding = React.useCallback((): { sessionId: string | null; type: 'auth' | 'guest' } => {
+    if (sessionIdentifier) {
+      return { sessionId: sessionIdentifier, type: 'auth' };
+    }
+
+    try {
+      const guestToken = (typeof window !== 'undefined') ? localStorage.getItem(GUEST_BINDING_KEY) : null;
+      if (guestToken) {
+        return { sessionId: guestToken, type: 'guest' };
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const newGuest = `guest_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(GUEST_BINDING_KEY, newGuest);
+      return { sessionId: newGuest, type: 'guest' };
+    }
+
+    return { sessionId: null, type: 'guest' };
+  }, [sessionIdentifier]);
+
   const saveCartIdToSession = (cartId: string) => {
     try {
       localStorage.setItem(CART_ID_KEY, cartId);
+      const binding = getCurrentSessionBinding();
+      localStorage.setItem(CART_BINDING_KEY, JSON.stringify({ sessionId: binding.sessionId, type: binding.type, timestamp: Date.now() }));
     } catch (error) {
 
       // Handle quota exceeded error by clearing old data and retrying
       if (error instanceof Error && error.name === 'QuotaExceededError') {
         try {
-          localStorage.clear();
+          localStorage.removeItem(CART_ID_KEY);
+          localStorage.removeItem(CART_BINDING_KEY);
           localStorage.setItem(CART_ID_KEY, cartId);
+          const binding = getCurrentSessionBinding();
+          localStorage.setItem(CART_BINDING_KEY, JSON.stringify({ sessionId: binding.sessionId, type: binding.type, timestamp: Date.now() }));
         } catch (retryError) {
         }
       }
@@ -199,9 +257,22 @@ export function CartProvider({ children }: CartProviderProps) {
   const getCartIdFromSession = (): string | null => {
     try {
       const cartId = localStorage.getItem(CART_ID_KEY);
-      if (cartId) {
+      const bindingRaw = localStorage.getItem(CART_BINDING_KEY);
+      if (!cartId) {
+        return null;
       }
-      return cartId;
+
+      const binding = safeParseJSON<{ sessionId: string | null; type?: 'auth' | 'guest' }>(bindingRaw);
+      if (!binding || !binding.sessionId) {
+        return cartId;
+      }
+
+      const currentSessionId = getCurrentSessionBinding();
+      if (currentSessionId.sessionId && binding.sessionId === currentSessionId.sessionId) {
+        return cartId;
+      }
+
+      return null;
     } catch (error) {
       return null;
     }
@@ -211,6 +282,7 @@ export function CartProvider({ children }: CartProviderProps) {
     try {
       const existingCartId = localStorage.getItem(CART_ID_KEY);
       localStorage.removeItem(CART_ID_KEY);
+      localStorage.removeItem(CART_BINDING_KEY);
       if (existingCartId) {
       }
     } catch (error) {

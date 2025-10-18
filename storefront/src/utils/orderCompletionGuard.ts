@@ -83,8 +83,10 @@ export async function acquireCompletionLock(
     return { allowed: true }
   } catch (error) {
     console.error('[COMPLETION_GUARD][acquire_lock][error]', { cartId, error: String(error) })
-    // Fail open in case of KV issues (but log for monitoring)
-    return { allowed: true }
+    return {
+      allowed: false,
+      reason: 'lock_unavailable',
+    }
   }
 }
 

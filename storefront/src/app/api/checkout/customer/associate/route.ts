@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
       // Prefer secure server-side association via backend route (no token in Next runtime required)
       const response = await storeFetch(`/store/custom/associate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-call': process.env.INTERNAL_API_SECRET || '',
+        },
         body: JSON.stringify({ cart_id: cartId, customer_id: customerId }),
       })
       
