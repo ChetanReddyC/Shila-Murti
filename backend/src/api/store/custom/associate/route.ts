@@ -11,6 +11,12 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     const { cart_id, customer_id, order_id } = (req.body as any) || {}
 
+    const internalSecret = process.env.INTERNAL_API_SECRET || process.env.internal_api_secret
+    const providedSecret = req.headers['x-internal-call']
+    if (!internalSecret || providedSecret !== internalSecret) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' })
+    }
+
     if (!customer_id || typeof customer_id !== 'string') {
       return res.status(400).json({ ok: false, error: 'invalid_customer_id' })
     }
@@ -30,6 +36,20 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         let cartLinked = false
         try {
           const cartModuleService = req.scope.resolve(Modules.CART as any)
+          if (cartModuleService && typeof cartModuleService.listCarts === 'function') {
+            const [existingCart] = await cartModuleService.listCarts({
+              id: cart_id,
+            }, {
+              take: 1,
+            })
+            if (!existingCart) {
+              return res.status(404).json({ ok: false, error: 'cart_not_found' })
+            }
+            if (existingCart.customer_id && existingCart.customer_id !== customer_id) {
+              return res.status(409).json({ ok: false, error: 'cart_owned', message: 'Cart already belongs to another customer' })
+            }
+          }
+
           if (cartModuleService && typeof cartModuleService.updateCarts === 'function') {
             await cartModuleService.updateCarts([{ id: cart_id, customer_id }])
             cartLinked = true
