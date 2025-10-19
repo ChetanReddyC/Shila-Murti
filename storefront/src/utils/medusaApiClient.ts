@@ -266,7 +266,7 @@ export class MedusaApiClient {
         ...options,
         signal: controller.signal,
         mode: 'cors',
-        credentials: 'omit',
+        credentials: this.credentials,
         headers: finalHeaders,
       });
 
@@ -887,8 +887,10 @@ export class MedusaApiClient {
   }
 }
 
-// Export a default instance
-export const medusaApiClient = new MedusaApiClient();
+// Export a default instance with credentials enabled for cart session cookies
+export const medusaApiClient = new MedusaApiClient({
+  credentials: 'include' // Required for sending httpOnly session cookies to backend
+});
 
 // Export factory function for custom configurations
 export const createMedusaApiClient = (config: ApiClientConfig): MedusaApiClient => {
