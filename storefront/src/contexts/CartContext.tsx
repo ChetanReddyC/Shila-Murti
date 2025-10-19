@@ -147,19 +147,10 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   }
 }
 
-// Storage keys - use localStorage for cross-tab cart sharing
-const CART_ID_KEY = 'medusa_cart_id';
-const CART_BINDING_KEY = 'medusa_cart_binding';
-const GUEST_BINDING_KEY = 'medusa_guest_binding';
-
-const hashIdentifier = (value: string): string => {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return `h${Math.abs(hash)}`;
-};
+// Session API endpoint for secure cart management
+// IMPORTANT: Must use backend API to set cookie on backend domain (localhost:9000)
+// so that cookies are sent with subsequent cart requests to the backend
+const CART_SESSION_API = `${process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL}/store/cart-session`;
 
 const safeParseJSON = <T,>(payload: string | null): T | null => {
   if (!payload) return null;
@@ -190,12 +181,9 @@ export function CartProvider({ children }: CartProviderProps) {
   const { errorState, handleApiError, clearError: clearErrorHandler, isRetryableError } = useErrorHandler();
   const { data: session, status: sessionStatus } = useSession();
 
-  const sessionIdentifier = React.useMemo(() => {
+  const sessionUserId = React.useMemo(() => {
     if (sessionStatus === 'authenticated') {
-      const idSource = session?.user?.email || session?.user?.id || session?.user?.name;
-      if (idSource) {
-        return hashIdentifier(String(idSource));
-      }
+      return session?.user?.email || session?.user?.id || session?.user?.name || null;
     }
     return null;
   }, [sessionStatus, session?.user?.email, session?.user?.id, session?.user?.name]);
@@ -208,86 +196,82 @@ export function CartProvider({ children }: CartProviderProps) {
     params: any[];
   } | null>(null);
 
-  // Storage helpers with enhanced error handling - using localStorage for cross-tab sharing
-  const getCurrentSessionBinding = React.useCallback((): { sessionId: string | null; type: 'auth' | 'guest' } => {
-    if (sessionIdentifier) {
-      return { sessionId: sessionIdentifier, type: 'auth' };
-    }
-
+  // Secure session management using httpOnly cookies via API
+  const saveCartIdToSession = React.useCallback(async (cartId: string): Promise<void> => {
     try {
-      const guestToken = (typeof window !== 'undefined') ? localStorage.getItem(GUEST_BINDING_KEY) : null;
-      if (guestToken) {
-        return { sessionId: guestToken, type: 'guest' };
+      const response = await fetch(CART_SESSION_API, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+        },
+        credentials: 'include', // Important: include cookies
+        body: JSON.stringify({ 
+          cartId, 
+          userId: sessionUserId 
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save cart session: ${response.status}`);
       }
-    } catch {}
 
-    if (typeof window !== 'undefined') {
-      const newGuest = `guest_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      localStorage.setItem(GUEST_BINDING_KEY, newGuest);
-      return { sessionId: newGuest, type: 'guest' };
-    }
-
-    return { sessionId: null, type: 'guest' };
-  }, [sessionIdentifier]);
-
-  const saveCartIdToSession = (cartId: string) => {
-    try {
-      localStorage.setItem(CART_ID_KEY, cartId);
-      const binding = getCurrentSessionBinding();
-      localStorage.setItem(CART_BINDING_KEY, JSON.stringify({ sessionId: binding.sessionId, type: binding.type, timestamp: Date.now() }));
+      const data = await response.json();
+      console.log('[CART] Session saved securely', { cartId: cartId.substring(0, 8) + '...' });
     } catch (error) {
-
-      // Handle quota exceeded error by clearing old data and retrying
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
-        try {
-          localStorage.removeItem(CART_ID_KEY);
-          localStorage.removeItem(CART_BINDING_KEY);
-          localStorage.setItem(CART_ID_KEY, cartId);
-          const binding = getCurrentSessionBinding();
-          localStorage.setItem(CART_BINDING_KEY, JSON.stringify({ sessionId: binding.sessionId, type: binding.type, timestamp: Date.now() }));
-        } catch (retryError) {
-        }
-      }
+      console.error('[CART] Failed to save session:', error);
+      // Don't throw - gracefully degrade but log the error
     }
-  };
+  }, [sessionUserId]);
 
   // Guard to prevent concurrent silent clearing operations
   const silentClearInProgressRef = useRef(false);
 
-  const getCartIdFromSession = (): string | null => {
+  const getCartIdFromSession = React.useCallback(async (): Promise<string | null> => {
     try {
-      const cartId = localStorage.getItem(CART_ID_KEY);
-      const bindingRaw = localStorage.getItem(CART_BINDING_KEY);
-      if (!cartId) {
+      const response = await fetch(CART_SESSION_API, {
+        method: 'GET',
+        headers: {
+          'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+        },
+        credentials: 'include' // Important: include cookies
+      });
+
+      if (!response.ok) {
         return null;
       }
 
-      const binding = safeParseJSON<{ sessionId: string | null; type?: 'auth' | 'guest' }>(bindingRaw);
-      if (!binding || !binding.sessionId) {
-        return cartId;
+      const data = await response.json();
+      if (data.session && data.session.cartId) {
+        return data.session.cartId;
       }
-
-      const currentSessionId = getCurrentSessionBinding();
-      if (currentSessionId.sessionId && binding.sessionId === currentSessionId.sessionId) {
-        return cartId;
-      }
-
+      
       return null;
     } catch (error) {
+      console.error('[CART] Failed to get session:', error);
       return null;
     }
-  };
+  }, []);
 
-  const removeCartIdFromSession = () => {
+  const removeCartIdFromSession = React.useCallback(async (): Promise<void> => {
     try {
-      const existingCartId = localStorage.getItem(CART_ID_KEY);
-      localStorage.removeItem(CART_ID_KEY);
-      localStorage.removeItem(CART_BINDING_KEY);
-      if (existingCartId) {
+      const response = await fetch(CART_SESSION_API, {
+        method: 'DELETE',
+        headers: {
+          'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+        },
+        credentials: 'include' // Important: include cookies
+      });
+
+      if (!response.ok) {
+        console.error('[CART] Failed to clear session:', response.status);
+      } else {
+        console.log('[CART] Session cleared successfully');
       }
     } catch (error) {
+      console.error('[CART] Failed to clear session:', error);
     }
-  };
+  }, []);
 
   // Order confirmation protection helpers (sessionStorage-backed with TTL)
   const getOrderConfirmationActive = React.useCallback((): boolean => {
@@ -405,7 +389,7 @@ export function CartProvider({ children }: CartProviderProps) {
       const newCart = await medusaApiClient.createCart();
 
       dispatch({ type: 'SET_CART', payload: newCart });
-      saveCartIdToSession(newCart.id);
+      await saveCartIdToSession(newCart.id);
       setLastOperation(null); // Clear last operation on success
 
     } catch (error) {
@@ -417,12 +401,12 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Handle cart session expiration and recreation
   const handleCartExpiration = React.useCallback(async (): Promise<void> => {
-    removeCartIdFromSession();
+    await removeCartIdFromSession();
     dispatch({ type: 'CLEAR_CART' });
 
     // Optionally create a new cart immediately
     // For now, we'll wait for the next add operation to create a new cart
-  }, []);
+  }, [removeCartIdFromSession]);
 
   // Load a specific cart by ID (for cross-device recovery)
   const loadSpecificCart = React.useCallback(async (cartId: string): Promise<void> => {
@@ -441,7 +425,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
       // Update both state and storage
       dispatch({ type: 'SET_CART', payload: cart });
-      saveCartIdToSession(cart.id);
+      await saveCartIdToSession(cart.id);
     } catch (error) {
 
       if (error instanceof ApiError && error.status === 404) {
@@ -456,7 +440,7 @@ export function CartProvider({ children }: CartProviderProps) {
   // Refresh cart from API with enhanced error handling
   const refreshCart = React.useCallback(async (): Promise<void> => {
     // Lock removed - backend guard handles duplicate prevention
-    const cartId = state.cartId || getCartIdFromSession();
+    const cartId = state.cartId || await getCartIdFromSession();
 
     if (!cartId) {
       return;
@@ -487,7 +471,7 @@ export function CartProvider({ children }: CartProviderProps) {
         dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
     }
-  }, [state.cartId, handleCartExpiration, handleApiError]);
+  }, [state.cartId, handleCartExpiration, handleApiError, getCartIdFromSession]);
 
   // Add item to cart with enhanced session management
   const addToCart = React.useCallback(async (variantId: string, quantity: number): Promise<void> => {
@@ -499,14 +483,14 @@ export function CartProvider({ children }: CartProviderProps) {
     try {
       // Ensure we have a cart
       let currentCart = state.cart;
-      let cartId = state.cartId || getCartIdFromSession();
+      let cartId = state.cartId || await getCartIdFromSession();
 
       // If we have a cart ID but no cart object, try to refresh first
       if (cartId && !currentCart) {
         try {
           currentCart = await medusaApiClient.getCart(cartId);
           if ((currentCart as any)?.completed_at) {
-            removeCartIdFromSession();
+            await removeCartIdFromSession();
             dispatch({ type: 'CLEAR_CART' });
             currentCart = null as any;
             cartId = null;
@@ -515,7 +499,7 @@ export function CartProvider({ children }: CartProviderProps) {
             dispatch({ type: 'SET_CART', payload: currentCart as MedusaCart });
           }
         } catch (refreshError) {
-          removeCartIdFromSession();
+          await removeCartIdFromSession();
           currentCart = null;
           cartId = null;
         }
@@ -533,7 +517,7 @@ export function CartProvider({ children }: CartProviderProps) {
         try {
           currentCart = await medusaApiClient.createCart({}); // Pass empty object
           dispatch({ type: 'SET_CART', payload: currentCart });
-          saveCartIdToSession(currentCart.id);
+          await saveCartIdToSession(currentCart.id);
         } catch (createError) {
           const errorMessage = handleApiError(createError);
           dispatch({ type: 'SET_ERROR', payload: errorMessage });
@@ -561,7 +545,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
       throw error; // Re-throw so calling components can handle it
     }
-  }, [state.cart, state.cartId, handleApiError, handleCartExpiration]);
+  }, [state.cart, state.cartId, handleApiError, handleCartExpiration, getCartIdFromSession, saveCartIdToSession, removeCartIdFromSession]);
 
   // Remove item from cart
   const removeFromCart = React.useCallback(async (lineItemId: string): Promise<void> => {
@@ -650,10 +634,10 @@ export function CartProvider({ children }: CartProviderProps) {
   const clearCart = React.useCallback(async (): Promise<void> => {
     // Do not force route changes here. Just clear state and id.
     dispatch({ type: 'CLEAR_CART' });
-    removeCartIdFromSession();
+    await removeCartIdFromSession();
     setLastOperation(null);
     clearErrorHandler();
-  }, [clearErrorHandler]);
+  }, [clearErrorHandler, removeCartIdFromSession]);
 
   // Clear cart silently: reset state and session without touching loading/error
   const clearCartSilently = React.useCallback(async (): Promise<void> => {
@@ -663,17 +647,17 @@ export function CartProvider({ children }: CartProviderProps) {
     silentClearInProgressRef.current = true;
     try {
       dispatch({ type: 'CLEAR_CART_SILENTLY' });
-      removeCartIdFromSession();
+      await removeCartIdFromSession();
     } catch (error) {
       // Graceful degradation: log and attempt a best-effort non-silent clear without surfacing UI states
       try {
         dispatch({ type: 'CLEAR_CART' });
-        removeCartIdFromSession();
+        await removeCartIdFromSession();
       } catch { }
     } finally {
       silentClearInProgressRef.current = false;
     }
-  }, []);
+  }, [removeCartIdFromSession]);
 
   // Clear error state
   const clearError = React.useCallback((): void => {
@@ -739,7 +723,7 @@ export function CartProvider({ children }: CartProviderProps) {
   useEffect(() => {
     const initializeCart = async () => {
       // Lock removed - immediate cart recovery after order completion
-      const savedCartId = getCartIdFromSession();
+      const savedCartId = await getCartIdFromSession();
 
       // On order-confirmation page, do not recover cart to avoid interference
       const path = typeof window !== 'undefined' ? window.location.pathname : ''
@@ -754,42 +738,21 @@ export function CartProvider({ children }: CartProviderProps) {
           dispatch({ type: 'SET_CART_ID', payload: savedCartId });
           await refreshCart();
         } else {
-          removeCartIdFromSession();
+          await removeCartIdFromSession();
           dispatch({ type: 'CLEAR_CART' });
         }
       } else {
+        console.log('[CART] No saved cart session found');
       }
     };
 
     initializeCart();
-  }, []);
+  }, [getCartIdFromSession, removeCartIdFromSession, validateCartSession, refreshCart]);
 
   // Protection lock removed - browser back/forward handler no longer needed
 
-  // Handle cross-tab cart synchronization via localStorage events
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      // Only respond to cart ID changes from other tabs
-      if (e.key === CART_ID_KEY && e.newValue !== e.oldValue) {
-        const newCartId = e.newValue;
-
-        if (newCartId && newCartId !== state.cartId) {
-          // Another tab updated the cart ID, refresh our cart
-          dispatch({ type: 'SET_CART_ID', payload: newCartId });
-          refreshCart();
-        } else if (!newCartId && state.cart) {
-          // Another tab cleared the cart
-          dispatch({ type: 'CLEAR_CART' });
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [state.cartId, state.cart, refreshCart]);
+  // Cross-tab synchronization is now handled automatically via httpOnly cookies
+  // No need for localStorage events as the server manages the session
 
   // Handle browser session end - cleanup on beforeunload
   useEffect(() => {

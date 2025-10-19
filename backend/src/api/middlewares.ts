@@ -1,6 +1,7 @@
 import { defineMiddlewares } from "@medusajs/framework/http"
 import type { MedusaRequest, MedusaResponse, MedusaNextFunction } from "@medusajs/framework/http"
 import { extractBearerToken, verifyAccessToken } from "../utils/jwt"
+import { validateCartOwnership } from "./middlewares/cartOwnership"
 
 // Explicit CORS + diagnostics for Store routes. This guarantees that
 // custom headers like `x-publishable-api-key` are allowed and that
@@ -25,12 +26,12 @@ async function corsAndDiagnostics(
     res.setHeader("Access-Control-Allow-Origin", origin)
   }
   res.setHeader("Vary", "Origin")
-  res.setHeader("Access-Control-Allow-Credentials", "false")
+  res.setHeader("Access-Control-Allow-Credentials", "true")
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET,POST,PUT,PATCH,DELETE,OPTIONS"
   )
-  res.setHeader("Access-Control-Allow-Headers", allowedHeaders)
+  res.setHeader("Access-Control-Allow-Headers", allowedHeaders + ",Cookie")
 
   // Basic diagnostics for tricky requests (visible in backend logs)
   if (req.path?.includes("/store/carts/") && req.path?.includes("/payment-sessions")) {
@@ -105,7 +106,25 @@ export default defineMiddlewares({
       // Enforce elevated session (mfaComplete=true) on address book endpoints
       matcher: "/store/addresses*",
       middlewares: [authGuard],
-    }
+    },
+    {
+      // Validate cart ownership for adding items to cart
+      matcher: "/store/carts/:id/line-items",
+      method: ["POST"],
+      middlewares: [validateCartOwnership],
+    },
+    {
+      // Validate cart ownership for updating/removing line items
+      matcher: "/store/carts/:id/line-items/:lineItemId",
+      method: ["POST", "DELETE"],
+      middlewares: [validateCartOwnership],
+    },
+    {
+      // Validate cart ownership for updating cart (addresses, shipping, etc.)
+      matcher: "/store/carts/:id",
+      method: ["POST"],
+      middlewares: [validateCartOwnership],
+    },
   ],
 })
 
