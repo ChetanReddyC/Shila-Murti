@@ -43,6 +43,66 @@ export async function kvSet(key: string, value: unknown, ttlSeconds?: number): P
   if (!res.ok) throw new Error(`KV set failed ${res.status}`)
 }
 
+/**
+ * Atomic SET if Not eXists (NX) operation for distributed locking
+ * Returns true if key was set, false if key already exists
+ * Throws error if no KV store is configured
+ * 
+ * Note: Cloudflare KV requires minimum TTL of 60 seconds
+ */
+export async function kvSetNX(key: string, value: unknown, ttlSeconds?: number): Promise<boolean> {
+  if (useCloudflare()) {
+    // Cloudflare KV doesn't support atomic NX, so we simulate with get-then-set
+    // This is NOT truly atomic but better than nothing for Cloudflare
+    const existing = await kvGet(key)
+    if (existing !== null) return false
+    
+    // Cloudflare KV requires minimum TTL of 60 seconds
+    const actualTTL = ttlSeconds && ttlSeconds >= 60 ? ttlSeconds : 60
+    
+    const base = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
+    const url = `${base}?expiration_ttl=${actualTTL}`
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${CF_API_TOKEN}`,
+        'Content-Type': 'text/plain',
+      },
+      body: typeof value === 'string' ? value : JSON.stringify(value),
+    })
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error')
+      throw new Error(`CF KV setNX failed ${res.status}: ${errorText}`)
+    }
+    return true
+  }
+
+  if (KV_URL && KV_TOKEN) {
+    // Upstash Redis supports atomic SET NX EX
+    const url = `${KV_URL}/set/${encodeURIComponent(key)}`
+    const body: any = { value, nx: true }
+    if (ttlSeconds) body.ex = ttlSeconds
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error')
+      throw new Error(`KV setNX failed ${res.status}: ${errorText}`)
+    }
+    
+    const json = await res.json().catch(() => null)
+    // Upstash returns { result: "OK" } on success, { result: null } if key exists
+    return json?.result === 'OK'
+  }
+  
+  // No KV store configured - critical error
+  throw new Error('KV store not configured. Cannot acquire distributed lock. Set CF_KV_* or KV_REST_API_* environment variables.')
+}
+
 export async function kvGet<T = unknown>(key: string): Promise<T | null> {
   if (useCloudflare()) {
     const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`

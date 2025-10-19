@@ -3,9 +3,13 @@
  * 
  * Prevents duplicate completions, race conditions, and exploitation
  * Provides idempotency and rate limiting for order completion flow
+ * 
+ * SECURITY FIX: Now uses atomic distributed locking to prevent race conditions
  */
 
 import { kvGet, kvSet, kvIncr } from '@/lib/kv'
+import { acquireDistributedLock, releaseDistributedLock, type Lock } from '@/lib/distributedLock'
+import { createHash } from 'crypto'
 
 interface CompletionAttempt {
   cartId: string
@@ -13,27 +17,51 @@ interface CompletionAttempt {
   timestamp: number
   status: 'pending' | 'completed' | 'failed'
   attempts: number
+  idempotencyKey?: string
+}
+
+export interface CompletionLock {
+  allowed: boolean
+  lock?: Lock
+  reason?: string
+  existingOrderId?: string
 }
 
 const MAX_ATTEMPTS_PER_CART = 5
-const COMPLETION_LOCK_TTL = 300 // 5 minutes
+// Note: Cloudflare KV requires minimum TTL of 60 seconds
+const COMPLETION_LOCK_TTL = 60 // 60 seconds (minimum for Cloudflare KV)
 const RATE_LIMIT_WINDOW = 60 // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 10
 
 /**
- * Checks if cart completion is allowed and creates a lock
- * Returns true if allowed, false if duplicate/blocked
+ * Generates an idempotency key for cart completion
+ */
+export function generateIdempotencyKey(cartId: string, orderId?: string): string {
+  const data = `${cartId}:${orderId || 'manual'}:${Date.now()}`
+  return createHash('sha256').update(data).digest('hex').substring(0, 32)
+}
+
+/**
+ * Checks if cart completion is allowed and acquires atomic lock
+ * 
+ * SECURITY FIX: Uses distributed lock with atomic SET NX to prevent race conditions
+ * 
+ * @returns Lock object if allowed, reason if blocked
  */
 export async function acquireCompletionLock(
   cartId: string,
   orderId?: string
-): Promise<{ allowed: boolean; reason?: string; existingOrderId?: string }> {
+): Promise<CompletionLock> {
   try {
-    // Check if cart is already completed
+    // Check if cart is already completed (idempotency check)
     const completedKey = `order:completed:${cartId}`
     const existingCompletion = await kvGet<CompletionAttempt>(completedKey)
     
     if (existingCompletion?.status === 'completed') {
+      console.info('[COMPLETION_GUARD][idempotent_return]', {
+        cartId,
+        existingOrderId: existingCompletion.orderId,
+      })
       return {
         allowed: false,
         reason: 'Cart already completed',
@@ -46,6 +74,7 @@ export async function acquireCompletionLock(
     const attempts = await kvGet<number>(attemptKey) || 0
     
     if (attempts >= MAX_ATTEMPTS_PER_CART) {
+      console.warn('[COMPLETION_GUARD][max_attempts]', { cartId, attempts })
       return {
         allowed: false,
         reason: `Maximum completion attempts (${MAX_ATTEMPTS_PER_CART}) exceeded`,
@@ -62,27 +91,47 @@ export async function acquireCompletionLock(
     }
     
     if (requestCount && requestCount > MAX_REQUESTS_PER_MINUTE) {
+      console.warn('[COMPLETION_GUARD][rate_limited]', { cartId, requestCount })
       return {
         allowed: false,
         reason: 'Rate limit exceeded',
       }
     }
 
-    // Create pending lock
-    const lockData: CompletionAttempt = {
-      cartId,
-      orderId,
-      timestamp: Date.now(),
-      status: 'pending',
-      attempts: attempts + 1,
+    // SECURITY FIX: Acquire atomic distributed lock
+    const lockResource = `cart:complete:${cartId}`
+    const lockResult = await acquireDistributedLock(lockResource, COMPLETION_LOCK_TTL)
+    
+    if (!lockResult.success) {
+      console.warn('[COMPLETION_GUARD][lock_failed]', {
+        cartId,
+        reason: lockResult.error,
+      })
+      return {
+        allowed: false,
+        reason: lockResult.error || 'Another completion is in progress',
+      }
     }
 
-    await kvSet(completedKey, lockData, COMPLETION_LOCK_TTL)
+    // Track attempt count
     await kvSet(attemptKey, attempts + 1, 3600) // Track attempts for 1 hour
 
-    return { allowed: true }
+    console.log('[COMPLETION_GUARD][lock_acquired]', {
+      cartId,
+      orderId,
+      lockToken: lockResult.lock!.token,
+    })
+
+    return {
+      allowed: true,
+      lock: lockResult.lock,
+    }
+    
   } catch (error) {
-    console.error('[COMPLETION_GUARD][acquire_lock][error]', { cartId, error: String(error) })
+    console.error('[COMPLETION_GUARD][acquire_lock][error]', {
+      cartId,
+      error: String(error),
+    })
     return {
       allowed: false,
       reason: 'lock_unavailable',
@@ -91,11 +140,38 @@ export async function acquireCompletionLock(
 }
 
 /**
- * Marks cart completion as successful
+ * Releases the completion lock
+ * Should be called in finally block to ensure lock is always released
+ */
+export async function releaseCompletionLock(lock: Lock): Promise<void> {
+  try {
+    const released = await releaseDistributedLock(lock)
+    
+    if (released) {
+      console.log('[COMPLETION_GUARD][lock_released]', {
+        resource: lock.resource,
+      })
+    } else {
+      console.warn('[COMPLETION_GUARD][lock_release_failed]', {
+        resource: lock.resource,
+        reason: 'Lock already expired or token mismatch',
+      })
+    }
+  } catch (error) {
+    console.error('[COMPLETION_GUARD][release_lock][error]', {
+      resource: lock.resource,
+      error: String(error),
+    })
+  }
+}
+
+/**
+ * Marks cart completion as successful and releases lock
  */
 export async function markCompletionSuccess(
   cartId: string,
-  orderId: string
+  orderId: string,
+  idempotencyKey?: string
 ): Promise<void> {
   try {
     const completedKey = `order:completed:${cartId}`
@@ -105,6 +181,7 @@ export async function markCompletionSuccess(
       timestamp: Date.now(),
       status: 'completed',
       attempts: 1,
+      idempotencyKey,
     }
 
     // Store completion permanently (or with long TTL for audit)
@@ -113,8 +190,18 @@ export async function markCompletionSuccess(
     // Also track by orderId for webhook validation
     const orderKey = `order:cart:${orderId}`
     await kvSet(orderKey, cartId, 86400 * 7) // 7 days
+    
+    console.log('[COMPLETION_GUARD][success_marked]', {
+      cartId,
+      orderId,
+      idempotencyKey,
+    })
   } catch (error) {
-    console.error('[COMPLETION_GUARD][mark_success][error]', { cartId, orderId, error: String(error) })
+    console.error('[COMPLETION_GUARD][mark_success][error]', {
+      cartId,
+      orderId,
+      error: String(error),
+    })
   }
 }
 
