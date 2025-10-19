@@ -6,6 +6,7 @@ import {
   acquireCompletionLock,
   markCompletionSuccess,
   validateCashfreeOrder,
+  releaseCompletionLock,
 } from '@/utils/orderCompletionGuard'
 import { captureMedusaPayment, getPaymentIdFromOrder } from '@/utils/medusaPaymentCapture'
 
@@ -57,10 +58,25 @@ export async function POST(req: NextRequest) {
     }
     if (!cartId) return NextResponse.json({ error: 'cartId required' }, { status: 400 })
 
-    // Security: Acquire completion lock to prevent duplicates and race conditions
+    // SECURITY FIX: Acquire atomic distributed lock to prevent race conditions
     const lockResult = await acquireCompletionLock(cartId, orderId)
     if (!lockResult.allowed) {
       try { console.warn('[COMPLETE_API][blocked]', { cartId, orderId, reason: lockResult.reason }) } catch {}
+      
+      // If already completed, return the existing order (idempotency)
+      if (lockResult.existingOrderId) {
+        try {
+          const existingOrder = await medusaApiClient.getOrder(lockResult.existingOrderId)
+          return NextResponse.json({ 
+            ok: true, 
+            result: { order: existingOrder },
+            message: 'Order already exists'
+          })
+        } catch (e) {
+          // If we can't fetch the order, just return the error
+        }
+      }
+      
       return NextResponse.json({
         error: 'completion_blocked',
         reason: lockResult.reason,
@@ -68,8 +84,12 @@ export async function POST(req: NextRequest) {
       }, { status: 409 })
     }
 
-    // Security: If orderId provided, validate with Cashfree before completing
-    if (orderId) {
+    // SECURITY FIX: Lock acquired, ensure it's released in finally block
+    const completionLock = lockResult.lock!
+    
+    try {
+      // Security: If orderId provided, validate with Cashfree before completing
+      if (orderId) {
       // SECURITY FIX: Verify orderId belongs to this cartId (prevent payment hijacking)
       const mappedCartId = await kvGet<string>(`cf:order:cart:${orderId}`)
       if (!mappedCartId) {
@@ -111,10 +131,38 @@ export async function POST(req: NextRequest) {
         }, { status: 400 })
       }
       try { console.log('[COMPLETE_API][validation_success]', { orderId, status: validation.status, amount: validation.amount }) } catch {}
-    }
+      }
 
-    // Complete cart inline so we can trigger post-completion sync
-    try {
+      // Double-check: Verify cart hasn't been completed by another request
+      const doubleCheckKey = `order:completed:${cartId}`
+      const existingCompletion = await kvGet<any>(doubleCheckKey)
+      
+      if (existingCompletion?.status === 'completed') {
+        console.warn('[COMPLETE_API][race_condition_detected]', {
+          cartId,
+          existingOrderId: existingCompletion.orderId,
+          message: 'Cart was completed by another request despite lock'
+        })
+        
+        // Release lock and return existing order
+        await releaseCompletionLock(completionLock)
+        
+        try {
+          const existingOrder = await medusaApiClient.getOrder(existingCompletion.orderId)
+          return NextResponse.json({ 
+            ok: true, 
+            result: { order: existingOrder },
+            message: 'Order already exists'
+          })
+        } catch (e) {
+          return NextResponse.json({
+            error: 'order_already_completed',
+            orderId: existingCompletion.orderId
+          }, { status: 409 })
+        }
+      }
+
+      // Complete cart inline so we can trigger post-completion sync
       const result = await medusaApiClient.completeCart(cartId)
       try { console.log('[COMPLETE_API][complete][response]', { cartId, hasOrder: Boolean((result as any)?.order), hasCart: Boolean((result as any)?.cart) }) } catch {}
 
@@ -352,10 +400,22 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json({ ok: true, result })
+      
     } catch (e: any) {
+      console.error('[COMPLETE_API][error]', {
+        cartId,
+        orderId,
+        error: e?.message || String(e)
+      })
       return NextResponse.json({ ok: false, error: e?.message || 'complete_failed' }, { status: 400 })
+    } finally {
+      // SECURITY FIX: Always release lock, even on error
+      await releaseCompletionLock(completionLock)
     }
   } catch (e: any) {
+    console.error('[COMPLETE_API][outer_error]', {
+      error: e?.message || String(e)
+    })
     return NextResponse.json({ error: 'server_error', message: e?.message || String(e) }, { status: 500 })
   }
 }
