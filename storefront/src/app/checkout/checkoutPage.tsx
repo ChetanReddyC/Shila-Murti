@@ -1850,6 +1850,90 @@ export default function CheckoutPage() {
 
 
 
+      // SECURITY: Validate prices before initiating payment
+
+      try {
+
+        const validationResponse = await fetch('/api/checkout/validate-pricing', {
+
+          method: 'POST',
+
+          headers: { 'Content-Type': 'application/json' },
+
+          body: JSON.stringify({
+
+            cartId: cart.id,
+
+            selectedShippingOptionId: selectedShippingOptionId || undefined,
+
+            clientTotal: total,
+
+            clientShipping: effectiveShippingAmount,
+
+            clientSubtotal: subtotal,
+
+            clientTax: taxes
+
+          })
+
+        })
+
+
+
+        const validationResult = await validationResponse.json()
+
+
+
+        if (!validationResult.valid) {
+
+          console.error('[CHECKOUT] Price validation failed', {
+
+            cartId: cart.id,
+
+            discrepancies: validationResult.discrepancies,
+
+            serverPrices: validationResult.serverPrices,
+
+            clientPrices: validationResult.clientPrices
+
+          })
+
+
+
+          alert(
+
+            'Price validation failed. The cart prices may have changed. Please refresh the page and try again.'
+
+          )
+
+          setCashfreeLoading(false)
+
+          return
+
+        }
+
+
+
+        console.log('[CHECKOUT] Price validation passed', {
+
+          cartId: cart.id,
+
+          serverTotal: validationResult.serverPrices.total
+
+        })
+
+      } catch (validationError) {
+
+        console.error('[CHECKOUT] Price validation error', validationError)
+
+        // Don't block payment on validation errors (fail open)
+
+        // Log for investigation but allow checkout to proceed
+
+      }
+
+
+
       const orderId = `order_${Date.now()}`
 
       // Ensure two decimals for INR
