@@ -1,4 +1,5 @@
 import { medusaApiClient, MedusaApiClient, UpdateCartPayload, CompleteCartResponse, OrderMinimal, ShippingOption, ApiError } from './medusaApiClient'
+import { PriceValidationService } from '../services/PriceValidationService'
 
 export type ShippingSelectionStrategy = 'cheapest'
 
@@ -228,6 +229,89 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
       
       const cartWithSelected = await client.selectPaymentSession(cartId, providerId)
       logs.push({ step: 'select-payment-session', details: { providerId, selected: true } })
+    }
+
+    // 3.5) SECURITY: Validate prices before completing cart
+    currentStep = 'validate-pricing'
+    try {
+      // Fetch fresh cart to get accurate totals with shipping methods applied
+      const cartForValidation = await client.getCart(cartId)
+      
+      // Calculate server-side prices (source of truth)
+      const serverPrices = PriceValidationService.calculateServerPrices(
+        cartForValidation,
+        selectedIds.size > 0 ? Array.from(selectedIds)[0] : undefined
+      )
+      
+      // If client provided explicit amounts, validate them
+      if (targetAmount !== undefined) {
+        const shippingDiff = Math.abs(serverPrices.shipping - targetAmount)
+        
+        if (shippingDiff > 0.01) {
+          console.error('[CHECKOUT][PRICE_VALIDATION] Shipping amount mismatch', {
+            cartId,
+            serverShipping: serverPrices.shipping,
+            clientShipping: targetAmount,
+            difference: shippingDiff,
+            severity: shippingDiff > 1 ? 'high' : 'medium'
+          })
+          
+          // Log as potential fraud attempt
+          logs.push({
+            step: 'price-validation-failed',
+            details: {
+              field: 'shipping',
+              serverValue: serverPrices.shipping,
+              clientValue: targetAmount,
+              difference: shippingDiff
+            }
+          })
+          
+          return {
+            success: false,
+            cartId,
+            logs,
+            error: {
+              step: 'validate-pricing',
+              message: 'Price validation failed. Shipping amount mismatch detected. Please refresh and try again.'
+            }
+          }
+        }
+      }
+      
+      logs.push({
+        step: 'validate-pricing',
+        details: {
+          valid: true,
+          serverPrices: {
+            subtotal: serverPrices.subtotal,
+            shipping: serverPrices.shipping,
+            tax: serverPrices.tax,
+            total: serverPrices.total
+          }
+        }
+      })
+      
+      console.log('[CHECKOUT][PRICE_VALIDATION] Validation passed', {
+        cartId,
+        serverTotal: serverPrices.total,
+        serverShipping: serverPrices.shipping
+      })
+      
+    } catch (validationError: any) {
+      console.error('[CHECKOUT][PRICE_VALIDATION] Validation error', {
+        cartId,
+        error: validationError?.message || String(validationError)
+      })
+      
+      // Don't block checkout on validation errors (fail open for availability)
+      // but log the error for investigation
+      logs.push({
+        step: 'price-validation-error',
+        details: {
+          error: validationError?.message || String(validationError)
+        }
+      })
     }
 
     // 4) Complete the cart
