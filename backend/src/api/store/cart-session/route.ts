@@ -1,5 +1,5 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { kvGet, kvSet } from "../../../utils/kv"
+import { kvGet, kvSet, kvDel } from "../../../utils/kv"
 import crypto from "crypto"
 
 // Helper to parse cookies from Cookie header (Medusa doesn't auto-parse cookies)
@@ -202,7 +202,7 @@ export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
     const sessionToken = cookies[CART_SESSION_COOKIE]
     
     if (sessionToken) {
-      await kvSet(`${CART_SESSION_KEY_PREFIX}${sessionToken}`, null, 1)
+      await kvDel(`${CART_SESSION_KEY_PREFIX}${sessionToken}`)
       
       console.log('[CART_SESSION] Session deleted', {
         sessionToken: sessionToken.substring(0, 8) + '...'

@@ -95,3 +95,33 @@ export async function kvSet(key: string, value: unknown, ttlSeconds?: number): P
     throw new Error(`KV set failed ${res.status}`)
   }
 }
+
+export async function kvDel(key: string): Promise<void> {
+  if (useCloudflare()) {
+    const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
+    const res = await fetch(url, { 
+      method: 'DELETE', 
+      headers: { Authorization: `Bearer ${CF_API_TOKEN}` } 
+    })
+    if (!res.ok && res.status !== 404) {
+      console.error('[KV] Cloudflare KV del failed:', res.status, res.statusText)
+      throw new Error(`CF KV del failed ${res.status}`)
+    }
+    return
+  }
+
+  if (!KV_URL || !KV_TOKEN) {
+    console.warn('[KV] No KV configuration found, skipping delete')
+    return
+  }
+  
+  const url = `${KV_URL}/del/${encodeURIComponent(key)}`
+  const res = await fetch(url, { 
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${KV_TOKEN}` } 
+  })
+  if (!res.ok && res.status !== 404) {
+    console.error('[KV] Upstash del failed:', res.status, res.statusText)
+    throw new Error(`KV del failed ${res.status}`)
+  }
+}
