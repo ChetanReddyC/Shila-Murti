@@ -119,6 +119,18 @@
   opacity: 0.7;
 }
 
+.inputError {
+  border-color: #EF4444;
+  background-color: #FEF2F2;
+}
+
+.fieldError {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #EF4444;
+  font-weight: 400;
+}
+
 /* Shipping Options */
 .shippingOptions {
   display: flex;
