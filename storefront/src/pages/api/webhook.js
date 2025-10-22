@@ -6,8 +6,11 @@ import fetch from 'node-fetch';
 const captureCashfreePaymentPromise = import('../../utils/cashfreeCapture.ts').then(m => m.captureCashfreePayment).catch(() => null);
 const preventWebhookReplayPromise = import('../../utils/orderCompletionGuard.ts').then(m => m.preventWebhookReplay).catch(() => null);
 const acquireCompletionLockPromise = import('../../utils/orderCompletionGuard.ts').then(m => m.acquireCompletionLock).catch(() => null);
-const getCartIdFromOrderPromise = import('../../utils/orderCompletionGuard.ts').then(m => m.getCartIdFromOrder).catch(() => null);
 const medusaCapturePromise = import('../../utils/medusaPaymentCapture.ts').catch(() => null);
+
+// SECURITY FIX: Import secure mapping validation
+const getOrderCartMappingPromise = import('../../lib/cashfreeMapping.ts').then(m => m.getOrderCartMapping).catch(() => null);
+const validateOrderMappingPromise = import('../../lib/cashfreeMapping.ts').then(m => m.validateOrderMapping).catch(() => null);
 
 export const config = { api: { bodyParser: false } };
 
@@ -43,6 +46,7 @@ export default async function handler(req, res) {
     console.error('[WEBHOOK][security][replay_check_error]', { error: String(replayError) });
   }
 
+  // Signature validation
   const payloadToSign = `${timestamp}.${raw.toString()}`;
   const expected = crypto.createHmac('sha256', process.env.CASHFREE_CLIENT_SECRET)
     .update(payloadToSign)
@@ -79,20 +83,50 @@ export default async function handler(req, res) {
     console.log('[WEBHOOK][received]', { orderId, status, orderAmount, type });
 
     if (orderId && status === 'PAID') {
-      // Security: Get cart ID and check if already completed
+      // SECURITY FIX: Validate order-cart mapping with cryptographic verification
       let cartId = null;
+      let mappingValid = false;
+      
       try {
-        const getCartId = await getCartIdFromOrderPromise;
-        if (getCartId) {
-          cartId = await getCartId(orderId);
-          console.log('[WEBHOOK][cart_resolved]', { orderId, cartId });
+        const getMapping = await getOrderCartMappingPromise;
+        const validateMapping = await validateOrderMappingPromise;
+        
+        if (!getMapping || !validateMapping) {
+          console.error('[WEBHOOK][mapping_service_unavailable]');
+          return res.status(500).json({ ok: false, error: 'Mapping service unavailable' });
         }
+        
+        // Get the mapping
+        const mapping = await getMapping(orderId);
+        
+        if (!mapping) {
+          console.error('[WEBHOOK][mapping_not_found] Potential payment hijacking attempt');
+          return res.status(400).json({ ok: false, error: 'Invalid order mapping' });
+        }
+        
+        cartId = mapping.cartId;
+        
+        // Validate mapping integrity (cartId + amount)
+        const validation = await validateMapping(orderId, cartId, orderAmount);
+        
+        if (!validation.valid) {
+          console.error('[WEBHOOK][mapping_validation_failed] Potential fraud attempt:', validation.reason);
+          return res.status(400).json({ 
+            ok: false, 
+            error: 'Mapping validation failed',
+            reason: validation.reason 
+          });
+        }
+        
+        mappingValid = true;
+        
       } catch (err) {
-        console.error('[WEBHOOK][cart_resolve_error]', { orderId, error: String(err) });
+        console.error('[WEBHOOK][mapping_validation_error]');
+        return res.status(500).json({ ok: false, error: 'Mapping validation error' });
       }
 
-      // Security: Acquire lock if we have cartId
-      if (cartId) {
+      // Security: Acquire lock only if mapping is valid
+      if (cartId && mappingValid) {
         try {
           const acquireLock = await acquireCompletionLockPromise;
           if (acquireLock) {
@@ -139,24 +173,24 @@ export default async function handler(req, res) {
         }
       }
 
-      // Complete the cart via app route
-      const origin = process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'
-      try {
-        const completeResponse = await fetch(`${origin}/api/checkout/complete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId })
-        });
-        
-        const completeData = await completeResponse.json().catch(() => ({}));
-        console.log('[WEBHOOK][complete_response]', { 
-          orderId, 
-          status: completeResponse.status,
-          ok: completeResponse.ok,
-          data: completeData 
-        });
-      } catch (e) {
-        console.error('[WEBHOOK][complete_error]', { orderId, error: String(e) });
+      // Complete the cart via app route using validated cartId
+      if (cartId && mappingValid) {
+        const origin = process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'
+        try {
+          const completeResponse = await fetch(`${origin}/api/checkout/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, cartId })
+          });
+          
+          if (!completeResponse.ok) {
+            console.error('[WEBHOOK][complete_error] Status:', completeResponse.status);
+          }
+        } catch (e) {
+          console.error('[WEBHOOK][complete_error]');
+        }
+      } else {
+        console.error('[WEBHOOK][completion_skipped] No valid cart mapping');
       }
     } else {
       console.log('[WEBHOOK][ignored]', { orderId, status, reason: 'Not PAID status' });
