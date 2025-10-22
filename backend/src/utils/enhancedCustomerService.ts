@@ -5,7 +5,7 @@
  * to prevent duplicate customer accounts during checkout and profile updates.
  */
 
-import { normalizePhoneNumber, generatePlaceholderEmail, arePhoneNumbersEquivalent, generatePhoneVariations } from './phoneNormalization';
+import { normalizePhoneNumber, generatePlaceholderEmail, arePhoneNumbersEquivalent, generatePhoneVariations, normalizePhoneToCanonical } from './phoneNormalization';
 
 export interface CustomerLookupRequest {
   phone: string;
@@ -19,7 +19,7 @@ export interface CustomerLookupRequest {
 
 export interface CustomerLookupResult {
   customer: any | null;
-  lookupStrategy: 'email_match' | 'phone_metadata' | 'phone_field' | 'phone_variation' | 'new_customer';
+  lookupStrategy: 'email_match' | 'canonical_phone_match' | 'phone_metadata' | 'phone_field' | 'phone_variation' | 'new_customer';
   conflictDetected: boolean;
   phoneConflicts?: string[];
   consolidationRequired: boolean;
@@ -49,10 +49,21 @@ export class EnhancedCustomerService {
    */
   async findCustomerWithEnhancedLookup(request: CustomerLookupRequest): Promise<CustomerLookupResult> {
     const normalizedPhone = normalizePhoneNumber(request.phone);
+    
+    // Use canonical phone format for lookups to prevent duplicates
+    let canonicalPhone: string;
+    try {
+      canonicalPhone = normalizePhoneToCanonical(request.phone);
+    } catch (error) {
+      console.error('[EnhancedCustomerService] Invalid phone format:', request.phone);
+      throw new Error(`Invalid phone number format: ${request.phone}`);
+    }
+    
     const effectiveEmail = request.email || generatePlaceholderEmail(request.phone);
     
     console.log('[EnhancedCustomerService] Starting enhanced lookup:', {
       normalizedPhone,
+      canonicalPhone,
       effectiveEmail,
       whatsapp_authenticated: request.whatsapp_authenticated
     });
@@ -70,7 +81,18 @@ export class EnhancedCustomerService {
       };
     }
 
-    // Strategy 2: Phone metadata lookup
+    // Strategy 2: Canonical phone metadata lookup (MOST RELIABLE)
+    const canonicalPhoneResult = await this.lookupByCanonicalPhone(canonicalPhone);
+    if (canonicalPhoneResult.customer) {
+      return {
+        customer: canonicalPhoneResult.customer,
+        lookupStrategy: 'canonical_phone_match',
+        conflictDetected: false,
+        consolidationRequired: emailResult.customer ? true : false
+      };
+    }
+
+    // Strategy 3: Phone metadata lookup (legacy)
     const phoneMetadataResult = await this.lookupByPhoneMetadata(normalizedPhone);
     if (phoneMetadataResult.customer) {
       console.log('[EnhancedCustomerService] Found customer by phone metadata');
@@ -82,7 +104,7 @@ export class EnhancedCustomerService {
       };
     }
 
-    // Strategy 3: Legacy phone field lookup
+    // Strategy 4: Legacy phone field lookup
     const phoneFieldResult = await this.lookupByPhoneField(normalizedPhone);
     if (phoneFieldResult.customer) {
       console.log('[EnhancedCustomerService] Found customer by phone field');
@@ -94,7 +116,7 @@ export class EnhancedCustomerService {
       };
     }
 
-    // Strategy 4: Phone variation lookup for WhatsApp authenticated customers
+    // Strategy 5: Phone variation lookup for WhatsApp authenticated customers (legacy fallback)
     if (request.whatsapp_authenticated) {
       const variationResult = await this.lookupByPhoneVariations(normalizedPhone);
       if (variationResult.customer) {
@@ -161,6 +183,25 @@ export class EnhancedCustomerService {
       return { customer: customer || null };
     } catch (error) {
       console.error('[EnhancedCustomerService] Email lookup error:', error);
+      return { customer: null };
+    }
+  }
+
+  /**
+   * Looks up customer by canonical phone stored in metadata.
+   * This is the most reliable lookup method for preventing duplicates.
+   */
+  private async lookupByCanonicalPhone(canonicalPhone: string): Promise<{ customer: any | null }> {
+    try {
+      const customers = await this.customerModuleService.listCustomers({}, { take: 200 });
+      
+      const matchingCustomer = customers.find((customer: any) => 
+        customer.metadata?.phone_canonical === canonicalPhone
+      );
+      
+      return { customer: matchingCustomer || null };
+    } catch (error) {
+      console.error('[EnhancedCustomerService] Canonical phone lookup error:', error);
       return { customer: null };
     }
   }
@@ -236,6 +277,15 @@ export class EnhancedCustomerService {
   ): Promise<any> {
     const normalizedPhone = normalizePhoneNumber(request.phone);
     
+    // Get canonical phone for storage
+    let canonicalPhone: string;
+    try {
+      canonicalPhone = normalizePhoneToCanonical(request.phone);
+    } catch (error) {
+      console.error('[EnhancedCustomerService] Invalid phone during update:', request.phone);
+      canonicalPhone = normalizedPhone; // Fallback to normalized
+    }
+    
     // Only preserve existing name if it's not a default placeholder
     // Check for common placeholder values: "Customer" first name or "User" last name
     const hasPlaceholderName = 
@@ -261,6 +311,7 @@ export class EnhancedCustomerService {
         ...(existingCustomer.metadata || {}),
         phone: request.phone,
         phone_normalized: normalizedPhone,
+        phone_canonical: canonicalPhone, // Store canonical format for future lookups
         last_updated: new Date().toISOString(),
         update_source: 'enhanced_lookup',
         whatsapp_authenticated: request.whatsapp_authenticated || existingCustomer.metadata?.whatsapp_authenticated || false,
@@ -268,6 +319,7 @@ export class EnhancedCustomerService {
         unified_phone_lookup: true,
         consolidation_timestamp: new Date().toISOString(),
         duplicate_prevention: true,
+        canonical_phone_used: true,
         lookup_strategy_used: lookupResult.lookupStrategy,
         phone_conflicts_resolved: lookupResult.phoneConflicts?.length || 0
       }
@@ -284,6 +336,15 @@ export class EnhancedCustomerService {
 
   private async createNewCustomerWithMetadata(request: CustomerLookupRequest): Promise<any> {
     const normalizedPhone = normalizePhoneNumber(request.phone);
+    
+    // Get canonical phone for storage
+    let canonicalPhone: string;
+    try {
+      canonicalPhone = normalizePhoneToCanonical(request.phone);
+    } catch (error) {
+      console.error('[EnhancedCustomerService] Invalid phone during creation:', request.phone);
+      canonicalPhone = normalizedPhone; // Fallback to normalized
+    }
     
     // Handle email based on authentication method
     let effectiveEmail: string;
@@ -304,6 +365,7 @@ export class EnhancedCustomerService {
       metadata: {
         phone: request.phone,
         phone_normalized: normalizedPhone,
+        phone_canonical: canonicalPhone, // Store canonical format for future lookups
         created_via: 'enhanced_customer_service',
         creation_timestamp: new Date().toISOString(),
         profile_source: request.whatsapp_authenticated ? 'whatsapp_authenticated' : 
@@ -314,6 +376,7 @@ export class EnhancedCustomerService {
         auth_timestamp: new Date().toISOString(),
         unified_phone_lookup: true,
         duplicate_prevention: true,
+        canonical_phone_used: true,
         auth_source: 'customer_creation'
       }
     };
