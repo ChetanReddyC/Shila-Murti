@@ -11,6 +11,7 @@ import { processCheckout } from '../../utils/checkoutOrchestrator';
 import { useSession } from 'next-auth/react';
 import { usePasskey } from '../../hooks/usePasskey';
 import { PriceCalculationService } from '../../services/PriceCalculationService';
+import { validateIndianAddress, validateAddressField, type AddressInput } from '../../utils/addressValidation';
 
 export default function CheckoutPage() {
 
@@ -53,6 +54,10 @@ export default function CheckoutPage() {
     contactNumber: ''
 
   });
+
+  // Field-level validation errors
+
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
 
 
@@ -1217,6 +1222,72 @@ export default function CheckoutPage() {
 
     });
 
+    
+
+    // Clear error for this field when user starts typing
+
+    if (formErrors[name]) {
+
+      setFormErrors(prev => {
+
+        const updated = { ...prev };
+
+        delete updated[name];
+
+        return updated;
+
+      });
+
+    }
+
+  };
+
+  
+
+  // Validate individual field on blur
+
+  const handleFieldBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+
+    const { name, value } = e.target;
+
+    
+
+    // Only validate fields that are part of AddressInput
+
+    const addressFields = ['name', 'address', 'city', 'state', 'postalCode', 'contactNumber'];
+
+    if (!addressFields.includes(name)) return;
+
+    
+
+    const error = validateAddressField(name as keyof AddressInput, value);
+
+    
+
+    if (error) {
+
+      setFormErrors(prev => ({
+
+        ...prev,
+
+        [name]: error
+
+      }));
+
+    } else {
+
+      setFormErrors(prev => {
+
+        const updated = { ...prev };
+
+        delete updated[name];
+
+        return updated;
+
+      });
+
+    }
+
   };
 
 
@@ -2071,6 +2142,82 @@ export default function CheckoutPage() {
 
 
       return;
+
+    }
+
+    
+
+    // Validate address before proceeding
+
+    const addressValidation = validateIndianAddress({
+
+      name: formData.name,
+
+      address: formData.address,
+
+      city: formData.city,
+
+      state: formData.state,
+
+      postalCode: formData.postalCode,
+
+      contactNumber: formData.contactNumber
+
+    });
+
+    
+
+    if (!addressValidation.valid) {
+
+      // Set all errors
+
+      const errorMap: Record<string, string> = {};
+
+      addressValidation.errors.forEach((error) => {
+
+        // Try to map errors to specific fields
+
+        if (error.toLowerCase().includes('name')) errorMap.name = error;
+
+        else if (error.toLowerCase().includes('address')) errorMap.address = error;
+
+        else if (error.toLowerCase().includes('city')) errorMap.city = error;
+
+        else if (error.toLowerCase().includes('state')) errorMap.state = error;
+
+        else if (error.toLowerCase().includes('postal') || error.toLowerCase().includes('pin')) errorMap.postalCode = error;
+
+        else if (error.toLowerCase().includes('phone') || error.toLowerCase().includes('contact')) errorMap.contactNumber = error;
+
+      });
+
+      
+
+      setFormErrors(errorMap);
+
+      
+
+      // Show alert with first error
+
+      alert(`Please fix the following errors:\n\n${addressValidation.errors.join('\n')}`);
+
+      return;
+
+    }
+
+    
+
+    // Show warnings if any (don't block submission)
+
+    if (addressValidation.warnings.length > 0) {
+
+      const proceed = confirm(
+
+        `Warning:\n\n${addressValidation.warnings.join('\n')}\n\nDo you want to proceed anyway?`
+
+      );
+
+      if (!proceed) return;
 
     }
 
@@ -3118,17 +3265,25 @@ export default function CheckoutPage() {
 
                     name="name"
 
-                    className={styles.input}
+                    className={`${styles.input} ${formErrors.name ? styles.inputError : ''}`}
 
                     value={formData.name}
 
                     onChange={handleInputChange}
+
+                    onBlur={handleFieldBlur}
 
                     placeholder="Enter your name"
 
                     required
 
                   />
+
+                  {formErrors.name && (
+
+                    <div className={styles.fieldError}>{formErrors.name}</div>
+
+                  )}
 
                 </div>
                 <div className={styles.formGroup}>
@@ -3137,12 +3292,16 @@ export default function CheckoutPage() {
                     type="text"
                     id="address"
                     name="address"
-                    className={styles.input}
+                    className={`${styles.input} ${formErrors.address ? styles.inputError : ''}`}
                     value={formData.address}
                     onChange={handleInputChange}
+                    onBlur={handleFieldBlur}
                     placeholder="Enter your address"
                     required
                   />
+                  {formErrors.address && (
+                    <div className={styles.fieldError}>{formErrors.address}</div>
+                  )}
                 </div>
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
@@ -3151,12 +3310,16 @@ export default function CheckoutPage() {
                       type="text"
                       id="city"
                       name="city"
-                      className={styles.input}
+                      className={`${styles.input} ${formErrors.city ? styles.inputError : ''}`}
                       value={formData.city}
                       onChange={handleInputChange}
+                      onBlur={handleFieldBlur}
                       placeholder="Enter your city"
                       required
                     />
+                    {formErrors.city && (
+                      <div className={styles.fieldError}>{formErrors.city}</div>
+                    )}
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="state" className={styles.label}>State</label>
@@ -3164,12 +3327,16 @@ export default function CheckoutPage() {
                       type="text"
                       id="state"
                       name="state"
-                      className={styles.input}
+                      className={`${styles.input} ${formErrors.state ? styles.inputError : ''}`}
                       value={formData.state}
                       onChange={handleInputChange}
+                      onBlur={handleFieldBlur}
                       placeholder="Enter your state"
                       required
                     />
+                    {formErrors.state && (
+                      <div className={styles.fieldError}>{formErrors.state}</div>
+                    )}
                   </div>
                 </div>
                 <div className={styles.formRow}>
@@ -3179,12 +3346,16 @@ export default function CheckoutPage() {
                       type="text"
                       id="postalCode"
                       name="postalCode"
-                      className={styles.input}
+                      className={`${styles.input} ${formErrors.postalCode ? styles.inputError : ''}`}
                       value={formData.postalCode}
                       onChange={handleInputChange}
+                      onBlur={handleFieldBlur}
                       placeholder="Enter your postal code"
                       required
                     />
+                    {formErrors.postalCode && (
+                      <div className={styles.fieldError}>{formErrors.postalCode}</div>
+                    )}
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="contactNumber" className={styles.label}>Contact Number</label>
@@ -3192,12 +3363,16 @@ export default function CheckoutPage() {
                       type="text"
                       id="contactNumber"
                       name="contactNumber"
-                      className={styles.input}
+                      className={`${styles.input} ${formErrors.contactNumber ? styles.inputError : ''}`}
                       value={formData.contactNumber}
                       onChange={handleInputChange}
+                      onBlur={handleFieldBlur}
                       placeholder="Enter your contact number"
                       required
                     />
+                    {formErrors.contactNumber && (
+                      <div className={styles.fieldError}>{formErrors.contactNumber}</div>
+                    )}
                   </div>
                 </div>
               </div>

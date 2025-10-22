@@ -737,6 +737,20 @@ export class MedusaApiClient {
     return response.product;
   }
 
+  async getVariant(variantId: string): Promise<any> {
+    // Fetch variant details including prices
+    const endpoint = `/store/variants/${variantId}`;
+    try {
+      const response = await this.makeRequestWithRetry<{ variant: any }>(endpoint);
+      return response.variant;
+    } catch (error) {
+      // If direct variant endpoint doesn't exist, we might need to fetch through products
+      // This is a fallback approach for older Medusa versions
+      console.warn('[MedusaApiClient] Failed to fetch variant directly, might need alternative approach', error);
+      throw error;
+    }
+  }
+
   async getProductByHandle(handle: string): Promise<Product> {
     // For Medusa v2, we can use the handle parameter directly
     const queryParams = new URLSearchParams();

@@ -8,6 +8,7 @@ import { useErrorHandler } from '../hooks/useErrorHandler';
 import { PriceCalculationService, CartTotals, ValidationResult } from '../services/PriceCalculationService';
 import { PriceValidator, PriceConsistencyResult } from '../services/PriceValidator';
 import { InventoryValidationService } from '../services/InventoryValidationService';
+import { CartLimitService } from '../services/CartLimitService';
 
 // Cart state interface
 interface CartState {
@@ -482,21 +483,13 @@ export function CartProvider({ children }: CartProviderProps) {
     setLastOperation({ type: 'addToCart', params: [variantId, quantity] });
 
     try {
-      // Validate quantity input (basic validation before fetching variant)
-      if (!Number.isInteger(quantity) || quantity < 1) {
-        const errorMessage = 'Quantity must be a positive integer';
-        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      // Validate quantity input (comprehensive validation)
+      const quantityError = CartLimitService.validateQuantityInput(quantity);
+      if (quantityError) {
+        dispatch({ type: 'SET_ERROR', payload: quantityError });
         dispatch({ type: 'SET_LOADING', payload: false });
         setLastOperation(null);
-        throw new Error(errorMessage);
-      }
-
-      if (quantity > 99) {
-        const errorMessage = 'Maximum quantity per item is 99';
-        dispatch({ type: 'SET_ERROR', payload: errorMessage });
-        dispatch({ type: 'SET_LOADING', payload: false });
-        setLastOperation(null);
-        throw new Error(errorMessage);
+        throw new Error(quantityError);
       }
 
       // Ensure we have a cart
@@ -541,6 +534,40 @@ export function CartProvider({ children }: CartProviderProps) {
           dispatch({ type: 'SET_ERROR', payload: errorMessage });
           throw createError;
         }
+      }
+
+      // Validate cart limits before adding (with estimated price for value check)
+      let estimatedUnitPrice: number | undefined;
+      try {
+        // Fetch variant to get price for cart value validation
+        const variant = await medusaApiClient.getVariant(variantId);
+        if (variant && variant.prices && variant.prices.length > 0) {
+          // Use first price (should match cart's region/currency)
+          estimatedUnitPrice = Number(variant.prices[0].amount || 0) / 100; // Convert from cents
+        }
+      } catch (priceError) {
+        // If we can't fetch price, proceed without value check (fail open)
+      }
+
+      const limitValidation = CartLimitService.validateAddToCart(
+        currentCart,
+        variantId,
+        quantity,
+        estimatedUnitPrice
+      );
+
+      if (!limitValidation.valid) {
+        const errorMessage = limitValidation.errors.join(' ');
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        setLastOperation(null);
+        throw new Error(errorMessage);
+      }
+
+      // Show warnings if any (don't block the operation)
+      if (limitValidation.warnings.length > 0) {
+        // Log warnings for user awareness (could show as toast in future)
+        console.warn('[CART] Cart limit warnings:', limitValidation.warnings);
       }
 
       const updatedCart = await medusaApiClient.addLineItem(currentCart.id, {
@@ -640,6 +667,21 @@ export function CartProvider({ children }: CartProviderProps) {
     setLastOperation({ type: 'updateQuantity', params: [lineItemId, quantity] });
 
     try {
+      // Validate cart limits before updating quantity
+      const limitValidation = CartLimitService.validateUpdateQuantity(
+        state.cart,
+        lineItemId,
+        quantity
+      );
+
+      if (!limitValidation.valid) {
+        const errorMessage = limitValidation.errors.join(' ');
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        setLastOperation(null);
+        return; // Don't proceed with update
+      }
+
       // Validate inventory before updating
       const validation = await InventoryValidationService.validateCartItemUpdate(
         cartItem.variant_id,
