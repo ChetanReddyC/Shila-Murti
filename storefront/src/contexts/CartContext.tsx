@@ -7,6 +7,7 @@ import { medusaApiClient, ApiError } from '../utils/medusaApiClient';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 import { PriceCalculationService, CartTotals, ValidationResult } from '../services/PriceCalculationService';
 import { PriceValidator, PriceConsistencyResult } from '../services/PriceValidator';
+import { InventoryValidationService } from '../services/InventoryValidationService';
 
 // Cart state interface
 interface CartState {
@@ -481,6 +482,23 @@ export function CartProvider({ children }: CartProviderProps) {
     setLastOperation({ type: 'addToCart', params: [variantId, quantity] });
 
     try {
+      // Validate quantity input (basic validation before fetching variant)
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        const errorMessage = 'Quantity must be a positive integer';
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        setLastOperation(null);
+        throw new Error(errorMessage);
+      }
+
+      if (quantity > 99) {
+        const errorMessage = 'Maximum quantity per item is 99';
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        setLastOperation(null);
+        throw new Error(errorMessage);
+      }
+
       // Ensure we have a cart
       let currentCart = state.cart;
       let cartId = state.cartId || await getCartIdFromSession();
@@ -600,13 +618,18 @@ export function CartProvider({ children }: CartProviderProps) {
       throw new Error('No cart available');
     }
 
+    // Find the cart item to get variant information
+    const cartItem = state.cart.items?.find((item) => item.id === lineItemId);
+    if (!cartItem) {
+      throw new Error('Item not found in cart');
+    }
+
     // If quantity is 0 or negative, remove the item
     if (quantity <= 0) {
       // Ensure the id exists before attempting removal
       const exists = state.cart.items?.some((it) => it.id === lineItemId);
       if (exists) {
         await removeFromCart(lineItemId);
-      } else {
       }
       return;
     }
@@ -617,6 +640,24 @@ export function CartProvider({ children }: CartProviderProps) {
     setLastOperation({ type: 'updateQuantity', params: [lineItemId, quantity] });
 
     try {
+      // Validate inventory before updating
+      const validation = await InventoryValidationService.validateCartItemUpdate(
+        cartItem.variant_id,
+        cartItem.quantity,
+        quantity,
+        cartItem.variant?.product?.id
+      );
+
+      if (!validation.valid) {
+        // Show validation error to user
+        const errorMessage = validation.error || 'Cannot update quantity';
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        setLastOperation(null);
+        return; // Don't proceed with update
+      }
+
+      // Proceed with update if validation passes
       const updatedCart = await medusaApiClient.updateLineItem(cartId, lineItemId, {
         quantity,
       });
