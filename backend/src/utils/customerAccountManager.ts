@@ -2,12 +2,13 @@ import { Modules } from "@medusajs/framework/utils"
 import { createCustomersWorkflow } from "@medusajs/medusa/core-flows"
 import { randomUUID } from "crypto"
 import { buildAdminAuthHeaders } from "./adminAuthHeaders"
-import { normalizePhoneNumber, generatePlaceholderEmail } from "./phoneNormalization"
+import { normalizePhoneNumber, generatePlaceholderEmail, normalizePhoneToCanonical, generateCanonicalCustomerId } from "./phoneNormalization"
 import {
   createEnhancedCustomerService,
   CustomerLookupRequest,
   CustomerConsolidationInfo,
 } from "./enhancedCustomerService"
+import { createCustomerMergeService } from "./customerMergeService"
 
 type Scope = {
   resolve<T = any>(dependency: any): T
@@ -94,9 +95,18 @@ export async function findOrCreateCustomerAccount(
   } = input
 
   const normalizedPhone = normalizePhoneNumber(phone)
+  
+  // Generate canonical phone format for duplicate prevention
+  let canonicalPhone: string;
+  try {
+    canonicalPhone = normalizePhoneToCanonical(phone);
+  } catch (error) {
+    throw new Error(`Invalid phone number format: ${phone}`);
+  }
 
   const customerModuleService: any = scope.resolve(Modules.CUSTOMER)
   const enhancedCustomerService = createEnhancedCustomerService(customerModuleService)
+  const customerMergeService = createCustomerMergeService(customerModuleService)
 
   const effectiveEmail =
     email ||
@@ -114,6 +124,137 @@ export async function findOrCreateCustomerAccount(
     last_name: last_name || "",
   }
 
+  // CRITICAL: Check for duplicates BEFORE attempting creation
+  // This prevents creating duplicate accounts with slightly different phone formats
+  const existingCustomer = await customerMergeService.findBestExistingCustomer(
+    phone,
+    effectiveEmail
+  );
+
+  // If we found a high-confidence match, use that customer instead of creating new one
+  if (existingCustomer) {
+    // Update the existing customer with any new information
+    const resultCustomer = existingCustomer;
+    const consolidationInfo: CustomerConsolidationInfo = {
+      strategy_used: 'duplicate_prevention',
+      existing_customer_found: true,
+      phone_conflicts_resolved: 0
+    };
+
+    const lookupStrategy = consolidationInfo.strategy_used;
+
+    // Continue with existing customer update logic...
+    const storedSubject = resultCustomer.metadata?.auth_subject || null;
+
+    if (
+      requireAuthSubjectMatch &&
+      storedSubject &&
+      storedSubject !== auth_subject
+    ) {
+      return {
+        ok: false,
+        reason: "auth_subject_mismatch",
+        statusCode: 409,
+        customerId: resultCustomer.id,
+        storedSubject,
+      }
+    }
+
+    if (requireAuthSubjectMatch && storedSubject && !auth_subject) {
+      return {
+        ok: false,
+        reason: "auth_subject_mismatch",
+        statusCode: 409,
+        customerId: resultCustomer.id,
+        storedSubject,
+      }
+    }
+
+    // Update name if needed
+    const hasPlaceholderName = 
+      !resultCustomer.first_name ||
+      resultCustomer.first_name === "Customer" || 
+      resultCustomer.first_name.trim() === "" ||
+      resultCustomer.last_name === "User"
+    
+    const hasRealNameInRequest = 
+      first_name && 
+      first_name !== "Customer" && 
+      first_name.trim() !== ""
+    
+    const shouldUpdateName = hasPlaceholderName || (hasRealNameInRequest && !resultCustomer.first_name)
+    
+    // Check if we should update email (from placeholder to real email)
+    const hasPlaceholderEmail = resultCustomer.email?.includes('@guest.local')
+    const hasRealEmailInRequest = email && !email.includes('@guest.local') && email_authenticated
+    const shouldUpdateEmail = hasPlaceholderEmail && hasRealEmailInRequest
+    
+    const updatePayload: Record<string, any> = {
+      first_name: shouldUpdateName ? (first_name || "Customer") : resultCustomer.first_name,
+      last_name: shouldUpdateName ? (last_name || "") : resultCustomer.last_name,
+      phone: phone || resultCustomer.phone,
+      email: shouldUpdateEmail ? email : resultCustomer.email, // Update email if transitioning from placeholder to real
+      has_account: true,
+    }
+
+    if (addresses?.length) {
+      updatePayload.addresses = transformAddresses(addresses, {
+        first_name: first_name || resultCustomer.first_name,
+        last_name: last_name || resultCustomer.last_name,
+      })
+    }
+
+    updatePayload.metadata = {
+      ...(resultCustomer.metadata || {}),
+      phone,
+      phone_normalized: normalizedPhone,
+      phone_canonical: canonicalPhone, // Store canonical format for future lookups
+      last_updated: new Date().toISOString(),
+      update_source: 'duplicate_prevention_enhanced',
+      whatsapp_authenticated: whatsapp_authenticated || resultCustomer.metadata?.whatsapp_authenticated || false,
+      email_authenticated: email_authenticated || resultCustomer.metadata?.email_authenticated || false,
+      identity_method: shouldUpdateEmail ? 'email' : identity_method, // Update to email if transitioning
+      auth_timestamp:
+        resultCustomer.metadata?.auth_timestamp || new Date().toISOString(),
+      auth_source: "customer_update",
+      unified_phone_lookup: true,
+      duplicate_prevention: true,
+      canonical_phone_used: true,
+      email_upgraded_from_placeholder: shouldUpdateEmail // Track that email was upgraded
+    }
+
+    if (auth_subject) {
+      updatePayload.metadata.auth_subject = auth_subject
+      updatePayload.metadata.auth_subject_last_verified_at = new Date().toISOString()
+    }
+
+    await customerModuleService.updateCustomers(resultCustomer.id, updatePayload)
+
+    const [finalCustomer] = await customerModuleService.listCustomers(
+      { id: resultCustomer.id },
+      { take: 1, relations: ["addresses"] }
+    )
+
+    const associations = await associateCartAndOrder({
+      scope,
+      cart_id,
+      order_id,
+      customer_id: finalCustomer.id,
+    })
+
+    return {
+      ok: true,
+      customer: finalCustomer,
+      wasCreated: false,
+      statusCode: 200,
+      lookupStrategy,
+      consolidationInfo,
+      cartAssociation: associations.cart,
+      orderAssociation: associations.order,
+    }
+  }
+
+  // No duplicate found, proceed with enhanced customer service lookup
   const { customer: resultCustomer, consolidationInfo } =
     await enhancedCustomerService.findOrCreateCustomer(lookupRequest)
 
@@ -162,10 +303,16 @@ export async function findOrCreateCustomerAccount(
     // Use request name if: (1) existing has placeholder, OR (2) request has real name and existing doesn't
     const shouldUpdateName = hasPlaceholderName || (hasRealNameInRequest && !resultCustomer.first_name)
     
+    // Check if we should update email (from placeholder to real email)
+    const hasPlaceholderEmail = resultCustomer.email?.includes('@guest.local')
+    const hasRealEmailInRequest = email && !email.includes('@guest.local') && email_authenticated
+    const shouldUpdateEmail = hasPlaceholderEmail && hasRealEmailInRequest
+    
     const updatePayload: Record<string, any> = {
       first_name: shouldUpdateName ? (first_name || "Customer") : resultCustomer.first_name,
       last_name: shouldUpdateName ? (last_name || "") : resultCustomer.last_name,
       phone: phone || resultCustomer.phone,
+      email: shouldUpdateEmail ? email : resultCustomer.email, // Update email if transitioning from placeholder to real
       has_account: true,
     }
 
@@ -182,9 +329,9 @@ export async function findOrCreateCustomerAccount(
       phone_normalized: normalizedPhone,
       last_updated: new Date().toISOString(),
       update_source: "enhanced_store_custom",
-      whatsapp_authenticated,
-      email_authenticated,
-      identity_method,
+      whatsapp_authenticated: whatsapp_authenticated || resultCustomer.metadata?.whatsapp_authenticated || false,
+      email_authenticated: email_authenticated || resultCustomer.metadata?.email_authenticated || false,
+      identity_method: shouldUpdateEmail ? 'email' : identity_method, // Update to email if transitioning
       auth_timestamp:
         resultCustomer.metadata?.auth_timestamp || new Date().toISOString(),
       auth_source: "customer_update",
@@ -195,6 +342,7 @@ export async function findOrCreateCustomerAccount(
         timestamp: new Date().toISOString(),
       },
       duplicate_prevention: true,
+      email_upgraded_from_placeholder: shouldUpdateEmail // Track that email was upgraded
     }
 
     if (auth_subject) {

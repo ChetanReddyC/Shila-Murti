@@ -36,6 +36,84 @@ export function normalizePhoneNumber(phone: string | null | undefined): string {
 }
 
 /**
+ * Normalizes a phone number to CANONICAL format for preventing duplicates.
+ * This is the single source of truth for phone number formatting.
+ * 
+ * CANONICAL FORMAT: +919XXXXXXXXX (always with + prefix)
+ * 
+ * Handles all variations:
+ * - "9014711878" → "+919014711878"
+ * - "09014711878" → "+919014711878"
+ * - "+919014711878" → "+919014711878"
+ * - "919014711878" → "+919014711878"
+ * 
+ * @param phone - Raw phone number input
+ * @returns Canonical phone number in format +919XXXXXXXXX
+ * @throws Error if phone number is invalid
+ */
+export function normalizePhoneToCanonical(phone: string | null | undefined): string {
+  if (!phone) {
+    throw new Error('Phone number is required');
+  }
+  
+  // Remove all non-digits
+  let digits = String(phone).replace(/\D/g, '');
+  
+  // Handle country code variations
+  if (digits.startsWith('91') && digits.length === 12) {
+    // Already has country code: 919014711878
+    return `+${digits}`;
+  }
+  
+  if (digits.startsWith('0') && digits.length === 11) {
+    // Leading zero format: 09014711878
+    return `+91${digits.slice(1)}`;
+  }
+  
+  if (digits.length === 10) {
+    // Standard 10-digit format: 9014711878
+    return `+91${digits}`;
+  }
+  
+  // For other formats, try to extract 10-digit mobile number
+  if (digits.length > 10) {
+    const last10 = digits.slice(-10);
+    // Validate it starts with valid Indian mobile prefix (6-9)
+    if (last10[0] >= '6' && last10[0] <= '9') {
+      return `+91${last10}`;
+    }
+  }
+  
+  throw new Error(`Invalid Indian phone number format: ${phone}`);
+}
+
+/**
+ * Generates a canonical customer ID from phone or email.
+ * This ensures consistent IDs across different authentication methods.
+ * 
+ * For phone auth: 919XXXXXXXXX@guest.local (without + prefix for ID)
+ * For email auth: user@email.com (unchanged)
+ * 
+ * @param identifier - Phone number or email address
+ * @param method - Authentication method ('phone' or 'email')
+ * @returns Canonical customer ID
+ */
+export function generateCanonicalCustomerId(identifier: string, method: 'phone' | 'email'): string {
+  if (method === 'phone') {
+    try {
+      const canonical = normalizePhoneToCanonical(identifier);
+      // Remove + prefix for customer ID (919XXXXXXXXX@guest.local)
+      return `${canonical.replace('+', '')}@guest.local`;
+    } catch (error) {
+      throw new Error(`Cannot generate customer ID: ${error instanceof Error ? error.message : 'Invalid phone'}`);
+    }
+  }
+  
+  // For email, return as-is (already canonical)
+  return identifier.toLowerCase().trim();
+}
+
+/**
  * Generates a placeholder email address from a phone number.
  * Used for customers who authenticate via WhatsApp but don't provide email.
  * 
