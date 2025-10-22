@@ -9,6 +9,7 @@ import {
   releaseCompletionLock,
 } from '@/utils/orderCompletionGuard'
 import { captureMedusaPayment, getPaymentIdFromOrder } from '@/utils/medusaPaymentCapture'
+import { getOrderCartMapping } from '@/lib/cashfreeMapping'
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,19 +42,14 @@ export async function POST(req: NextRequest) {
       }
     }
     if (orderId && !cartId) {
-      // Try resolve from in-memory map (dev only)
-      const map: Map<string, string> | undefined = (global as any).orderCartMap
-      const mapped = map?.get(orderId)
-      if (mapped) {
-        return await handleComplete(mapped, orderId)
-      }
-      // Try KV-backed mapping
+      // SECURITY FIX: Resolve cartId from secure mapping service
       try {
-        const kvMapped = await kvGet<string>(`cf:order:cart:${orderId}`)
-        if (kvMapped) {
-          return await handleComplete(kvMapped, orderId)
+        const mapping = await getOrderCartMapping(orderId)
+        if (mapping) {
+          return await handleComplete(mapping.cartId, orderId)
         }
       } catch (err) {
+        console.error('[COMPLETE_API][mapping_resolve_error]')
       }
     }
     if (!cartId) return NextResponse.json({ error: 'cartId required' }, { status: 400 })
@@ -90,47 +86,35 @@ export async function POST(req: NextRequest) {
     try {
       // Security: If orderId provided, validate with Cashfree before completing
       if (orderId) {
-      // SECURITY FIX: Verify orderId belongs to this cartId (prevent payment hijacking)
-      const mappedCartId = await kvGet<string>(`cf:order:cart:${orderId}`)
-      if (!mappedCartId) {
-        // Fallback to in-memory map
-        const map: Map<string, string> | undefined = (global as any).orderCartMap
-        const memMappedCartId = map?.get(orderId)
-        if (!memMappedCartId || memMappedCartId !== cartId) {
-          console.error('[COMPLETE_API][security_violation]', { 
-            orderId, 
-            cartId, 
-            mappedCartId: memMappedCartId,
-            reason: 'orderId does not belong to this cartId' 
-          })
+        // SECURITY FIX: Verify orderId belongs to this cartId using new mapping service
+        const mapping = await getOrderCartMapping(orderId)
+        
+        if (!mapping) {
+          console.error('[COMPLETE_API][security_violation] No mapping found')
           return NextResponse.json({
             error: 'invalid_order',
             message: 'This payment does not belong to your cart',
           }, { status: 403 })
         }
-      } else if (mappedCartId !== cartId) {
-        console.error('[COMPLETE_API][security_violation]', { 
-          orderId, 
-          cartId, 
-          mappedCartId,
-          reason: 'orderId belongs to different cartId' 
-        })
-        return NextResponse.json({
-          error: 'invalid_order',
-          message: 'This payment does not belong to your cart',
-        }, { status: 403 })
-      }
-
-      const validation = await validateCashfreeOrder(orderId)
-      if (!validation.valid) {
-        try { console.error('[COMPLETE_API][validation_failed]', { orderId, error: validation.error, status: validation.status }) } catch {}
-        return NextResponse.json({
-          error: 'payment_validation_failed',
-          details: validation.error,
-          orderStatus: validation.status,
-        }, { status: 400 })
-      }
-      try { console.log('[COMPLETE_API][validation_success]', { orderId, status: validation.status, amount: validation.amount }) } catch {}
+        
+        if (mapping.cartId !== cartId) {
+          console.error('[COMPLETE_API][security_violation] Cart ID mismatch')
+          return NextResponse.json({
+            error: 'invalid_order',
+            message: 'This payment does not belong to your cart',
+          }, { status: 403 })
+        }
+        
+        const validation = await validateCashfreeOrder(orderId)
+        if (!validation.valid) {
+          try { console.error('[COMPLETE_API][validation_failed]', { orderId, error: validation.error, status: validation.status }) } catch {}
+          return NextResponse.json({
+            error: 'payment_validation_failed',
+            details: validation.error,
+            orderStatus: validation.status,
+          }, { status: 400 })
+        }
+        try { console.log('[COMPLETE_API][validation_success]', { orderId, status: validation.status, amount: validation.amount }) } catch {}
       }
 
       // Double-check: Verify cart hasn't been completed by another request

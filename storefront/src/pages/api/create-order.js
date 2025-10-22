@@ -1,9 +1,6 @@
 // pages/api/create-order.js
 import fetch from 'node-fetch';
-
-// In-memory map to reconcile Cashfree order_id to Medusa cartId (dev-only)
-const orderCartMap = global.orderCartMap || new Map();
-global.orderCartMap = orderCartMap;
+import { storeOrderCartMapping } from '../../lib/cashfreeMapping.ts';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -60,22 +57,21 @@ export default async function handler(req, res) {
     if (!response.ok) {
       return res.status(response.status).json({ error: 'create-order failed', details: data });
     }
-    try {
-      if (orderId && cartId) {
-        orderCartMap.set(String(orderId), String(cartId));
-        // Auto-expire mapping after 1 hour
-        setTimeout(() => orderCartMap.delete(String(orderId)), 60 * 60 * 1000).unref?.();
-        // Also persist mapping in KV via app route for resilience across instances
-        try {
-          const appOrigin = process.env.CASHFREE_RETURN_ORIGIN || process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://127.0.0.1:3000'
-          fetch(`${appOrigin}/api/cashfree/map`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderId: String(orderId), cartId: String(cartId) })
-          }).catch(() => {})
-        } catch {}
+    
+    // SECURITY FIX: Store secure order-cart mapping with cryptographic binding
+    if (orderId && cartId) {
+      try {
+        await storeOrderCartMapping(
+          String(orderId),
+          String(cartId),
+          Number(orderAmount),
+          'INR'
+        );
+      } catch (mappingError) {
+        console.error('[CREATE_ORDER][mapping_error]');
+        // Continue even if mapping fails - order was created successfully
       }
-    } catch {}
+    }
 
     return res.status(200).json(data);
   } catch (err) {
