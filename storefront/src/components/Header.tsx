@@ -16,6 +16,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const [isOnCartPage, setIsOnCartPage] = useState<boolean>(false);
   const [isOnOrderConfirmation, setIsOnOrderConfirmation] = useState<boolean>(false);
   const [lastSeenCount, setLastSeenCount] = useState<number>(0);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -113,17 +114,33 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           </div>
 
           <div className="flex items-center">
-            <nav className={styles.navContainer}>
-              {[
-                { label: 'Home', href: '/' },
-                { label: 'Shop', href: '/products' },
-                { label: 'About', href: '#' },
-                { label: 'Contact', href: '/contact' },
-              ].map((link) => (
-                <a key={link.label} className={styles.navLink} href={link.href}>
-                  {link.label}
-                </a>
-              ))}
+            <nav className={`${styles.navContainer} ${isProfileMenuOpen ? styles.profileMenuOpen : ''}`}>
+              <div className={`${styles.navLinksWrapper} ${isProfileMenuOpen ? styles.fadeOut : styles.fadeIn}`}>
+                {[
+                  { label: 'Home', href: '/' },
+                  { label: 'Shop', href: '/products' },
+                  { label: 'About', href: '#' },
+                  { label: 'Contact', href: '/contact' },
+                ].map((link) => (
+                  <a key={link.label} className={styles.navLink} href={link.href}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+              <div className={`${styles.profileMenuWrapper} ${isProfileMenuOpen ? styles.fadeIn : styles.fadeOut}`}>
+                {[
+                  { label: 'Account Details', href: '#' },
+                  { label: 'Order History', href: '#' },
+                  { label: 'Wishlist', href: '#' },
+                  { label: 'Address Book', href: '#' },
+                  { label: 'Payment Methods', href: '#' },
+                  { label: 'Security', href: '#' },
+                ].map((link) => (
+                  <a key={link.label} className={styles.navLink} href={link.href}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </nav>
 
             {hydrated && session?.user && (
@@ -139,6 +156,16 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
               <button className={styles.iconButton} aria-label="Search">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M229.66 218.34l-50.07-50.06a88.11 88.11 0 10-11.31 11.31l50.06 50.07a8 8 0 0011.32-11.32zM40 112a72 72 0 1172 72 72.08 72.08 0 01-72-72z" />
+                </svg>
+              </button>
+
+              <button 
+                className={styles.iconButton} 
+                aria-label="User Profile"
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M230.92 212c-15.23-26.33-38.7-45.21-66.09-54.16a72 72 0 10-73.66 0C63.78 166.79 40.31 185.67 25.08 212a8 8 0 1013.85 8c18.84-32.56 52.14-52 89.07-52s70.23 19.44 89.07 52a8 8 0 1013.85-8zM72 96a56 56 0 1156 56 56.06 56.06 0 01-56-56z" />
                 </svg>
               </button>
 
