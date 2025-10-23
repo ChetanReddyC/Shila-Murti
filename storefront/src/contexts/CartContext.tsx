@@ -198,6 +198,11 @@ export function CartProvider({ children }: CartProviderProps) {
     params: any[];
   } | null>(null);
 
+  // Performance Enhancement: Prevent concurrent refresh calls
+  // Addresses Security Audit Issue #11A: N+1 Query Problem
+  const refreshInProgressRef = useRef(false);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Secure session management using httpOnly cookies via API
   const saveCartIdToSession = React.useCallback(async (cartId: string): Promise<void> => {
     try {
@@ -484,13 +489,18 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Refresh cart from API with enhanced error handling
   const refreshCart = React.useCallback(async (): Promise<void> => {
-    // Lock removed - backend guard handles duplicate prevention
+    // Performance Enhancement: Prevent concurrent refresh calls
+    if (refreshInProgressRef.current) {
+      return;
+    }
+
     const cartId = state.cartId || await getCartIdFromSession();
 
     if (!cartId) {
       return;
     }
 
+    refreshInProgressRef.current = true;
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     setLastOperation({ type: 'refreshCart', params: [] });
@@ -515,8 +525,33 @@ export function CartProvider({ children }: CartProviderProps) {
         const errorMessage = handleApiError(error);
         dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
+    } finally {
+      refreshInProgressRef.current = false;
     }
   }, [state.cartId, handleCartExpiration, handleApiError, getCartIdFromSession]);
+
+  // Performance Enhancement: Debounced version of refreshCart for useEffect hooks
+  // Addresses Security Audit Issue #11A: N+1 Query Problem
+  const debouncedRefreshCart = React.useCallback(() => {
+    // Clear any pending refresh
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+
+    // Schedule new refresh with 300ms debounce
+    refreshTimeoutRef.current = setTimeout(() => {
+      refreshCart();
+    }, 300);
+  }, [refreshCart]);
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Add item to cart with enhanced session management
   const addToCart = React.useCallback(async (variantId: string, quantity: number): Promise<void> => {
@@ -831,17 +866,17 @@ export function CartProvider({ children }: CartProviderProps) {
     return state.cart.items.reduce((total, item) => total + item.quantity, 0);
   }, [state.cart]);
 
-  // Validate cart session integrity
-  const validateCartSession = React.useCallback(async (cartId: string): Promise<boolean> => {
-    // Lock removed - backend guard handles duplicate prevention
+  // Validate cart session integrity and return cart data
+  // Performance Enhancement: Return cart data to avoid redundant fetch
+  const validateCartSession = React.useCallback(async (cartId: string): Promise<{ valid: boolean; cart?: MedusaCart }> => {
     try {
       const cart = await medusaApiClient.getCart(cartId);
       if ((cart as any)?.completed_at) {
-        return false;
+        return { valid: false };
       }
-      return true;
+      return { valid: true, cart };
     } catch (error) {
-      return false;
+      return { valid: false };
     }
   }, []);
 
@@ -858,11 +893,12 @@ export function CartProvider({ children }: CartProviderProps) {
       }
 
       if (savedCartId) {
-        // Validate the cart session before using it
-        const isValidSession = await validateCartSession(savedCartId);
-        if (isValidSession) {
+        // Performance Enhancement: Validate and load cart in single API call
+        // Previously: validateCartSession fetched cart, then refreshCart fetched again (N+1 problem)
+        const validation = await validateCartSession(savedCartId);
+        if (validation.valid && validation.cart) {
           dispatch({ type: 'SET_CART_ID', payload: savedCartId });
-          await refreshCart();
+          dispatch({ type: 'SET_CART', payload: validation.cart });
         } else {
           await removeCartIdFromSession();
           dispatch({ type: 'CLEAR_CART' });
@@ -873,7 +909,10 @@ export function CartProvider({ children }: CartProviderProps) {
     };
 
     initializeCart();
-  }, [getCartIdFromSession, removeCartIdFromSession, validateCartSession, refreshCart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Note: refreshCart is intentionally not in deps - initialization should only run once on mount
+    // to prevent N+1 query problem. The function is stable enough for this use case.
+  }, [getCartIdFromSession, removeCartIdFromSession, validateCartSession]);
 
   // Protection lock removed - browser back/forward handler no longer needed
 
@@ -896,12 +935,13 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Handle page visibility changes to refresh cart when user returns
   useEffect(() => {
-    const handleVisibilityChange = async () => {
+    const handleVisibilityChange = () => {
       if (!document.hidden && state.cartId) {
         // Do not auto-refresh on order confirmation page to avoid flicker/redirects
         const path = typeof window !== 'undefined' ? window.location.pathname : ''
         if (path && path.startsWith('/order-confirmation')) return
-        await refreshCart();
+        // Use debounced refresh to prevent rapid visibility changes from causing multiple API calls
+        debouncedRefreshCart();
       }
     };
 
@@ -910,15 +950,15 @@ export function CartProvider({ children }: CartProviderProps) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [state.cartId, refreshCart]);
+  }, [state.cartId, debouncedRefreshCart]);
 
   // Handle network connectivity changes to ensure cart persistence
   useEffect(() => {
-    const handleOnline = async () => {
-
+    const handleOnline = () => {
       // If we have a cart ID but no cart data, try to refresh
+      // Use debounced refresh to prevent rapid network flickers from causing multiple API calls
       if (state.cartId && !state.cart) {
-        await refreshCart();
+        debouncedRefreshCart();
       }
     };
 
@@ -933,7 +973,7 @@ export function CartProvider({ children }: CartProviderProps) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [state.cartId, state.cart, refreshCart]);
+  }, [state.cartId, state.cart, debouncedRefreshCart]);
 
   // Security Enhancement: Periodic session rotation check
   // Addresses Issue #9: Session Management Weaknesses

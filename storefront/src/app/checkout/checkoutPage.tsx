@@ -21,17 +21,9 @@ export default function CheckoutPage() {
 
   const { authenticate } = usePasskey();
 
-
-
-  // Ensure we have fresh cart data when entering checkout
-
-  useEffect(() => {
-
-    refreshCart();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-
-  }, []);
+  // Performance Enhancement: Removed redundant refreshCart() call
+  // CartContext already loads cart on initialization - no need to call it again here
+  // This was causing N+1 query problem (multiple concurrent API calls on mount)
 
 
 
