@@ -1,6 +1,19 @@
+/**
+ * Enhanced Cart Session API
+ * 
+ * Security Audit Issue #9 Fix: Session Management Weaknesses
+ * 
+ * Features:
+ * - Cryptographically secure session tokens
+ * - Idle timeout (1 hour) and session expiration (7 days)
+ * - Automatic session rotation for long-lived sessions
+ * - Device fingerprinting and validation
+ * - IP address tracking
+ * - HttpOnly + Secure + SameSite cookies
+ */
+
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { kvGet, kvSet, kvDel } from "../../../utils/kv"
-import crypto from "crypto"
+import { SessionManager } from "../../../services/SessionManager"
 
 // Helper to parse cookies from Cookie header (Medusa doesn't auto-parse cookies)
 function parseCookies(cookieHeader?: string): Record<string, string> {
@@ -17,30 +30,8 @@ function parseCookies(cookieHeader?: string): Record<string, string> {
 
 const CART_SESSION_COOKIE = 'cart_session_token'
 const CART_SESSION_TTL = 86400 * 7 // 7 days in seconds
-const CART_SESSION_KEY_PREFIX = 'cart:session:'
 
-interface CartSession {
-  sessionId: string
-  cartId: string
-  userId?: string
-  createdAt: number
-  updatedAt: number
-  fingerprint?: string
-}
-
-function generateSessionToken(): string {
-  return crypto.randomBytes(32).toString('hex')
-}
-
-function generateFingerprint(req: MedusaRequest): string {
-  const userAgent = req.headers['user-agent'] || ''
-  const acceptLanguage = req.headers['accept-language'] || ''
-  const acceptEncoding = req.headers['accept-encoding'] || ''
-  const fingerprint = `${userAgent}|${acceptLanguage}|${acceptEncoding}`
-  return crypto.createHash('sha256').update(fingerprint).digest('hex').substring(0, 16)
-}
-
-// GET - Retrieve current cart session
+// GET - Retrieve current cart session (with validation)
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
     const cookies = parseCookies(req.headers.cookie as string | undefined)
@@ -53,34 +44,49 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       })
     }
 
-    const session = await kvGet<CartSession>(`${CART_SESSION_KEY_PREFIX}${sessionToken}`)
+    // Validate session (checks expiration, idle timeout, fingerprint)
+    const validation = await SessionManager.validateSession(req, sessionToken)
     
-    if (!session) {
-      res.setHeader('Set-Cookie', `${CART_SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`)
+    if (!validation.valid) {
+      // Clear invalid cookie
+      const cookieValue = [
+        `${CART_SESSION_COOKIE}=`,
+        'HttpOnly',
+        process.env.NODE_ENV === 'production' ? 'Secure' : '',
+        'SameSite=Lax',
+        'Max-Age=0',
+        'Path=/'
+      ].filter(Boolean).join('; ')
+      
+      res.setHeader('Set-Cookie', cookieValue)
+      
       return res.json({ 
         session: null,
-        message: 'Session expired or invalid' 
+        message: `Session ${validation.reason}`,
+        reason: validation.reason
       })
     }
 
-    // Update last accessed time
-    const updatedSession = {
-      ...session,
-      updatedAt: Date.now()
+    // Check if session needs rotation
+    if (validation.requiresRotation) {
+      return res.json({ 
+        session: {
+          cartId: validation.session!.cartId,
+          userId: validation.session!.userId,
+          createdAt: validation.session!.createdAt,
+          lastAccessedAt: validation.session!.lastAccessedAt
+        },
+        requiresRotation: true,
+        message: 'Session valid but rotation recommended'
+      })
     }
-    
-    await kvSet(
-      `${CART_SESSION_KEY_PREFIX}${sessionToken}`,
-      updatedSession,
-      CART_SESSION_TTL
-    )
 
     return res.json({ 
       session: {
-        cartId: session.cartId,
-        userId: session.userId,
-        createdAt: session.createdAt,
-        updatedAt: updatedSession.updatedAt
+        cartId: validation.session!.cartId,
+        userId: validation.session!.userId,
+        createdAt: validation.session!.createdAt,
+        lastAccessedAt: validation.session!.lastAccessedAt
       },
       message: 'Session retrieved successfully' 
     })
@@ -99,8 +105,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     console.log('[CART_SESSION] POST request received', {
       hasBody: !!req.body,
-      body: req.body,
-      cookieHeader: req.headers.cookie,
       hasPublishableKey: !!req.headers['x-publishable-api-key']
     })
     
@@ -114,57 +118,38 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     }
 
     const cookies = parseCookies(req.headers.cookie as string | undefined)
-    let sessionToken = cookies[CART_SESSION_COOKIE]
-    let session: CartSession | null = null
+    const existingToken = cookies[CART_SESSION_COOKIE]
     
-    if (sessionToken) {
-      session = await kvGet<CartSession>(`${CART_SESSION_KEY_PREFIX}${sessionToken}`)
-    }
-
-    const fingerprint = generateFingerprint(req)
-    const now = Date.now()
-
-    if (session) {
-      // Update existing session
-      session = {
-        ...session,
-        cartId,
-        userId: userId || session.userId,
-        updatedAt: now,
-        fingerprint
+    let sessionToken: string
+    let sessionData
+    
+    // Check if updating existing session
+    if (existingToken) {
+      const validation = await SessionManager.validateSession(req, existingToken)
+      
+      if (validation.valid && validation.session) {
+        // Update existing session
+        await SessionManager.updateSession(existingToken, { cartId, userId })
+        sessionToken = existingToken
+        sessionData = validation.session
+        
+        console.log('[CART_SESSION] Updated existing session', {
+          sessionId: existingToken.substring(0, 12) + '...',
+          cartId,
+          userId: userId ? userId.substring(0, 8) + '...' : 'guest'
+        })
+      } else {
+        // Session invalid, create new one
+        const result = await SessionManager.createSession(req, cartId, userId)
+        sessionToken = result.token
+        sessionData = result.session
       }
-      
-      console.log('[CART_SESSION] Updating existing session', {
-        sessionId: session.sessionId.substring(0, 8) + '...',
-        cartId,
-        userId
-      })
-      
     } else {
       // Create new session
-      sessionToken = generateSessionToken()
-      session = {
-        sessionId: sessionToken,
-        cartId,
-        userId,
-        createdAt: now,
-        updatedAt: now,
-        fingerprint
-      }
-      
-      console.log('[CART_SESSION] Creating new session', {
-        sessionId: session.sessionId.substring(0, 8) + '...',
-        cartId,
-        userId
-      })
+      const result = await SessionManager.createSession(req, cartId, userId)
+      sessionToken = result.token
+      sessionData = result.session
     }
-
-    // Store session in KV store
-    await kvSet(
-      `${CART_SESSION_KEY_PREFIX}${sessionToken}`,
-      session,
-      CART_SESSION_TTL
-    )
 
     // Set httpOnly cookie
     const isProduction = process.env.NODE_ENV === 'production'
@@ -172,7 +157,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       `${CART_SESSION_COOKIE}=${sessionToken}`,
       'HttpOnly',
       isProduction ? 'Secure' : '',
-      'SameSite=Lax', // Changed from Strict to Lax for cross-origin requests
+      'SameSite=Lax',
       `Max-Age=${CART_SESSION_TTL}`,
       'Path=/'
     ].filter(Boolean).join('; ')
@@ -181,8 +166,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     return res.json({ 
       success: true,
-      sessionId: session.sessionId,
-      cartId: session.cartId,
+      sessionId: sessionData.sessionId,
+      cartId: sessionData.cartId,
       message: 'Session created/updated successfully'
     })
     
@@ -202,14 +187,24 @@ export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
     const sessionToken = cookies[CART_SESSION_COOKIE]
     
     if (sessionToken) {
-      await kvDel(`${CART_SESSION_KEY_PREFIX}${sessionToken}`)
+      await SessionManager.deleteSession(sessionToken)
       
       console.log('[CART_SESSION] Session deleted', {
-        sessionToken: sessionToken.substring(0, 8) + '...'
+        sessionToken: sessionToken.substring(0, 12) + '...'
       })
     }
 
-    res.setHeader('Set-Cookie', `${CART_SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/`)
+    // Clear cookie
+    const cookieValue = [
+      `${CART_SESSION_COOKIE}=`,
+      'HttpOnly',
+      process.env.NODE_ENV === 'production' ? 'Secure' : '',
+      'SameSite=Lax',
+      'Max-Age=0',
+      'Path=/'
+    ].filter(Boolean).join('; ')
+    
+    res.setHeader('Set-Cookie', cookieValue)
 
     return res.json({ 
       success: true,
@@ -220,6 +215,56 @@ export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
     console.error('[CART_SESSION] DELETE error:', error)
     return res.status(500).json({ 
       error: 'Failed to clear session',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    })
+  }
+}
+
+// PUT - Rotate session (for long-lived sessions)
+export async function PUT(req: MedusaRequest, res: MedusaResponse) {
+  try {
+    const cookies = parseCookies(req.headers.cookie as string | undefined)
+    const oldSessionToken = cookies[CART_SESSION_COOKIE]
+    
+    if (!oldSessionToken) {
+      return res.status(400).json({ 
+        error: 'No active session to rotate' 
+      })
+    }
+
+    const result = await SessionManager.rotateSession(req, oldSessionToken)
+    
+    if (!result) {
+      return res.status(400).json({ 
+        error: 'Failed to rotate session - session invalid' 
+      })
+    }
+
+    // Set new session cookie
+    const isProduction = process.env.NODE_ENV === 'production'
+    const cookieValue = [
+      `${CART_SESSION_COOKIE}=${result.token}`,
+      'HttpOnly',
+      isProduction ? 'Secure' : '',
+      'SameSite=Lax',
+      `Max-Age=${CART_SESSION_TTL}`,
+      'Path=/'
+    ].filter(Boolean).join('; ')
+
+    res.setHeader('Set-Cookie', cookieValue)
+
+    return res.json({ 
+      success: true,
+      sessionId: result.session.sessionId,
+      cartId: result.session.cartId,
+      rotationCount: result.session.rotationCount,
+      message: 'Session rotated successfully' 
+    })
+    
+  } catch (error) {
+    console.error('[CART_SESSION] PUT (rotate) error:', error)
+    return res.status(500).json({ 
+      error: 'Failed to rotate session',
       message: error instanceof Error ? error.message : 'Unknown error'
     })
   }
