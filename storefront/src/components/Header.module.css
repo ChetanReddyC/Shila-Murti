@@ -51,13 +51,60 @@
   margin-right: 2.5rem;
   position: relative;
   z-index: 30;
+  min-height: 24px;
+  min-width: 400px;
+}
+
+.navLinksWrapper,
+.profileMenuWrapper {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  position: absolute;
+  left: 0;
+  white-space: nowrap;
+  will-change: transform, opacity;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fadeIn {
+  animation: slideInFromLeft 0.15s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+.fadeOut {
+  animation: slideOutToRight 0.15s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+@keyframes slideInFromLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+}
+
+@keyframes slideOutToRight {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(50px);
+    pointer-events: none;
+  }
 }
 
 .navLink {
   font-size: 0.9375rem;
   font-weight: 500;
   color: #000000;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 
@@ -122,6 +169,12 @@
   .navContainer {
     gap: 1.5rem;
     margin-right: 1.5rem;
+    min-width: 300px;
+  }
+
+  .navLinksWrapper,
+  .profileMenuWrapper {
+    gap: 1.5rem;
   }
 
   .header {
@@ -132,7 +185,11 @@
 @media (max-width: 640px) {
   .navContainer {
     display: none;
-    /* Hide normal nav on mobile */
+  }
+
+  .navLinksWrapper,
+  .profileMenuWrapper {
+    display: none;
   }
 
   .brand {
