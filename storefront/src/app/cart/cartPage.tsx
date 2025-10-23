@@ -29,11 +29,9 @@ export default function CartPage() {
   // const [operationSuccess, setOperationSuccess] = useState<string | null>(null);
   // const [operationError, setOperationError] = useState<string | null>(null);
 
-  // Refresh cart data on first mount (context also initializes on mount)
-  useEffect(() => {
-    refreshCart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Performance Enhancement: Removed redundant refreshCart() call
+  // CartContext already loads cart on initialization - no need to call it again here
+  // This was causing N+1 query problem (multiple concurrent API calls on mount)
 
   // Use centralized currency formatting
   // NOTE: Our backend amounts are already stored in rupees (not cents).
