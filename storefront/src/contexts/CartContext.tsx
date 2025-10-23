@@ -244,6 +244,14 @@ export function CartProvider({ children }: CartProviderProps) {
       }
 
       const data = await response.json();
+      
+      // Security Enhancement: Detect if session needs rotation
+      // Note: Actual rotation is handled separately to avoid circular dependencies
+      if (data.requiresRotation && data.session?.cartId) {
+        console.log('[CART] Session rotation recommended - will rotate in background');
+        // Rotation will be triggered by the rotation check effect
+      }
+      
       if (data.session && data.session.cartId) {
         return data.session.cartId;
       }
@@ -272,6 +280,41 @@ export function CartProvider({ children }: CartProviderProps) {
       }
     } catch (error) {
       console.error('[CART] Failed to clear session:', error);
+    }
+  }, []);
+
+  /**
+   * Security Enhancement: Rotate cart session
+   * 
+   * Addresses Security Audit Issue #9: Session Management Weaknesses
+   * - Rotates session token for long-lived sessions
+   * - Prevents session hijacking by limiting token lifetime
+   * - Maintains cart continuity during rotation
+   */
+  const rotateCartSession = React.useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await fetch(CART_SESSION_API, {
+        method: 'PUT',
+        headers: {
+          'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+        },
+        credentials: 'include' // Important: include cookies
+      });
+
+      if (!response.ok) {
+        console.error('[CART] Failed to rotate session:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      console.log('[CART] Session rotated successfully', {
+        rotationCount: data.rotationCount
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('[CART] Failed to rotate session:', error);
+      return false;
     }
   }, []);
 
@@ -891,6 +934,39 @@ export function CartProvider({ children }: CartProviderProps) {
       window.removeEventListener('offline', handleOffline);
     };
   }, [state.cartId, state.cart, refreshCart]);
+
+  // Security Enhancement: Periodic session rotation check
+  // Addresses Issue #9: Session Management Weaknesses
+  useEffect(() => {
+    if (!state.cartId) {
+      return;
+    }
+
+    // Check for session rotation requirement every 30 minutes
+    const rotationCheckInterval = setInterval(async () => {
+      try {
+        const response = await fetch(CART_SESSION_API, {
+          method: 'GET',
+          headers: {
+            'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+          },
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.requiresRotation) {
+            console.log('[CART] Session rotation required - rotating now');
+            await rotateCartSession();
+          }
+        }
+      } catch (error) {
+        console.error('[CART] Rotation check failed:', error);
+      }
+    }, 30 * 60 * 1000); // Check every 30 minutes
+
+    return () => clearInterval(rotationCheckInterval);
+  }, [state.cartId, rotateCartSession]);
 
   // Periodic cart session validation to ensure persistence
   useEffect(() => {
