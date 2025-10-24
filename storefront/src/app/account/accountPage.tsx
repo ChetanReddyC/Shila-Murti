@@ -6,10 +6,13 @@ import styles from './accountPage.module.css';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSession, signIn } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 const PasskeySection = dynamic(() => import('./PasskeySection'), { ssr: false })
 
 export default function AccountPage() {
-  const [activeTab, setActiveTab] = useState('Account Details');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam || 'Account Details');
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [orders, setOrders] = useState<Array<{ id: string; orderId: string; date: string; item: string; status: string }>>([]);
@@ -34,6 +37,13 @@ export default function AccountPage() {
     'Payment Methods',
     'Security'
   ];
+
+  // Update active tab when URL parameter changes
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   useEffect(() => {
     try {
@@ -383,13 +393,14 @@ export default function AccountPage() {
               {/* Navigation Tabs */}
               <div className={styles.navigationMenu}>
                 {navigationItems.map((item) => (
-                  <div
+                  <Link
                     key={item}
+                    href={`/account?tab=${encodeURIComponent(item)}`}
                     className={`${styles.navItem} ${activeTab === item ? styles.navItemActive : ''}`}
                     onClick={() => setActiveTab(item)}
                   >
                     {item}
-                  </div>
+                  </Link>
                 ))}
               </div>
               

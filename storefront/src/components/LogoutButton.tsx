@@ -45,17 +45,30 @@ const LogoutButton = () => {
     <button 
       onClick={handleLogout}
       style={{ 
-        background: 'none', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         border: 'none', 
-        color: '#141414', 
+        color: '#ffffff', 
         cursor: 'pointer',
-        fontSize: '14px',
-        padding: '8px 12px',
-        borderRadius: '4px',
-        transition: 'background-color 0.2s'
+        fontSize: '0.8125rem',
+        fontWeight: '600',
+        padding: '0.5rem 1rem',
+        borderRadius: '8px',
+        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+        letterSpacing: '0.02em'
       }}
-      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
-      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-2px)'
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
+      }}
+      onMouseDown={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = '0 1px 4px rgba(102, 126, 234, 0.3)'
+      }}
     >
       Logout
     </button>
