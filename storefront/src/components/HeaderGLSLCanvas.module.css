@@ -1,0 +1,15 @@
+.headerGlslCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 30;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .headerGlslCanvas {
+    height: 55px;
+  }
+}

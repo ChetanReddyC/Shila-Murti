@@ -7,6 +7,8 @@ import { isOrderConfirmationProtectionActive } from '../utils/orderConfirmationP
 import styles from './Header.module.css';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import HeaderGLSLCanvas from './HeaderGLSLCanvas';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
@@ -18,6 +20,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const [isOnOrderConfirmation, setIsOnOrderConfirmation] = useState<boolean>(false);
   const [lastSeenCount, setLastSeenCount] = useState<number>(0);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
+  const [toggleCount, setToggleCount] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -121,7 +124,9 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         <div
           className="absolute inset-0 z-20 overflow-hidden"
           style={{ boxShadow: 'inset 2px 2px 1px 0 rgba(255, 255, 255, 0), inset -1px -1px 1px 1px rgba(255, 255, 255, 0)' }}
-        />
+        >
+          <HeaderGLSLCanvas />
+        </div>
 
         <div className="relative z-30 flex w-full items-center">
           <div className={styles.brandContainer}>
@@ -130,60 +135,199 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
 
           <div className={styles.rightSection}>
             <nav className={`${styles.navContainer} ${isProfileMenuOpen ? styles.profileMenuOpen : ''}`}>
-              <div className={`${styles.navLinksWrapper} ${isProfileMenuOpen ? styles.fadeOut : styles.fadeIn}`}>
-                {[
-                  { label: 'Home', href: '/' },
-                  { label: 'Shop', href: '/products' },
-                  { label: 'About', href: '#' },
-                  { label: 'Contact', href: '/contact' },
-                ].map((link) => (
-                  <a key={link.label} className={styles.navLink} href={link.href}>
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-              <div className={`${styles.profileMenuWrapper} ${isProfileMenuOpen ? styles.fadeIn : styles.fadeOut}`}>
-                {[
-                  { label: 'Account Details', href: '/account?tab=Account Details' },
-                  { label: 'Order History', href: '/account?tab=Order History' },
-                  { label: 'Wishlist', href: '/account?tab=Wishlist' },
-                  { label: 'Address Book', href: '/account?tab=Address Book' },
-                  { label: 'Payment Methods', href: '/account?tab=Payment Methods' },
-                  { label: 'Security', href: '/account?tab=Security' },
-                ].map((link) => (
-                  <a 
-                    key={link.label} 
-                    className={styles.navLink} 
-                    href={link.href}
-                    onClick={() => setIsProfileMenuOpen(false)}
-                  >
-                    {link.label}
-                  </a>
-                ))}
-                {hydrated && session?.user && (
-                  <button 
-                    className={styles.logoutLink}
-                    onClick={async () => {
-                      setIsProfileMenuOpen(false);
-                      try {
-                        const logoutRes = await fetch('/api/auth/logout', { method: 'POST' });
-                        if (typeof window !== 'undefined') {
-                          sessionStorage.clear();
-                          localStorage.removeItem('medusa_cart_id');
-                          localStorage.removeItem('checkout_form');
-                          localStorage.removeItem('checkout_identity');
-                          localStorage.removeItem('magic_verification_success');
+              <AnimatePresence mode="wait">
+                {!isProfileMenuOpen ? (
+                  <motion.div
+                    key="navLinks"
+                    className={styles.navLinksWrapper}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    variants={{
+                      visible: {
+                        transition: {
+                          staggerChildren: 0.06,
+                          delayChildren: 0.08
                         }
-                        await signOut({ callbackUrl: '/login', redirect: true });
-                      } catch (error) {
-                        console.error('[LOGOUT] Error:', error);
+                      },
+                      exit: {
+                        transition: {
+                          staggerChildren: 0.04,
+                          staggerDirection: -1
+                        }
                       }
                     }}
                   >
-                    Logout
-                  </button>
+                    {[
+                      { label: 'Home', href: '/' },
+                      { label: 'Shop', href: '/products' },
+                      { label: 'About', href: '#' },
+                      { label: 'Contact', href: '/contact' },
+                    ].map((link) => (
+                      <motion.a
+                        key={link.label}
+                        className={styles.navLink}
+                        href={link.href}
+                        variants={{
+                          hidden: {
+                            opacity: 0,
+                            x: 30,
+                            y: -8,
+                            scale: 0.92
+                          },
+                          visible: {
+                            opacity: 1,
+                            x: 0,
+                            y: 0,
+                            scale: 1,
+                            transition: {
+                              type: 'spring',
+                              stiffness: 300,
+                              damping: 24,
+                              mass: 0.6
+                            }
+                          },
+                          exit: {
+                            opacity: 0,
+                            x: -30,
+                            y: 8,
+                            scale: 0.92,
+                            transition: {
+                              duration: 0.15,
+                              ease: [0.4, 0, 1, 1]
+                            }
+                          }
+                        }}
+                      >
+                        {link.label}
+                      </motion.a>
+                    ))}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="profileMenu"
+                    className={styles.profileMenuWrapper}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    variants={{
+                      visible: {
+                        transition: {
+                          staggerChildren: 0.06,
+                          delayChildren: 0.04
+                        }
+                      },
+                      exit: {
+                        transition: {
+                          staggerChildren: 0.04,
+                          staggerDirection: -1
+                        }
+                      }
+                    }}
+                  >
+                    {[
+                      { label: 'Account Details', href: '/account?tab=Account Details' },
+                      { label: 'Order History', href: '/account?tab=Order History' },
+                      { label: 'Wishlist', href: '/account?tab=Wishlist' },
+                      { label: 'Address Book', href: '/account?tab=Address Book' },
+                      { label: 'Payment Methods', href: '/account?tab=Payment Methods' },
+                      { label: 'Security', href: '/account?tab=Security' },
+                    ].map((link) => (
+                      <motion.a
+                        key={link.label}
+                        className={styles.navLink}
+                        href={link.href}
+                        onClick={() => setIsProfileMenuOpen(false)}
+                        variants={{
+                          hidden: {
+                            opacity: 0,
+                            x: 30,
+                            y: -6,
+                            scale: 0.94
+                          },
+                          visible: {
+                            opacity: 1,
+                            x: 0,
+                            y: 0,
+                            scale: 1,
+                            transition: {
+                              type: 'spring',
+                              stiffness: 300,
+                              damping: 24,
+                              mass: 0.6
+                            }
+                          },
+                          exit: {
+                            opacity: 0,
+                            x: -30,
+                            y: 6,
+                            scale: 0.94,
+                            transition: {
+                              duration: 0.15,
+                              ease: [0.4, 0, 1, 1]
+                            }
+                          }
+                        }}
+                      >
+                        {link.label}
+                      </motion.a>
+                    ))}
+                    {hydrated && session?.user && (
+                      <motion.button
+                        className={styles.logoutLink}
+                        variants={{
+                          hidden: {
+                            opacity: 0,
+                            x: 30,
+                            y: -6,
+                            scale: 0.94
+                          },
+                          visible: {
+                            opacity: 1,
+                            x: 0,
+                            y: 0,
+                            scale: 1,
+                            transition: {
+                              type: 'spring',
+                              stiffness: 300,
+                              damping: 24,
+                              mass: 0.6
+                            }
+                          },
+                          exit: {
+                            opacity: 0,
+                            x: -30,
+                            y: 6,
+                            scale: 0.94,
+                            transition: {
+                              duration: 0.15,
+                              ease: [0.4, 0, 1, 1]
+                            }
+                          }
+                        }}
+                        onClick={async () => {
+                          setIsProfileMenuOpen(false);
+                          try {
+                            const logoutRes = await fetch('/api/auth/logout', { method: 'POST' });
+                            if (typeof window !== 'undefined') {
+                              sessionStorage.clear();
+                              localStorage.removeItem('medusa_cart_id');
+                              localStorage.removeItem('checkout_form');
+                              localStorage.removeItem('checkout_identity');
+                              localStorage.removeItem('magic_verification_success');
+                            }
+                            await signOut({ callbackUrl: '/login', redirect: true });
+                          } catch (error) {
+                            console.error('[LOGOUT] Error:', error);
+                          }
+                        }}
+                      >
+                        Logout
+                      </motion.button>
+                    )}
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
             </nav>
 
             <div className={styles.iconContainer}>
@@ -196,7 +340,10 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
               <button 
                 className={`${styles.iconButton} ${isProfileMenuOpen ? styles.iconButtonActive : ''}`}
                 aria-label="User Profile"
-                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                onClick={() => {
+                  setIsProfileMenuOpen(!isProfileMenuOpen);
+                  setToggleCount(prev => prev + 1);
+                }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M230.92 212c-15.23-26.33-38.7-45.21-66.09-54.16a72 72 0 10-73.66 0C63.78 166.79 40.31 185.67 25.08 212a8 8 0 1013.85 8c18.84-32.56 52.14-52 89.07-52s70.23 19.44 89.07 52a8 8 0 1013.85-8zM72 96a56 56 0 1156 56 56.06 56.06 0 01-56-56z" />
@@ -219,9 +366,23 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                     <path d="M216 40H40A16 16 0 0024 56v144a16 16 0 0016 16h176a16 16 0 0016-16V56a16 16 0 00-16-16zm0 160H40V56h176zM176 88a48 48 0 01-96 0 8 8 0 0116 0 32 32 0 0064 0 8 8 0 0116 0z" />
                   </svg>
-                  {shouldShowBadge && (
-                    <span className={`${styles.cartBadge} ${cartLoading ? styles.cartBadgeLoading : ''}`}>{totalItems}</span>
-                  )}
+                  <AnimatePresence>
+                    {shouldShowBadge && (
+                      <motion.span
+                        key="cart-badge"
+                        className={`${styles.cartBadge} ${cartLoading ? styles.cartBadgeLoading : ''}`}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{ 
+                          duration: 0.3,
+                          ease: [0.175, 0.885, 0.32, 1.275]
+                        }}
+                      >
+                        {totalItems}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </div>
               </a>
             </div>

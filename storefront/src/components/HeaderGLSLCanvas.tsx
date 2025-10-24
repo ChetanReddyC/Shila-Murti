@@ -1,0 +1,177 @@
+'use client';
+
+import { useRef, useEffect } from 'react';
+import styles from './HeaderGLSLCanvas.module.css';
+
+const vsSource = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() {
+    v_uv = a_pos * 0.5 + 0.5;
+    gl_Position = vec4(a_pos, 0.0, 1.0);
+  }
+`;
+
+const fsSource = `
+  precision highp float;
+  varying vec2 v_uv;
+  uniform float u_time;
+  uniform vec2 u_res;
+
+  // 2D noise
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123);
+  }
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+    u.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for(int i = 0; i < 5; i++) {
+      v += a * noise(p);
+      p = 2.0 * p + vec2(cos(u_time * 0.2), sin(u_time * 0.3));
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  void main() {
+    // normalized coordinates
+    vec2 uv = (v_uv - 0.5) * vec2(u_res.x / u_res.y, 1.0);
+    
+    // ZOOM EFFECT: Scale down UV to make smoke patterns bigger/closer
+    uv *= 0.4; // TWEAK: Lower = more zoomed (0.2-1.0)
+    
+    float t = u_time * 0.4;
+
+    // swirl field
+    float angleNoise = fbm(uv * 1.5 + vec2(0.0, -t));
+    float swirlAngle = (angleNoise - 0.5) * 3.1415;
+    mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
+    vec2 p = rot * uv;
+
+    // layered sinusoidal distortion
+    p += vec2(
+      sin((uv.y + t) * 3.0) * 0.2,
+      cos((uv.x - t) * 3.0) * 0.2
+    );
+
+    // compute density
+    float d = fbm(p * 1.3 - vec2(0.0, t * 0.6));
+    d *= 0.7; // TWEAK: Lower = less smoke (0.5-1.5)
+    float alpha = smoothstep(0.3, 0.6, d); // TWEAK: Higher first number = less visible
+
+    // Only show on right 40% of header
+    float rightMask = smoothstep(0.58, 0.62, v_uv.x);
+    
+    // Combine masks - removed vertical fade for full height
+    float final_mask = rightMask * alpha;
+
+    // Smoke color
+    vec3 fluid = vec3(0.15, 0.2, 0.25);
+    gl_FragColor = vec4(fluid, final_mask * 0.8); // TWEAK: Lower = more subtle (0.3-0.9)
+  }
+`;
+
+const HeaderGLSLCanvas = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Canvas WebGL setup and rendering
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
+    if (!gl) {
+      return;
+    }
+    
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    
+    // Set canvas size based on viewport
+    const updateCanvasSize = () => {
+      const viewportWidth = window.innerWidth;
+      // Header is 90% width at 1rem from top
+      canvas.width = Math.floor(viewportWidth * 0.9);
+      canvas.height = 65;
+      console.log('Canvas size set:', canvas.width, 'x', canvas.height);
+    };
+    
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    
+    // Also update on mount after a short delay
+    setTimeout(() => {
+      updateCanvasSize();
+      console.log('Canvas positioned, parent:', canvas.parentElement?.className);
+    }, 100);
+
+    const compile = (type: number, src: string) => {
+      const s = gl.createShader(type);
+      if (!s) return null;
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return s;
+    };
+
+    const vs = compile(gl.VERTEX_SHADER, vsSource);
+    const fs = compile(gl.FRAGMENT_SHADER, fsSource);
+
+    if (!vs || !fs) {
+      window.removeEventListener('resize', updateCanvasSize);
+      return;
+    }
+
+    const prog = gl.createProgram();
+    if (!prog) {
+      window.removeEventListener('resize', updateCanvasSize);
+      return;
+    }
+
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+    const posLoc = gl.getAttribLocation(prog, 'a_pos');
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const uTime = gl.getUniformLocation(prog, 'u_time');
+    const uRes = gl.getUniformLocation(prog, 'u_res');
+
+    const start = performance.now();
+    let animationFrameId: number;
+
+    const render = () => {
+      gl.uniform1f(uTime, (performance.now() - start) * 0.001);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', updateCanvasSize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className={styles.headerGlslCanvas} />;
+};
+
+export default HeaderGLSLCanvas;
