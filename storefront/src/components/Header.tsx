@@ -5,7 +5,8 @@ import { useSession } from 'next-auth/react';
 import { useCart } from '../contexts/CartContext';
 import { isOrderConfirmationProtectionActive } from '../utils/orderConfirmationProtection';
 import styles from './Header.module.css';
-import LogoutButton from './LogoutButton';
+import { signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
@@ -63,6 +64,20 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
     }
   }, [isOnCartPage, hasVisitedCart, getTotalItems]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const isClickInsideNav = target.closest('nav');
+      const isClickOnProfileButton = target.closest('[aria-label="User Profile"]');
+      if (!isClickInsideNav && !isClickOnProfileButton && isProfileMenuOpen) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isProfileMenuOpen]);
+
   const protectionActive = hydrated ? (isOrderConfirmationActive() || isOrderConfirmationProtectionActive()) : false;
   const preventCartNavigation = hydrated ? (isOnOrderConfirmation || protectionActive) : false;
   const totalItems = preventCartNavigation ? 0 : getTotalItems();
@@ -108,12 +123,12 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           style={{ boxShadow: 'inset 2px 2px 1px 0 rgba(255, 255, 255, 0), inset -1px -1px 1px 1px rgba(255, 255, 255, 0)' }}
         />
 
-        <div className="relative z-30 flex w-full justify-between items-center">
+        <div className="relative z-30 flex w-full items-center">
           <div className={styles.brandContainer}>
             <h2 className={styles.brand}>Shila Murthi</h2>
           </div>
 
-          <div className="flex items-center">
+          <div className={styles.rightSection}>
             <nav className={`${styles.navContainer} ${isProfileMenuOpen ? styles.profileMenuOpen : ''}`}>
               <div className={`${styles.navLinksWrapper} ${isProfileMenuOpen ? styles.fadeOut : styles.fadeIn}`}>
                 {[
@@ -129,28 +144,47 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
               </div>
               <div className={`${styles.profileMenuWrapper} ${isProfileMenuOpen ? styles.fadeIn : styles.fadeOut}`}>
                 {[
-                  { label: 'Account Details', href: '#' },
-                  { label: 'Order History', href: '#' },
-                  { label: 'Wishlist', href: '#' },
-                  { label: 'Address Book', href: '#' },
-                  { label: 'Payment Methods', href: '#' },
-                  { label: 'Security', href: '#' },
+                  { label: 'Account Details', href: '/account?tab=Account Details' },
+                  { label: 'Order History', href: '/account?tab=Order History' },
+                  { label: 'Wishlist', href: '/account?tab=Wishlist' },
+                  { label: 'Address Book', href: '/account?tab=Address Book' },
+                  { label: 'Payment Methods', href: '/account?tab=Payment Methods' },
+                  { label: 'Security', href: '/account?tab=Security' },
                 ].map((link) => (
-                  <a key={link.label} className={styles.navLink} href={link.href}>
+                  <a 
+                    key={link.label} 
+                    className={styles.navLink} 
+                    href={link.href}
+                    onClick={() => setIsProfileMenuOpen(false)}
+                  >
                     {link.label}
                   </a>
                 ))}
+                {hydrated && session?.user && (
+                  <button 
+                    className={styles.logoutLink}
+                    onClick={async () => {
+                      setIsProfileMenuOpen(false);
+                      try {
+                        const logoutRes = await fetch('/api/auth/logout', { method: 'POST' });
+                        if (typeof window !== 'undefined') {
+                          sessionStorage.clear();
+                          localStorage.removeItem('medusa_cart_id');
+                          localStorage.removeItem('checkout_form');
+                          localStorage.removeItem('checkout_identity');
+                          localStorage.removeItem('magic_verification_success');
+                        }
+                        await signOut({ callbackUrl: '/login', redirect: true });
+                      } catch (error) {
+                        console.error('[LOGOUT] Error:', error);
+                      }
+                    }}
+                  >
+                    Logout
+                  </button>
+                )}
               </div>
             </nav>
-
-            {hydrated && session?.user && (
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ marginRight: 12, color: '#141414', fontSize: 14 }}>
-                  {session.user.email || session.user.name || session.user.phone || 'Signed in'}
-                </div>
-                <LogoutButton />
-              </div>
-            )}
 
             <div className={styles.iconContainer}>
               <button className={styles.iconButton} aria-label="Search">
@@ -160,7 +194,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
               </button>
 
               <button 
-                className={styles.iconButton} 
+                className={`${styles.iconButton} ${isProfileMenuOpen ? styles.iconButtonActive : ''}`}
                 aria-label="User Profile"
                 onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
               >
