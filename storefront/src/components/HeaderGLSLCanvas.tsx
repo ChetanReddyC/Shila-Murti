@@ -55,23 +55,37 @@ const fsSource = `
     // Period of ~6 seconds (PI/3 ≈ 1.047, so full cycle = 6s)
     float direction = sin(u_time * 3.14159 / 3.0); // Smoothly oscillates between -1 and 1
     
-    // Accumulated horizontal offset for continuous motion
-    float horizontalOffset = cos(u_time * 3.14159 / 3.0) * 0.6; // Integrated position
+    // TRUE FLOW: Accumulate displacement over time based on current direction
+    // This makes the smoke ACTUALLY move, not just pan the view
+    // We integrate velocity (direction) over time to get position displacement
+    float flowTime = u_time * 0.3;
+    vec2 accumulatedFlow = vec2(
+      // Horizontal flow component (integrated sine wave)
+      (1.0 - cos(u_time * 3.14159 / 3.0)) * 0.5, // This accumulates left/right
+      // Always some upward drift
+      -flowTime * 0.3
+    );
+    
+    // Scale the horizontal flow by direction to make it oscillate
+    accumulatedFlow.x *= direction * 0.8;
 
-    // swirl field - smooth alternating horizontal movement
-    float angleNoise = fbm(uv * 1.5 + vec2(horizontalOffset, 0.0));
+    // Apply accumulated flow to move the smoke pattern
+    vec2 flowingUV = uv * 1.5 + accumulatedFlow;
+    
+    // swirl field - using the FLOWING coordinates
+    float angleNoise = fbm(flowingUV);
     float swirlAngle = (angleNoise - 0.5) * 3.1415;
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * uv;
 
-    // layered sinusoidal distortion - smooth horizontal flow
+    // layered sinusoidal distortion with flow influence
     p += vec2(
-      sin((uv.y + t) * 3.0) * 0.2,
-      cos((uv.x + horizontalOffset) * 3.0) * 0.15
+      sin((uv.y + flowTime) * 3.0) * 0.2,
+      cos((uv.x + accumulatedFlow.x) * 3.0) * 0.15
     );
 
-    // compute density - smooth flow direction
-    float d = fbm(p * 1.3 - vec2(horizontalOffset, 0.0));
+    // compute density using FLOWING coordinates
+    float d = fbm(p * 1.3 + accumulatedFlow);
     d *= 0.7; // TWEAK: Lower = less smoke (0.5-1.5)
     float alpha = smoothstep(0.3, 0.6, d); // TWEAK: Higher first number = less visible
 
