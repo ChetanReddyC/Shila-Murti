@@ -51,20 +51,27 @@ const fsSource = `
     
     float t = u_time * 0.4;
 
-    // swirl field
-    float angleNoise = fbm(uv * 1.5 + vec2(0.0, -t));
+    // Smooth oscillating direction using sine wave
+    // Period of ~6 seconds (PI/3 ≈ 1.047, so full cycle = 6s)
+    float direction = sin(u_time * 3.14159 / 3.0); // Smoothly oscillates between -1 and 1
+    
+    // Accumulated horizontal offset for continuous motion
+    float horizontalOffset = cos(u_time * 3.14159 / 3.0) * 0.6; // Integrated position
+
+    // swirl field - smooth alternating horizontal movement
+    float angleNoise = fbm(uv * 1.5 + vec2(horizontalOffset, 0.0));
     float swirlAngle = (angleNoise - 0.5) * 3.1415;
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * uv;
 
-    // layered sinusoidal distortion
+    // layered sinusoidal distortion - smooth horizontal flow
     p += vec2(
       sin((uv.y + t) * 3.0) * 0.2,
-      cos((uv.x - t) * 3.0) * 0.2
+      cos((uv.x + horizontalOffset) * 3.0) * 0.15
     );
 
-    // compute density
-    float d = fbm(p * 1.3 - vec2(0.0, t * 0.6));
+    // compute density - smooth flow direction
+    float d = fbm(p * 1.3 - vec2(horizontalOffset, 0.0));
     d *= 0.7; // TWEAK: Lower = less smoke (0.5-1.5)
     float alpha = smoothstep(0.3, 0.6, d); // TWEAK: Higher first number = less visible
 
