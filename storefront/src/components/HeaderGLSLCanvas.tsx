@@ -17,6 +17,8 @@ const fsSource = `
   varying vec2 v_uv;
   uniform float u_time;
   uniform vec2 u_res;
+  uniform float u_interaction_time;
+  uniform float u_direction;
 
   // 2D noise
   float hash(vec2 p) {
@@ -47,27 +49,18 @@ const fsSource = `
     vec2 uv = (v_uv - 0.5) * vec2(u_res.x / u_res.y, 1.0);
     
     // ZOOM EFFECT: Scale down UV to make smoke patterns bigger/closer
-    uv *= 0.4; // TWEAK: Lower = more zoomed (0.2-1.0)
+    uv *= 0.4;
     
-    float t = u_time * 0.4;
-
-    // Smooth oscillating direction using sine wave
-    // Period of ~6 seconds (PI/3 ≈ 1.047, so full cycle = 6s)
-    float direction = sin(u_time * 3.14159 / 3.0); // Smoothly oscillates between -1 and 1
+    float flowTime = u_interaction_time * 0.5;
     
-    // TRUE FLOW: Accumulate displacement over time based on current direction
-    // This makes the smoke ACTUALLY move, not just pan the view
-    // We integrate velocity (direction) over time to get position displacement
-    float flowTime = u_time * 0.3;
+    // Natural flow based on interaction direction
+    // u_direction: -1 = left (profile open), 1 = right (profile closed)
     vec2 accumulatedFlow = vec2(
-      // Horizontal flow component (integrated sine wave)
-      (1.0 - cos(u_time * 3.14159 / 3.0)) * 0.5, // This accumulates left/right
+      // Horizontal flow in the specified direction - more intensive
+      u_direction * flowTime * 1.8,
       // Always some upward drift
-      -flowTime * 0.3
+      -flowTime * 0.4
     );
-    
-    // Scale the horizontal flow by direction to make it oscillate
-    accumulatedFlow.x *= direction * 0.8;
 
     // Apply accumulated flow to move the smoke pattern
     vec2 flowingUV = uv * 1.5 + accumulatedFlow;
@@ -78,31 +71,50 @@ const fsSource = `
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * uv;
 
-    // layered sinusoidal distortion with flow influence
+    // layered sinusoidal distortion with flow influence - enhanced
     p += vec2(
-      sin((uv.y + flowTime) * 3.0) * 0.2,
-      cos((uv.x + accumulatedFlow.x) * 3.0) * 0.15
+      sin((uv.y + flowTime) * 3.0) * 0.25 + u_direction * flowTime * 0.3,
+      cos((uv.x + accumulatedFlow.x) * 3.0) * 0.2
     );
 
     // compute density using FLOWING coordinates
     float d = fbm(p * 1.3 + accumulatedFlow);
-    d *= 0.7; // TWEAK: Lower = less smoke (0.5-1.5)
-    float alpha = smoothstep(0.3, 0.6, d); // TWEAK: Higher first number = less visible
+    d *= 0.7;
+    float alpha = smoothstep(0.3, 0.6, d);
 
     // Only show on right 40% of header
     float rightMask = smoothstep(0.58, 0.62, v_uv.x);
     
-    // Combine masks - removed vertical fade for full height
-    float final_mask = rightMask * alpha;
+    // Fade out after 4 seconds
+    float fadeOut = 1.0 - smoothstep(3.5, 4.0, u_interaction_time);
+    
+    // Combine masks with fade out
+    float final_mask = rightMask * alpha * fadeOut;
 
     // Smoke color
     vec3 fluid = vec3(0.15, 0.2, 0.25);
-    gl_FragColor = vec4(fluid, final_mask * 0.8); // TWEAK: Lower = more subtle (0.3-0.9)
+    gl_FragColor = vec4(fluid, final_mask * 0.8);
   }
 `;
 
-const HeaderGLSLCanvas = () => {
+interface HeaderGLSLCanvasProps {
+  isProfileMenuOpen: boolean;
+}
+
+const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const interactionTimeRef = useRef<number>(0);
+  const directionRef = useRef<number>(1); // 1 = right, -1 = left
+  const lastStateRef = useRef<boolean>(false);
+  
+  // Track interaction changes and reset timer
+  useEffect(() => {
+    if (isProfileMenuOpen !== lastStateRef.current) {
+      interactionTimeRef.current = 0;
+      directionRef.current = isProfileMenuOpen ? 1 : -1; // 1 for right (open), -1 for left (close)
+      lastStateRef.current = isProfileMenuOpen;
+    }
+  }, [isProfileMenuOpen]);
   
   // Canvas WebGL setup and rendering
   useEffect(() => {
@@ -172,13 +184,27 @@ const HeaderGLSLCanvas = () => {
 
     const uTime = gl.getUniformLocation(prog, 'u_time');
     const uRes = gl.getUniformLocation(prog, 'u_res');
+    const uInteractionTime = gl.getUniformLocation(prog, 'u_interaction_time');
+    const uDirection = gl.getUniformLocation(prog, 'u_direction');
 
     const start = performance.now();
     let animationFrameId: number;
+    let lastFrameTime = performance.now();
 
     const render = () => {
-      gl.uniform1f(uTime, (performance.now() - start) * 0.001);
+      const now = performance.now();
+      const deltaTime = (now - lastFrameTime) * 0.001;
+      lastFrameTime = now;
+      
+      // Update interaction time (capped at 4 seconds for fade out)
+      if (interactionTimeRef.current < 4.0) {
+        interactionTimeRef.current += deltaTime;
+      }
+      
+      gl.uniform1f(uTime, (now - start) * 0.001);
       gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uInteractionTime, interactionTimeRef.current);
+      gl.uniform1f(uDirection, directionRef.current);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       animationFrameId = requestAnimationFrame(render);
