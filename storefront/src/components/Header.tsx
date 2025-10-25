@@ -125,7 +125,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           className="absolute inset-0 z-20 overflow-hidden"
           style={{ boxShadow: 'inset 2px 2px 1px 0 rgba(255, 255, 255, 0), inset -1px -1px 1px 1px rgba(255, 255, 255, 0)' }}
         >
-          <HeaderGLSLCanvas />
+          <HeaderGLSLCanvas isProfileMenuOpen={isProfileMenuOpen} />
         </div>
 
         <div className="relative z-30 flex w-full items-center">
