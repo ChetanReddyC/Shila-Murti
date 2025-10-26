@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCart } from '../contexts/CartContext';
 import { isOrderConfirmationProtectionActive } from '../utils/orderConfirmationProtection';
@@ -9,6 +9,7 @@ import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import HeaderGLSLCanvas from './HeaderGLSLCanvas';
+import NavLinkShaderOverlay, { type NavLinkShaderOverlayAPI } from './NavLinkShaderOverlay';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
@@ -21,6 +22,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const [lastSeenCount, setLastSeenCount] = useState<number>(0);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
   const [toggleCount, setToggleCount] = useState<number>(0);
+  const navLinkShaderRef = useRef<NavLinkShaderOverlayAPI | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -168,6 +170,8 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                         key={link.label}
                         className={styles.navLink}
                         href={link.href}
+                        onMouseEnter={(e) => navLinkShaderRef.current?.beginHover(e.currentTarget)}
+                        onMouseLeave={() => navLinkShaderRef.current?.endHover()}
                         variants={{
                           hidden: {
                             opacity: 0,
@@ -248,6 +252,8 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                         className={styles.navLink}
                         href={link.href}
                         onClick={() => setIsProfileMenuOpen(false)}
+                        onMouseEnter={(e) => navLinkShaderRef.current?.beginHover(e.currentTarget)}
+                        onMouseLeave={() => navLinkShaderRef.current?.endHover()}
                         variants={{
                           hidden: {
                             opacity: 0,
@@ -295,6 +301,8 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                     {hydrated && session?.user && (
                       <motion.button
                         className={styles.logoutLink}
+                        onMouseEnter={(e) => navLinkShaderRef.current?.beginHover(e.currentTarget)}
+                        onMouseLeave={() => navLinkShaderRef.current?.endHover()}
                         variants={{
                           hidden: {
                             opacity: 0,
@@ -419,6 +427,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           </div>
         </div>
       </header>
+      <NavLinkShaderOverlay ref={navLinkShaderRef} />
     </div>
   );
 };
