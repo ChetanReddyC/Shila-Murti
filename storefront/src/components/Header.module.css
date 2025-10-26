@@ -89,20 +89,7 @@
   transform: translateY(-1px);
 }
 
-.navLink:after {
-  content: '';
-  position: absolute;
-  width: 0;
-  height: 2px;
-  bottom: -4px;
-  left: 0;
-  background-color: #000000;
-  transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.navLink:hover:after {
-  width: 100%;
-}
+/* Removed CSS underline - replaced with GLSL smoke effect */
 
 .logoutLink {
   font-size: 0.9375rem;
@@ -122,20 +109,7 @@
   transform: translateY(-1px);
 }
 
-.logoutLink:after {
-  content: '';
-  position: absolute;
-  width: 0;
-  height: 2px;
-  bottom: -4px;
-  left: 0;
-  background-color: #dc2626;
-  transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.logoutLink:hover:after {
-  width: 100%;
-}
+/* Removed CSS underline for logout - replaced with GLSL smoke effect */
 
 .iconButton {
   display: flex;

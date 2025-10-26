@@ -89,10 +89,30 @@ const GLSLCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', { alpha: true });
+    const gl = canvas.getContext('webgl', { 
+      alpha: true,
+      preserveDrawingBuffer: false,
+      antialias: false,
+      depth: false,
+      stencil: false
+    });
     if (!gl) {
+      console.warn('[GLSLCanvas] Failed to get WebGL context');
       return;
     }
+    
+    // Handle context loss gracefully
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      console.warn('[GLSLCanvas] WebGL context lost');
+    };
+    
+    const handleContextRestored = () => {
+      console.log('[GLSLCanvas] WebGL context restored');
+    };
+    
+    canvas.addEventListener('webglcontextlost', handleContextLost);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored);
     
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -147,6 +167,22 @@ const GLSLCanvas = () => {
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+      
+      // Clean up WebGL resources
+      if (gl && !gl.isContextLost()) {
+        gl.deleteProgram(prog);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.deleteBuffer(buf);
+        
+        // Force context loss to free up resources
+        const loseContext = gl.getExtension('WEBGL_lose_context');
+        if (loseContext) {
+          loseContext.loseContext();
+        }
+      }
     };
   }, []);
 
