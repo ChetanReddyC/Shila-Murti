@@ -51,14 +51,27 @@ const fsSource = `
     // ZOOM EFFECT: Scale down UV to make smoke patterns bigger/closer
     uv *= 0.4;
     
-    float flowTime = u_interaction_time * 0.5;
+    // Physics-based velocity: fast initial burst that decays to natural flow
+    // Simulates smoke reacting to an object passing through it
+    float t = u_interaction_time;
+    
+    // Exponential decay from fast (3.5) to slow (0.3) over ~2 seconds
+    float velocityMultiplier = 0.3 + 3.2 * exp(-2.5 * t);
+    
+    // Ease-out cubic for smooth deceleration
+    float easeOut = 1.0 - pow(1.0 - min(t / 1.5, 1.0), 3.0);
+    
+    // Combine exponential decay with ease-out for natural physics
+    float physicsVelocity = mix(velocityMultiplier, 0.5, easeOut);
+    
+    float flowTime = t * physicsVelocity;
     
     // Natural flow based on interaction direction
-    // u_direction: -1 = left (profile open), 1 = right (profile closed)
+    // u_direction: -1 = left, 1 = right
     vec2 accumulatedFlow = vec2(
-      // Horizontal flow in the specified direction - more intensive
+      // Horizontal flow with physics-based velocity
       u_direction * flowTime * 1.8,
-      // Always some upward drift
+      // Upward drift also affected by physics
       -flowTime * 0.4
     );
 
@@ -71,10 +84,12 @@ const fsSource = `
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * uv;
 
-    // layered sinusoidal distortion with flow influence - enhanced
+    // layered sinusoidal distortion with physics-based turbulence
+    // Initial chaos that settles into smooth flow
+    float turbulence = velocityMultiplier * 0.15;
     p += vec2(
-      sin((uv.y + flowTime) * 3.0) * 0.25 + u_direction * flowTime * 0.3,
-      cos((uv.x + accumulatedFlow.x) * 3.0) * 0.2
+      sin((uv.y + flowTime) * 3.0) * (0.25 + turbulence) + u_direction * flowTime * 0.3,
+      cos((uv.x + accumulatedFlow.x) * 3.0) * (0.2 + turbulence * 0.8)
     );
 
     // compute density using FLOWING coordinates
