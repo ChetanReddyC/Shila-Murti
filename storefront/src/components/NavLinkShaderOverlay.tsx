@@ -141,8 +141,8 @@ const fsSource = `
     
     // === EXTREME EXPLOSION PHYSICS ===
     if (u_explosion_time > 0.0) {
-      // Longer explosion duration ~1.2 seconds for far-reaching effect
-      float explosionProgress = min(u_explosion_time / 1.2, 1.0);
+      // Longer explosion duration ~1.5 seconds for far-reaching effect
+      float explosionProgress = min(u_explosion_time / 1.5, 1.0);
       
       // Multiple noise layers for HIGHLY random directions (total chaos!)
       float disperseAngle1 = fbm(vec2(uv.x * 15.0, uv.y * 12.0)) * 6.28;
@@ -233,27 +233,51 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
   const progressRef = useRef<number>(0);
   const explosionTimeRef = useRef<number>(0);
   const isExplodingRef = useRef<boolean>(false);
+  const baseLinkRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
 
   const positionCanvasOverLink = useCallback((linkElement: HTMLElement) => {
     const linkRect = linkElement.getBoundingClientRect();
     
-    // Since we're using fixed positioning, use absolute viewport coordinates
-    const left = linkRect.left;
-    const top = linkRect.bottom - 6; // Position at bottom of link
-    const width = linkRect.width;
-    const height = 16; // Taller for more visible effect
-
-    setCanvasRect({ left, top, width, height });
+    // Store base link rect for explosion calculations
+    baseLinkRectRef.current = {
+      left: linkRect.left,
+      top: linkRect.bottom - 6,
+      width: linkRect.width,
+      height: 16
+    };
+    
+    // Update React state
+    setCanvasRect(baseLinkRectRef.current);
+    
+    // ALSO immediately apply via inline styles to avoid async delay
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.style.left = `${Math.round(baseLinkRectRef.current.left)}px`;
+      canvas.style.top = `${Math.round(baseLinkRectRef.current.top)}px`;
+      canvas.style.width = `${Math.round(baseLinkRectRef.current.width)}px`;
+      canvas.style.height = `${Math.round(baseLinkRectRef.current.height)}px`;
+    }
   }, []);
 
   useImperativeHandle(ref, () => ({
     beginHover(linkElement: HTMLElement) {
+      // Cancel any ongoing explosion FIRST
+      explosionTimeRef.current = 0;
+      isExplodingRef.current = false;
+      
+      // Clear inline styles BEFORE repositioning (critical!)
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.style.left = '';
+        canvas.style.top = '';
+        canvas.style.width = '';
+        canvas.style.height = '';
+      }
+      
+      // Now position canvas for new link
       positionCanvasOverLink(linkElement);
       setActive(true);
       progressRef.current = 0;
-      // Cancel any ongoing explosion and reset
-      explosionTimeRef.current = 0;
-      isExplodingRef.current = false;
     },
     updatePointer(clientX: number, clientY: number) {
       // Not needed for nav links, but kept for API consistency
@@ -444,12 +468,48 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
         intensityRef.current = 1.0;
         progressRef.current = 1.0; // Keep full progress during explosion
         
+        // EXPAND CANVAS DYNAMICALLY during explosion for visible effect
+        // Update directly via ref to avoid React re-render jitter
+        if (baseLinkRectRef.current && canvas) {
+          const explosionProgress = Math.min(explosionTimeRef.current / 1.5, 1.0);
+          // Expand to 3x width and 5x height (80px tall)
+          const expandFactor = 1.0 + explosionProgress * 2.0; // 1x -> 3x
+          const heightExpandFactor = 1.0 + explosionProgress * 4.0; // 16px -> 80px
+          
+          const baseRect = baseLinkRectRef.current;
+          const expandedWidth = baseRect.width * expandFactor;
+          const expandedHeight = baseRect.height * heightExpandFactor;
+          
+          // Center expansion around original position
+          const leftOffset = (expandedWidth - baseRect.width) / 2;
+          const topOffset = (expandedHeight - baseRect.height) / 2;
+          
+          // Update canvas style directly (no React state = no jitter)
+          canvas.style.left = `${Math.round(baseRect.left - leftOffset)}px`;
+          canvas.style.top = `${Math.round(baseRect.top - topOffset)}px`;
+          canvas.style.width = `${Math.round(expandedWidth)}px`;
+          canvas.style.height = `${Math.round(expandedHeight)}px`;
+        }
+        
         // Explosion completes after 1.5 seconds (longer for dramatic effect)
         if (explosionTimeRef.current >= 1.5) {
           isExplodingRef.current = false;
           explosionTimeRef.current = 0;
           progressRef.current = 0;
           intensityRef.current = 0;
+          
+          // Clear inline styles before restoring via React state
+          if (canvas) {
+            canvas.style.left = '';
+            canvas.style.top = '';
+            canvas.style.width = '';
+            canvas.style.height = '';
+          }
+          
+          // Restore original canvas size via state (end of animation, one-time update is fine)
+          if (baseLinkRectRef.current) {
+            setCanvasRect(baseLinkRectRef.current);
+          }
         }
       } else {
         // Normal hover state management
