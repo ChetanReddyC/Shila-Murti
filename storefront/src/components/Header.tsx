@@ -146,13 +146,13 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                     variants={{
                       visible: {
                         transition: {
-                          staggerChildren: 0.06,
-                          delayChildren: 0.08
+                          staggerChildren: 0.05,
+                          delayChildren: 0.05
                         }
                       },
                       exit: {
                         transition: {
-                          staggerChildren: 0.04,
+                          staggerChildren: 0.03,
                           staggerDirection: -1
                         }
                       }
@@ -171,30 +171,40 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                         variants={{
                           hidden: {
                             opacity: 0,
-                            x: 30,
-                            y: -8,
-                            scale: 0.92
+                            x: 40,
+                            y: -12,
+                            scale: 0.85,
+                            rotateY: 15,
+                            filter: 'blur(4px)'
                           },
                           visible: {
                             opacity: 1,
                             x: 0,
                             y: 0,
                             scale: 1,
+                            rotateY: 0,
+                            filter: 'blur(0px)',
                             transition: {
                               type: 'spring',
-                              stiffness: 300,
-                              damping: 24,
-                              mass: 0.6
+                              stiffness: 350,
+                              damping: 20,
+                              mass: 0.5,
+                              filter: {
+                                duration: 0.25,
+                                ease: 'easeOut'
+                              }
                             }
                           },
                           exit: {
                             opacity: 0,
-                            x: -30,
-                            y: 8,
-                            scale: 0.92,
+                            x: -35,
+                            y: 10,
+                            scale: 0.88,
+                            rotateY: -12,
+                            filter: 'blur(3px)',
                             transition: {
-                              duration: 0.15,
-                              ease: [0.4, 0, 1, 1]
+                              duration: 0.18,
+                              ease: [0.6, 0.05, 0.8, 0.95]
                             }
                           }
                         }}
@@ -213,13 +223,13 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                     variants={{
                       visible: {
                         transition: {
-                          staggerChildren: 0.06,
-                          delayChildren: 0.04
+                          staggerChildren: 0.045,
+                          delayChildren: 0.03
                         }
                       },
                       exit: {
                         transition: {
-                          staggerChildren: 0.04,
+                          staggerChildren: 0.035,
                           staggerDirection: -1
                         }
                       }
@@ -241,30 +251,40 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                         variants={{
                           hidden: {
                             opacity: 0,
-                            x: 30,
-                            y: -6,
-                            scale: 0.94
+                            x: 45,
+                            y: -10,
+                            scale: 0.82,
+                            rotateX: -8,
+                            filter: 'blur(5px)'
                           },
                           visible: {
                             opacity: 1,
                             x: 0,
                             y: 0,
                             scale: 1,
+                            rotateX: 0,
+                            filter: 'blur(0px)',
                             transition: {
                               type: 'spring',
-                              stiffness: 300,
-                              damping: 24,
-                              mass: 0.6
+                              stiffness: 380,
+                              damping: 22,
+                              mass: 0.55,
+                              filter: {
+                                duration: 0.28,
+                                ease: [0.25, 0.1, 0.25, 1]
+                              }
                             }
                           },
                           exit: {
                             opacity: 0,
-                            x: -30,
-                            y: 6,
-                            scale: 0.94,
+                            x: -40,
+                            y: 8,
+                            scale: 0.86,
+                            rotateX: 8,
+                            filter: 'blur(4px)',
                             transition: {
-                              duration: 0.15,
-                              ease: [0.4, 0, 1, 1]
+                              duration: 0.16,
+                              ease: [0.65, 0, 0.85, 1]
                             }
                           }
                         }}
@@ -278,30 +298,40 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                         variants={{
                           hidden: {
                             opacity: 0,
-                            x: 30,
-                            y: -6,
-                            scale: 0.94
+                            x: 45,
+                            y: -10,
+                            scale: 0.82,
+                            rotateX: -8,
+                            filter: 'blur(5px)'
                           },
                           visible: {
                             opacity: 1,
                             x: 0,
                             y: 0,
                             scale: 1,
+                            rotateX: 0,
+                            filter: 'blur(0px)',
                             transition: {
                               type: 'spring',
-                              stiffness: 300,
-                              damping: 24,
-                              mass: 0.6
+                              stiffness: 380,
+                              damping: 22,
+                              mass: 0.55,
+                              filter: {
+                                duration: 0.28,
+                                ease: [0.25, 0.1, 0.25, 1]
+                              }
                             }
                           },
                           exit: {
                             opacity: 0,
-                            x: -30,
-                            y: 6,
-                            scale: 0.94,
+                            x: -40,
+                            y: 8,
+                            scale: 0.86,
+                            rotateX: 8,
+                            filter: 'blur(4px)',
                             transition: {
-                              duration: 0.15,
-                              ease: [0.4, 0, 1, 1]
+                              duration: 0.16,
+                              ease: [0.65, 0, 0.85, 1]
                             }
                           }
                         }}
