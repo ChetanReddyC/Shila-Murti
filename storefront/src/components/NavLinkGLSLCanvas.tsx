@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
+import { getWebGLContextManager } from '@/utils/webglContextManager';
 
 const vsSource = `
   attribute vec2 a_pos;
@@ -124,7 +125,10 @@ const NavLinkGLSLCanvas = ({ isHovered, width = 100, height = 8 }: NavLinkGLSLCa
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', { 
+    const contextManager = getWebGLContextManager();
+    const contextId = 'navlink-glsl-canvas';
+    
+    const gl = contextManager.getContext(contextId, canvas, {
       alpha: true, 
       premultipliedAlpha: false,
       preserveDrawingBuffer: false,
@@ -132,6 +136,7 @@ const NavLinkGLSLCanvas = ({ isHovered, width = 100, height = 8 }: NavLinkGLSLCa
       depth: false,
       stencil: false
     });
+    
     if (!gl) {
       console.warn('[NavLinkGLSLCanvas] Failed to get WebGL context');
       return;
@@ -248,13 +253,10 @@ const NavLinkGLSLCanvas = ({ isHovered, width = 100, height = 8 }: NavLinkGLSLCa
         gl.deleteShader(vs);
         gl.deleteShader(fs);
         gl.deleteBuffer(buf);
-        
-        // Force context loss to free up resources
-        const loseContext = gl.getExtension('WEBGL_lose_context');
-        if (loseContext) {
-          loseContext.loseContext();
-        }
       }
+      
+      // Note: We no longer force context loss - context manager handles lifecycle
+      // This allows context reuse and prevents hitting browser limits
     };
   }, [width, height]);
 

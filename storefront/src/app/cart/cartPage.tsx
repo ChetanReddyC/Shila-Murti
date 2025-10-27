@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Header from '../../components/Header';
 import styles from './cartPage.module.css';
 import Link from 'next/link';
 import { useCart } from '../../contexts/CartContext';
@@ -97,7 +96,6 @@ export default function CartPage() {
         style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
-          <Header />
           <NetworkStatus />
           <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
             <div className={styles.container}>
@@ -124,7 +122,6 @@ export default function CartPage() {
         style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
-          <Header />
           <NetworkStatus />
           <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
             <div className={styles.container}>
@@ -152,7 +149,6 @@ export default function CartPage() {
         style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
-          <Header />
           <NetworkStatus />
           <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
             <div className={styles.container}>
@@ -196,7 +192,6 @@ export default function CartPage() {
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
     >
       <div className="layout-container flex h-full grow flex-col">
-        <Header />
         <NetworkStatus />
 
         <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">

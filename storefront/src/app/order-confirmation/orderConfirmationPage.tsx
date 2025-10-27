@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Header from '../../components/Header';
 import dynamic from 'next/dynamic'
 import styles from './orderConfirmationPage.module.css';
 import cartStyles from '../cart/cartPage.module.css';
@@ -168,7 +167,6 @@ export default function OrderConfirmationPage() {
     <div className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}>
       <div className="layout-container flex h-full grow flex-col">
-        <Header />
         <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
           <div className={styles.container}>
             {/* Prevent accidental navigation away due to cart state changes by not rendering any links to /cart here */}

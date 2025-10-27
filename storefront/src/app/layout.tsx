@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "../contexts";
 import AuthSessionProvider from "@/providers/SessionProvider";
 import PasskeyNudge from "@/components/PasskeyNudge";
+import Header from "@/components/Header";
 
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -37,6 +38,8 @@ export default function RootLayout({
           <CartProvider>
             {/* Global post-elevation passkey prompt */}
             <PasskeyNudge />
+            {/* Global header - persists across all pages */}
+            <Header />
             {children}
           </CartProvider>
         </AuthSessionProvider>

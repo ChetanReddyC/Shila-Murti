@@ -1,4 +1,4 @@
-import Header from '../components/Header';
+
 
 export default function NotFound() {
   return (
@@ -7,8 +7,6 @@ export default function NotFound() {
       style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
     >
       <div className="layout-container flex h-full grow flex-col">
-        <Header />
-
         <div className="px-4 md:px-20 lg:px-40 flex flex-1 justify-center py-5">
           <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
             <div className="text-center py-20">

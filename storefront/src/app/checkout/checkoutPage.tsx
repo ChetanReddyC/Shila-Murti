@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Script from 'next/script';
-import Header from '../../components/Header';
 import styles from './checkoutPage.module.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -3005,8 +3004,6 @@ export default function CheckoutPage() {
 
         <div className="layout-container flex h-full grow flex-col">
 
-          <Header />
-
           <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
 
             <div className={styles.container}>
@@ -3048,8 +3045,6 @@ export default function CheckoutPage() {
       >
 
         <div className="layout-container flex h-full grow flex-col">
-
-          <Header />
 
           <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
 
@@ -3191,9 +3186,7 @@ export default function CheckoutPage() {
 
       <div className="layout-container flex h-full grow flex-col">
 
-        {/* Using the Header component */}
-
-        <Header showProgress={isProgressBarSticky} progress={formProgress} />
+        {/* Header is now in root layout - progress bar feature removed to avoid state management complexity */}
 
 
 

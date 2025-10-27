@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from 'react';
 import styles from './HeaderGLSLCanvas.module.css';
+import { getWebGLContextManager } from '@/utils/webglContextManager';
 
 const vsSource = `
   attribute vec2 a_pos;
@@ -136,7 +137,10 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', { 
+    const contextManager = getWebGLContextManager();
+    const contextId = 'header-glsl-canvas';
+    
+    const gl = contextManager.getContext(contextId, canvas, {
       alpha: true, 
       premultipliedAlpha: false,
       preserveDrawingBuffer: false,
@@ -144,10 +148,14 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
       depth: false,
       stencil: false
     });
+    
     if (!gl) {
       console.warn('[HeaderGLSLCanvas] Failed to get WebGL context');
       return;
     }
+    
+    // Mark context as actively used
+    contextManager.touchContext(contextId);
     
     // Handle context loss gracefully
     const handleContextLost = (e: Event) => {
@@ -260,13 +268,10 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
         gl.deleteShader(vs);
         gl.deleteShader(fs);
         gl.deleteBuffer(buf);
-        
-        // Force context loss to free up resources
-        const loseContext = gl.getExtension('WEBGL_lose_context');
-        if (loseContext) {
-          loseContext.loseContext();
-        }
       }
+      
+      // Note: We no longer force context loss - context manager handles lifecycle
+      // This allows context reuse and prevents hitting browser limits
     };
   }, []);
 

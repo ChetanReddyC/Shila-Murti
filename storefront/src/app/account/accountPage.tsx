@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Header from '../../components/Header';
 import styles from './accountPage.module.css';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -382,8 +381,6 @@ export default function AccountPage() {
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
     >
       <div className="layout-container flex h-full grow flex-col">
-        {/* Header component */}
-        <Header />
         
         <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
           <div className={styles.container}>

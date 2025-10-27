@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Header from '../../components/Header';
 import styles from './contactPage.module.css';
 
 export default function ContactPage() {
@@ -31,9 +30,6 @@ export default function ContactPage() {
       className="relative min-h-screen w-full bg-white overflow-x-hidden"
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
     >
-      {/* Header component */}
-      <Header />
-
       <div className="w-full flex justify-center bg-white pt-12">
         <div className="flex h-full grow flex-col w-full max-w-[1280px] px-4 sm:px-6 mx-auto">
           {/* Main content */}

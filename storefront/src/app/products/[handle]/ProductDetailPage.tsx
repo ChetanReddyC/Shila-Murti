@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { notFound } from 'next/navigation';
-import Header from '../../../components/Header';
 import ErrorBoundary from '../../../components/ErrorBoundary';
 import { productsService, ProductsServiceError } from '../../../services/productsService';
 import { ProductCardData } from '../../../utils/productDataMapper';
@@ -457,7 +456,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
-          <Header />
           <div className="px-40 flex flex-1 justify-center py-5">
             <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
               <div className="animate-pulse">
@@ -478,7 +476,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
-          <Header />
           <div className="px-40 flex flex-1 justify-center py-5">
             <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
               <div className="animate-pulse">
@@ -508,7 +505,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
       >
         <div className="layout-container flex h-full grow flex-col">
-          <Header />
           <div className="px-40 flex flex-1 justify-center py-5">
             <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
               <div className="text-center py-12">
@@ -561,7 +557,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
     >
       <div className="layout-container flex h-full grow flex-col">
-        <Header />
         <NetworkStatus />
 
         <div className="px-8 md:px-16 lg:px-24 xl:px-40 flex flex-1 justify-center py-12">
