@@ -6,9 +6,8 @@ import { extractBearerToken, verifyAccessToken } from "../../../../../utils/jwt"
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   await phoneConsistencyMiddleware(req, res, async () => {
-    // Accept either a verified customer JWT OR an admin access token for testing
+    // Only accept verified customer JWT tokens
     let authSubject: string | null = null
-    let requireMatch = true
 
     try {
       const bearer = extractBearerToken(req.headers.authorization as string | undefined)
@@ -18,19 +17,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
     } catch {}
 
+    // Customer authentication is required - no bypass allowed
     if (!authSubject) {
-      const adminHeader = (req.headers["x-medusa-access-token"] || req.headers["x-medusa-api-key"]) as string | undefined
-      const adminEnv = (process.env as any).MEDUSA_ADMIN_TOKEN || ""
-      const authz = (req.headers["authorization"] as string | undefined) || ""
-      const authzToken = authz?.toLowerCase().startsWith("bearer ") ? authz.split(" ")[1] : ""
-
-      if (adminEnv && (adminHeader === adminEnv || authzToken === adminEnv)) {
-        // Admin override: allow testing without a customer JWT
-        requireMatch = false
-      }
-    }
-
-    if (!authSubject && requireMatch) {
       return res.status(401).json({ message: "Customer authentication required" })
     }
 
@@ -100,7 +88,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         cart_id,
         order_id,
         auth_subject: authSubject,
-        requireAuthSubjectMatch: requireMatch,
+        requireAuthSubjectMatch: true, // Always require auth subject match
       })
 
       if (!result.ok) {

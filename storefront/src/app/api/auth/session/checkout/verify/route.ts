@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       const ensureRes = await fetch(`${base}/api/account/customer/ensure`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, phone: rawPhone, formData }),
+        body: JSON.stringify({ email, phone: rawPhone, formData, cart_id: cartId }), // Include cart_id
       })
       const ej = await ensureRes.json().catch(() => ({}))
 
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     const ensureRes = await fetch(`${base}/api/account/customer/ensure`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, phone: rawPhone, formData }),
+      body: JSON.stringify({ email, phone: rawPhone, formData, cart_id: cartId }), // Include cart_id
     })
     const ej = await ensureRes.json().catch(() => ({}))
 

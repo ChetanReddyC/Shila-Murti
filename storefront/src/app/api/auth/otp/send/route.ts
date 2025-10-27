@@ -21,7 +21,7 @@ function normalizePhoneOrEmail(identifier: any): { phone?: string; email?: strin
 }
 
 function generateOtp(): string {
-  if (process.env.NODE_ENV === 'test') return '123456'
+  // Always generate cryptographically secure OTPs (no test mode)
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 
