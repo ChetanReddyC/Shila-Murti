@@ -21,6 +21,12 @@ export interface OrderMapping {
   currency: string
   createdAt: number
   signature: string
+  // Customer authentication info for validation
+  customer?: {
+    id?: string
+    email?: string
+    phone?: string
+  }
 }
 
 export interface MappingValidation {
@@ -71,12 +77,14 @@ function verifyMappingSignature(mapping: OrderMapping): boolean {
  * @param cartId - Medusa cart_id
  * @param amount - Order amount in INR
  * @param currency - Currency code (default: INR)
+ * @param customer - Optional customer authentication info
  */
 export async function storeOrderCartMapping(
   orderId: string,
   cartId: string,
   amount: number,
-  currency: string = 'INR'
+  currency: string = 'INR',
+  customer?: { id?: string; email?: string; phone?: string }
 ): Promise<void> {
   try {
     const mapping: OrderMapping = {
@@ -85,7 +93,8 @@ export async function storeOrderCartMapping(
       amount,
       currency,
       createdAt: Date.now(),
-      signature: generateMappingSignature(orderId, cartId, amount)
+      signature: generateMappingSignature(orderId, cartId, amount),
+      customer
     }
     
     // Store primary mapping (order -> cart)

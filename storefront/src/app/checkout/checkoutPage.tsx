@@ -11,6 +11,7 @@ import { useSession } from 'next-auth/react';
 import { usePasskey } from '../../hooks/usePasskey';
 import { PriceCalculationService } from '../../services/PriceCalculationService';
 import { validateIndianAddress, validateAddressField, type AddressInput } from '../../utils/addressValidation';
+import AuthRequiredModal from '../../components/AuthRequiredModal';
 
 export default function CheckoutPage() {
 
@@ -93,6 +94,11 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState('')
 
   const [identityError, setIdentityError] = useState<string | null>(null)
+
+  // Auth required modal state
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModalMessage, setAuthModalMessage] = useState('')
+  const identityVerificationRef = useRef<HTMLDivElement>(null)
 
 
 
@@ -2047,7 +2053,12 @@ export default function CheckoutPage() {
       const data = await resp.json().catch(() => ({}))
 
       if (!resp.ok) {
-
+        // Handle authentication errors specifically
+        if (resp.status === 403 && data?.error === 'authentication_required') {
+          setAuthModalMessage('You must verify your identity before making a payment. Please complete the Identity Verification section using OTP, Magic Link, or Login.')
+          setAuthModalOpen(true)
+          return
+        }
 
         alert('Failed to create Cashfree order. Please try again.')
 
@@ -2307,8 +2318,8 @@ export default function CheckoutPage() {
     // Update the check that prevents submission
 
     if (!isReadyToPay) {
-
-      alert('Please verify your identity to continue. Use phone OTP or email magic link in the Identity Verification section.')
+      setAuthModalMessage('Please verify your identity to continue. Use phone OTP or email magic link in the Identity Verification section.')
+      setAuthModalOpen(true)
 
       return
 
@@ -2609,6 +2620,13 @@ export default function CheckoutPage() {
 
       // Fallbacks when checkout fails
 
+      // Handle authentication errors
+      if (result.error?.message?.includes('authentication_required') || 
+          result.error?.message?.includes('identity verification')) {
+        setAuthModalMessage('You must verify your identity before placing an order. Please complete the Identity Verification section using OTP, Magic Link, or Login.')
+        setAuthModalOpen(true)
+        return
+      }
 
       if (result.error?.step === 'cart-completed') {
 
@@ -2724,6 +2742,28 @@ export default function CheckoutPage() {
   };
 
 
+
+  // Handle "Verify Now" button click in auth modal - scroll to identity verification section
+  const handleScrollToVerification = () => {
+    if (identityVerificationRef.current) {
+      identityVerificationRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      })
+      // Add a subtle highlight effect
+      identityVerificationRef.current.style.transition = 'box-shadow 0.3s ease'
+      identityVerificationRef.current.style.boxShadow = '0 0 0 4px rgba(220, 38, 38, 0.2)'
+      setTimeout(() => {
+        if (identityVerificationRef.current) {
+          identityVerificationRef.current.style.boxShadow = 'none'
+        }
+      }, 2000)
+    } else {
+      // If identity verification section is not visible (e.g., user is authenticated but session expired),
+      // refresh the page to show the section or redirect to login
+      window.location.reload()
+    }
+  }
 
   // Handle login submission
 
@@ -3501,7 +3541,7 @@ export default function CheckoutPage() {
               </div>
               {/* Identity Verification Section (Task 2) - Only show for unauthenticated users who haven't verified */}
               {status !== 'authenticated' && !purchaseReady && (
-                <div className={styles.section}>
+                <div ref={identityVerificationRef} className={styles.section}>
                   <h2 className={styles.sectionTitle}>Identity Verification</h2>
                   {purchaseReady && (
                     <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-md">
@@ -3708,6 +3748,14 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Authentication Required Modal */}
+      <AuthRequiredModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onVerifyNow={handleScrollToVerification}
+        message={authModalMessage}
+      />
     </div>
   );
 }

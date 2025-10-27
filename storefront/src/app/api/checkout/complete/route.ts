@@ -10,6 +10,7 @@ import {
 } from '@/utils/orderCompletionGuard'
 import { captureMedusaPayment, getPaymentIdFromOrder } from '@/utils/medusaPaymentCapture'
 import { getOrderCartMapping } from '@/lib/cashfreeMapping'
+import { validateCheckoutAuth, extractCustomerInfo } from '@/utils/checkoutAuthValidation'
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +26,58 @@ export async function POST(req: NextRequest) {
       orderId,
       customerIdPresent: Boolean(customerId),
       bodyKeys: Object.keys(body || {})
+    })
+
+    // CRITICAL SECURITY: Validate checkout authentication before processing
+    // Try to get customer info from order mapping if available (for Cashfree returns)
+    let customerInfo = extractCustomerInfo(body)
+    
+    if (orderId && !customerInfo.email && !customerInfo.phone) {
+      try {
+        const mapping = await getOrderCartMapping(orderId)
+        if (mapping?.customer) {
+          customerInfo = {
+            ...customerInfo,
+            customerId: customerInfo.customerId || mapping.customer.id,
+            email: mapping.customer.email,
+            phone: mapping.customer.phone,
+            cartId: customerInfo.cartId || mapping.cartId
+          }
+          console.log('[COMPLETE_API][customer_info_from_mapping]', {
+            orderId,
+            hasEmail: !!mapping.customer.email,
+            hasPhone: !!mapping.customer.phone
+          })
+        }
+      } catch (error) {
+        console.error('[COMPLETE_API][mapping_retrieval_error]', error)
+      }
+    }
+    
+    const authResult = await validateCheckoutAuth(req, {
+      ...customerInfo,
+      cartId: cartId || customerInfo.cartId
+    })
+
+    if (!authResult.authenticated) {
+      console.error('[COMPLETE_API][auth_failed]', {
+        cartId,
+        orderId,
+        reason: authResult.reason
+      })
+      
+      return NextResponse.json({
+        error: 'authentication_required',
+        message: 'You must complete identity verification before placing an order. Please verify using OTP, Magic Link, or Login.',
+        reason: authResult.reason
+      }, { status: 403 })
+    }
+
+    console.log('[COMPLETE_API][auth_success]', {
+      cartId,
+      orderId,
+      method: authResult.method,
+      customerId: authResult.customerId
     })
 
     // Best-effort: if we have both cartId and customerId, try to associate before completing

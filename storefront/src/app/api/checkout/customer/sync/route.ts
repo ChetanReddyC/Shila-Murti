@@ -114,8 +114,14 @@ export async function POST(req: NextRequest) {
     };
     
     if (phoneConflictInfo.conflictDetected) {
-      
-      // Log conflict metrics
+      // VALID SCENARIO: User authenticated with one number but wants delivery to another
+      // Example: Login with personal WhatsApp (917780104586) but deliver to office (917452675836)
+      console.log('[SYNC_API][phone_difference_allowed]', {
+        authPhone: phoneConflictInfo.whatsappPhone,
+        shippingPhone: phoneConflictInfo.shippingPhone,
+        reason: 'Different auth vs shipping phone is a valid use case'
+      });
+      // Do NOT treat this as an error - just log it for analytics
     }
     
     // Use appropriate phone based on authentication method
