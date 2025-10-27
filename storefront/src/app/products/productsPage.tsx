@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import Header from '../../components/Header';
 import ProductsGrid from '../../components/ProductsGrid';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { productsService, ProductsServiceError } from '../../services/productsService';
@@ -373,8 +372,7 @@ export default function ProductsPage() {
         {sortedProducts.length} products loaded
       </div>
       <div className="layout-container flex h-full grow flex-col">
-        {/* Using the Header component */}
-        <Header />
+        {/* Header is now in root layout */}
 
         <div className="px-40 flex flex-1 justify-center py-5">
           <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">

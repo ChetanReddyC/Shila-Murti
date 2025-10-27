@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Header from '../../../../components/Header';
 import { useParams } from 'next/navigation';
 import SessionGuard from '@/components/SessionGuard';
 import styles from './page.module.css';
@@ -544,7 +543,6 @@ function OrderDetailsPageContent() {
   if (loading) {
     return (
       <div className={styles.container}>
-        <Header />
         <div className={styles.centerContent}>
           <p className={styles.loadingText}>Loading order details...</p>
         </div>
@@ -555,7 +553,6 @@ function OrderDetailsPageContent() {
   if (!orderData) {
     return (
       <div className={styles.container}>
-        <Header />
         <div className={styles.centerContent}>
           <p className={styles.loadingText}>Order not found</p>
         </div>
@@ -565,8 +562,6 @@ function OrderDetailsPageContent() {
 
   return (
     <div className={styles.container}>
-      <Header />
-      
       <div className={styles.mainWrapper}>
         <div className={styles.contentWrapper}>
           {/* Order Header */}

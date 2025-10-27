@@ -1,7 +1,6 @@
 'use client';
 
 import styles from './page.module.css';
-import Header from '../components/Header';
 import GLSLCanvas from '../components/GLSLCanvas';
 import DynamicSvgEffect from '../components/DynamicSvgEffect';
 import { useState, useEffect, useRef } from 'react';
@@ -88,11 +87,6 @@ export default function Home() {
         style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
       >
         {/* Removed debug indicator */}
-
-
-
-        {/* Header component */}
-        <Header />
 
         <div className="w-full flex justify-center bg-white pt-12">
           <div className="flex h-full grow flex-col w-full max-w-[1280px] px-4 sm:px-6 mx-auto">
