@@ -1,0 +1,166 @@
+/**
+ * Checkout Authentication Validation Utility
+ * 
+ * CRITICAL SECURITY: This module enforces authentication requirements for checkout operations.
+ * Users must complete identity verification (OTP, Magic Link, or Passkey) before placing orders.
+ */
+
+import { getServerSession } from 'next-auth'
+import type { NextRequest } from 'next/server'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { kvGet } from '@/lib/kv'
+import { getToken } from 'next-auth/jwt'
+import { isJWTBlacklisted } from '@/lib/auth/jwtBlacklist'
+
+interface AuthValidationResult {
+  authenticated: boolean
+  customerId?: string
+  reason?: string
+  method?: 'session' | 'otp' | 'magic_link' | 'passkey'
+}
+
+/**
+ * Normalize email to lowercase for consistent lookup
+ */
+function normalizeEmail(email?: string | null): string | undefined {
+  if (!email) return undefined
+  return String(email).trim().toLowerCase()
+}
+
+/**
+ * Normalize phone to international format with digits only
+ */
+function normalizePhoneDigits(phone?: string | null): string | undefined {
+  if (!phone) return undefined
+  const digits = String(phone).replace(/\D/g, '')
+  return digits ? `+${digits}` : undefined
+}
+
+/**
+ * Validate if user has completed checkout authentication
+ * 
+ * Checks multiple authentication methods in order of precedence:
+ * 1. Valid NextAuth session (logged in users)
+ * 2. OTP verification marker in KV store
+ * 3. Magic link verification marker in KV store
+ * 
+ * @param req - The incoming request
+ * @param options - Optional customerId, email, or phone to validate against
+ * @returns Authentication validation result
+ */
+export async function validateCheckoutAuth(
+  req: NextRequest,
+  options?: {
+    customerId?: string
+    email?: string
+    phone?: string
+    cartId?: string
+  }
+): Promise<AuthValidationResult> {
+  // PRIORITY 1: Check for valid NextAuth session
+  try {
+    // Get the JWT token to check blacklist
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+    
+    if (token) {
+      // Check if JWT is blacklisted (revoked during logout)
+      const jti = (token as any)?.jti
+      if (jti) {
+        const isBlacklisted = await isJWTBlacklisted(jti)
+        if (isBlacklisted) {
+          console.log('[CHECKOUT_AUTH] JWT is blacklisted:', jti)
+          // Continue to check other auth methods
+        } else {
+          // Valid session exists
+          const session = await getServerSession(authOptions)
+          
+          if (session) {
+            const sessionCustomerId = (session as any)?.customerId
+            
+            return {
+              authenticated: true,
+              customerId: sessionCustomerId || options?.customerId,
+              method: 'session'
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[CHECKOUT_AUTH] Session validation error:', error)
+    // Continue to check other auth methods
+  }
+
+  // PRIORITY 2: Check OTP verification marker (WhatsApp/Phone)
+  if (options?.phone) {
+    const phoneKey = normalizePhoneDigits(options.phone)
+    
+    if (phoneKey) {
+      try {
+        const otpMarker = await kvGet<number | string | unknown>(`otp:ok:${phoneKey}`)
+        
+        if (otpMarker) {
+          return {
+            authenticated: true,
+            customerId: options.customerId,
+            method: 'otp'
+          }
+        }
+      } catch (error) {
+        console.error('[CHECKOUT_AUTH] OTP marker check error:', error)
+      }
+    }
+  }
+
+  // PRIORITY 3: Check Magic Link verification marker (Email)
+  if (options?.email) {
+    const email = normalizeEmail(options.email)
+    
+    if (email) {
+      try {
+        // Check both general and cart-specific magic link markers
+        const state = options.cartId ? `checkout-${options.cartId}` : ''
+        const keyGeneral = `magic:ok:${email}`
+        const keyState = state ? `magic:ok:${email}:${state}` : ''
+        
+        const [generalMarker, stateMarker] = await Promise.all([
+          kvGet<number | string | unknown>(keyGeneral),
+          keyState ? kvGet<number | string | unknown>(keyState) : Promise.resolve(null),
+        ])
+        
+        if (generalMarker || stateMarker) {
+          return {
+            authenticated: true,
+            customerId: options.customerId,
+            method: 'magic_link'
+          }
+        }
+      } catch (error) {
+        console.error('[CHECKOUT_AUTH] Magic link marker check error:', error)
+      }
+    }
+  }
+
+  // No valid authentication found
+  return {
+    authenticated: false,
+    reason: 'No valid authentication found. User must complete identity verification (OTP, Magic Link, or Login) before checkout.'
+  }
+}
+
+/**
+ * Extract customer information from request body for validation
+ */
+export function extractCustomerInfo(body: any): {
+  customerId?: string
+  email?: string
+  phone?: string
+  cartId?: string
+} {
+  return {
+    customerId: body?.customerId || body?.customer?.id,
+    email: body?.email || body?.customer?.email,
+    phone: body?.phone || body?.customer?.phone,
+    cartId: body?.cartId || body?.cart_id
+  }
+}

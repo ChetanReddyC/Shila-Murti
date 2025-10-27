@@ -2,6 +2,128 @@
 import fetch from 'node-fetch';
 import { storeOrderCartMapping } from '../../lib/cashfreeMapping.ts';
 
+/**
+ * Validate checkout authentication for Cashfree payment creation (Pages Router)
+ * This prevents unauthorized users from creating payment sessions
+ * Simplified version that checks KV markers and session tokens without importing authOptions
+ */
+async function validateCheckoutAuthJS(req, res, customer, cartId) {
+  try {
+    const { getToken } = await import('next-auth/jwt');
+    const { kvGet } = await import('../../lib/kv');
+    
+    // Helper functions
+    const normalizeEmail = (email) => email ? String(email).trim().toLowerCase() : undefined;
+    const normalizePhoneDigits = (phone) => {
+      if (!phone) return undefined;
+      const digits = String(phone).replace(/\D/g, '');
+      return digits ? `+${digits}` : undefined;
+    };
+    
+    // PRIORITY 1: Check for valid NextAuth JWT token
+    try {
+      const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+      
+      if (token && !token.jti) {
+        // Old token format without jti - consider it valid
+        return {
+          authenticated: true,
+          customerId: token.customerId || customer?.id,
+          method: 'session'
+        };
+      }
+      
+      if (token && token.jti) {
+        // Check if JWT is blacklisted
+        const { isJWTBlacklisted } = await import('../../lib/auth/jwtBlacklist');
+        const isBlacklisted = await isJWTBlacklisted(token.jti);
+        
+        if (!isBlacklisted) {
+          // Valid token that's not blacklisted
+          return {
+            authenticated: true,
+            customerId: token.customerId || customer?.id,
+            method: 'session'
+          };
+        }
+      }
+    } catch (error) {
+      console.error('[CREATE_ORDER][session_check_error]', error);
+    }
+    
+    // PRIORITY 2: Check OTP verification marker (WhatsApp/Phone)
+    if (customer?.phone) {
+      const phoneKey = normalizePhoneDigits(customer.phone);
+      
+      if (phoneKey) {
+        try {
+          const otpMarker = await kvGet(`otp:ok:${phoneKey}`);
+          
+          if (otpMarker) {
+            console.log('[CREATE_ORDER][otp_auth_success]', { phoneKey });
+            return {
+              authenticated: true,
+              customerId: customer?.id,
+              method: 'otp'
+            };
+          }
+        } catch (error) {
+          console.error('[CREATE_ORDER][otp_check_error]', error);
+        }
+      }
+    }
+    
+    // PRIORITY 3: Check Magic Link verification marker (Email)
+    if (customer?.email) {
+      const email = normalizeEmail(customer.email);
+      
+      if (email) {
+        try {
+          const state = cartId ? `checkout-${cartId}` : '';
+          const keyGeneral = `magic:ok:${email}`;
+          const keyState = state ? `magic:ok:${email}:${state}` : '';
+          
+          const [generalMarker, stateMarker] = await Promise.all([
+            kvGet(keyGeneral),
+            keyState ? kvGet(keyState) : Promise.resolve(null),
+          ]);
+          
+          if (generalMarker || stateMarker) {
+            console.log('[CREATE_ORDER][magic_link_auth_success]', { email });
+            return {
+              authenticated: true,
+              customerId: customer?.id,
+              method: 'magic_link'
+            };
+          }
+        } catch (error) {
+          console.error('[CREATE_ORDER][magic_link_check_error]', error);
+        }
+      }
+    }
+    
+    // DEBUG: Log what we checked
+    console.log('[CREATE_ORDER][auth_check_debug]', {
+      hasPhone: !!customer?.phone,
+      hasEmail: !!customer?.email,
+      phoneKey: customer?.phone ? normalizePhoneDigits(customer.phone) : null,
+      emailKey: customer?.email ? normalizeEmail(customer.email) : null
+    });
+    
+    // No valid authentication found
+    return {
+      authenticated: false,
+      reason: 'No valid authentication found. User must complete identity verification (OTP, Magic Link, or Login) before checkout.'
+    };
+  } catch (error) {
+    console.error('[CREATE_ORDER][auth_validation_error]', error);
+    return {
+      authenticated: false,
+      reason: 'Authentication validation failed: ' + String(error.message || error)
+    };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -11,6 +133,30 @@ export default async function handler(req, res) {
   if (!orderId || !orderAmount) {
     return res.status(400).json({ error: 'orderId and orderAmount required' });
   }
+
+  // CRITICAL SECURITY: Validate checkout authentication before creating payment
+  // Pass both req and res for Pages Router compatibility
+  const authResult = await validateCheckoutAuthJS(req, res, customer, cartId);
+  
+  if (!authResult.authenticated) {
+    console.error('[CREATE_ORDER][auth_failed]', {
+      orderId,
+      cartId,
+      reason: authResult.reason
+    });
+    
+    return res.status(403).json({
+      error: 'authentication_required',
+      message: 'You must complete identity verification before initiating payment. Please verify using OTP, Magic Link, or Login.',
+      reason: authResult.reason
+    });
+  }
+  
+  console.log('[CREATE_ORDER][auth_success]', {
+    orderId,
+    cartId,
+    method: authResult.method
+  });
 
   const CF_BASE = process.env.CASHFREE_ENV === 'production'
     ? 'https://api.cashfree.com/pg'
@@ -59,13 +205,19 @@ export default async function handler(req, res) {
     }
     
     // SECURITY FIX: Store secure order-cart mapping with cryptographic binding
+    // Include customer authentication info for validation on return
     if (orderId && cartId) {
       try {
         await storeOrderCartMapping(
           String(orderId),
           String(cartId),
           Number(orderAmount),
-          'INR'
+          'INR',
+          {
+            id: customer?.id,
+            email: customer?.email,
+            phone: customer?.phone
+          }
         );
       } catch (mappingError) {
         console.error('[CREATE_ORDER][mapping_error]');

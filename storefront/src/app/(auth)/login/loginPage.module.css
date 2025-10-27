@@ -129,4 +129,115 @@
   text-decoration: underline;
 }
 
+/* Authentication method selection */
+.methodSection {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(20,20,20,0.08);
+}
+
+.methodTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2b2b2b;
+  margin-bottom: 12px;
+}
+
+.methodOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.methodOption {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(20,20,20,0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.methodOption:hover {
+  border-color: rgba(20,20,20,0.24);
+  background: rgba(20,20,20,0.02);
+}
+
+.methodOption input[type="radio"] {
+  margin: 0;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.methodLabel {
+  font-size: 14px;
+  color: #2b2b2b;
+  cursor: pointer;
+  flex: 1;
+}
+
+.methodDescription {
+  font-size: 12px;
+  color: #686868;
+  margin-top: 4px;
+}
+
+/* Authentication forms */
+.authForm {
+  margin-top: 16px;
+}
+
+.infoMessage {
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.infoMessage.success {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.infoMessage.error {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+.infoMessage.info {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.secondaryBtn {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: transparent;
+  color: #141414;
+  border: 1px solid rgba(20,20,20,0.16);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.secondaryBtn:hover {
+  background: rgba(20,20,20,0.04);
+}
+
+.secondaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 
