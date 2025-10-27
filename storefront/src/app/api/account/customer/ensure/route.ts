@@ -3,6 +3,7 @@ export const runtime = 'nodejs'
 import type { NextRequest } from 'next/server'
 import { getCounter, getHistogram } from '@/lib/metrics'
 import { storeFetch } from '@/lib/medusaServer'
+import { signBridgeToken } from '@/lib/auth/signing'
 
 function normalizeEmail(email?: string | null): string | undefined {
   if (!email) return undefined
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
     const rawEmail: string | undefined = body?.email
     const rawPhone: string | undefined = body?.phone
     const formData: any = body?.formData // Checkout form data with customer name and address
+    const cart_id: string | undefined = body?.cart_id // Cart ID to link to customer
+    const order_id: string | undefined = body?.order_id // Order ID to link to customer
 
     let email = normalizeEmail(rawEmail)
     const phone = normalizePhone(rawPhone)
@@ -44,7 +47,28 @@ export async function POST(req: NextRequest) {
     const lastName = formData?.last_name || ''
     const addresses = formData?.address ? [formData.address] : []
 
-    // Call the backend find-or-create endpoint with admin token for authentication
+    // Generate a customer JWT token for authentication
+    // The customer has already verified OTP/magic link before this endpoint is called
+    const subject = phone || email
+    if (!subject) {
+      return new Response(JSON.stringify({ ok: false, error: 'identifier_required' }), { status: 400 })
+    }
+
+    // Sign a JWT token for this customer
+    const jwtToken = await signBridgeToken({
+      sub: subject,
+      otpOK: Boolean(phone),
+      magicOK: Boolean(email && !phone),
+      mfaComplete: true,
+      purpose: 'customer.ensure',
+    })
+
+    if (!jwtToken) {
+      console.error('[ENSURE_CUSTOMER][JWT_SIGN_FAILED] Unable to sign JWT token - AUTH_SIGNING_JWK may be missing')
+      return new Response(JSON.stringify({ ok: false, error: 'jwt_signing_failed' }), { status: 500 })
+    }
+
+    // Call the backend find-or-create endpoint with customer JWT token
     const payload: Record<string, any> = {
       first_name: firstName,
       last_name: lastName,
@@ -55,17 +79,13 @@ export async function POST(req: NextRequest) {
     if (phone) payload.phone = phone
     if (email) payload.email = email
     if (addresses.length > 0) payload.addresses = addresses
-
-    const adminToken = process.env.MEDUSA_ADMIN_TOKEN || ''
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (adminToken) {
-      // Backend expects x-medusa-access-token with raw token value
-      headers['x-medusa-access-token'] = adminToken
-    }
+    if (cart_id) payload.cart_id = cart_id // Link cart to customer
+    if (order_id) payload.order_id = order_id // Link order to customer
 
     const res = await storeFetch('/store/custom/customer/find-or-create', {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
+      bearerToken: jwtToken, // Use customer JWT token instead of admin token
       body: JSON.stringify(payload),
     })
 
