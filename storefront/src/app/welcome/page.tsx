@@ -66,7 +66,7 @@ export default function WelcomePage() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ paddingTop: '100px' }}>
       <div className={styles.card}>
         <div className={styles.header}>
           <div className={styles.logo}>

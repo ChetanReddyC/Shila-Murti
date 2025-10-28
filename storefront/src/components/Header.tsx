@@ -89,7 +89,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const shouldShowBadge = hasVisitedCart && !isOnCartPage && totalItems > lastSeenCount;
 
   return (
-    <div className="w-full" style={{ height: '100px' }}>
+    <>
       <header className={styles.header}>
         <svg style={{ display: 'none' }}>
           <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
@@ -428,7 +428,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         </div>
       </header>
       <NavLinkShaderOverlay ref={navLinkShaderRef} />
-    </div>
+    </>
   );
 };
 

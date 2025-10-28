@@ -165,7 +165,7 @@ export default function OrderConfirmationPage() {
 
   return (
     <div className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
-      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}>
+      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}>
       <div className="layout-container flex h-full grow flex-col">
         <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
           <div className={styles.container}>

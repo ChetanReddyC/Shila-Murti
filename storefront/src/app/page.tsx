@@ -81,7 +81,7 @@ export default function Home() {
   };
 
   return (
-    <div className="relative w-full overflow-hidden">
+    <div className="relative w-full overflow-hidden" style={{ paddingTop: '100px' }}>
       <div
         className="relative min-h-screen w-full bg-white"
         style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}

@@ -28,7 +28,7 @@ export default function ContactPage() {
   return (
     <div
       className="relative min-h-screen w-full bg-white overflow-x-hidden"
-      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
+      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}
     >
       <div className="w-full flex justify-center bg-white pt-12">
         <div className="flex h-full grow flex-col w-full max-w-[1280px] px-4 sm:px-6 mx-auto">

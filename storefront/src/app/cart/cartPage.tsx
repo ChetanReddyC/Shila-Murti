@@ -189,7 +189,7 @@ export default function CartPage() {
   return (
     <div
       className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
-      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
+      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}
     >
       <div className="layout-container flex h-full grow flex-col">
         <NetworkStatus />

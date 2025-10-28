@@ -342,7 +342,7 @@ export default function LoginPage() {
   }, [])
 
   return (
-    <div className={styles.pageWrapper}>
+    <div className={styles.pageWrapper} style={{ paddingTop: '100px' }}>
       <div className={styles.card}>
         <div className={styles.brand}>
           <span className={styles.logoDot} />

@@ -3209,6 +3209,7 @@ export default function CheckoutPage() {
     <div
 
       className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
+      style={{ paddingTop: '100px' }}
 
       style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
 
