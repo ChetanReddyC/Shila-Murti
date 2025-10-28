@@ -90,13 +90,15 @@ export default function Home() {
 
         <div className="w-full flex justify-center bg-white pt-12">
           <div className="flex h-full grow flex-col w-full max-w-[1280px] px-4 sm:px-6 mx-auto">
-            {/* First decorative SVG - restored as plain image */}
+            {/* First decorative SVG - with standard viewport detection */}
             <div className={styles.shaderWrapper} style={{ zIndex: 5 }}>
               <DynamicSvgEffect
                 spotlightSize={400}
                 lightColor="#FFFFFF"
                 specularConstant={0.75}
                 specularExponent={25}
+                enableViewportCulling={true}
+                viewportMargin="50px"  // Standard margin for first SVG
               >
                 <img 
                   src="/svg-art1.svg" 
@@ -194,21 +196,27 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Second decorative SVG - restored as plain image */}
-                <div className={styles.shaderWrapperSecond} style={{ zIndex: 0, pointerEvents: 'auto' }}>
+                {/* Second decorative SVG - Restored with shader effects */}
+                <div className={styles.shaderWrapperSecond} style={{ zIndex: 0 }}>
                   <DynamicSvgEffect
                     spotlightSize={400}
                     lightColor="#FFFFFF"
                     specularConstant={0.75}
                     specularExponent={25}
+                    enableViewportCulling={true}
+                    viewportMargin="50px"
+                    containerStyle={{
+                      maskImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0) 100%)',
+                      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0) 100%)',
+                    }}
                   >
                     <img 
-                      src="/svg-art2.svg" 
+                      src="/violene11.png" 
                       alt="Decorative art" 
                       style={{
                         height: '100%',
                         width: 'auto',
-                        objectFit: 'contain',
+                        objectFit: 'fill',
                       }}
                     />
                   </DynamicSvgEffect>
