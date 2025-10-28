@@ -3,6 +3,9 @@
   display: inline-block;
   transform: translateZ(0); /* Force hardware acceleration */
   will-change: opacity; /* Hint to browser about opacity changes */
+  contain: layout style paint; /* CSS containment for better performance */
+  backface-visibility: hidden; /* Prevent flickering */
+  perspective: 1000px; /* Create stacking context */
 }
 
 .baseLayer {
