@@ -57,6 +57,9 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState<boolean>(false)
   const [otpCode, setOtpCode] = useState<string>('')
   const [otpVerifying, setOtpVerifying] = useState<boolean>(false)
+  const [showOtpModal, setShowOtpModal] = useState<boolean>(false)
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const autoSubmitTimerRef = useRef<any>(null)
   
   // Email authentication state
   const [email, setEmail] = useState<string>('')
@@ -180,6 +183,36 @@ export default function LoginPage() {
     }
   }, [authenticate, identifier])
 
+  // Handle OTP input change with auto-focus
+  const handleOtpInputChange = (index: number, value: string) => {
+    if (value.length <= 1 && /^\d*$/.test(value)) {
+      // Create array with proper length
+      const newOtpArray = Array(6).fill('')
+      const currentCode = otpCode.padEnd(6, '')
+      
+      // Fill existing digits
+      for (let i = 0; i < 6; i++) {
+        newOtpArray[i] = currentCode[i] || ''
+      }
+      
+      // Update current index
+      newOtpArray[index] = value
+      const completeCode = newOtpArray.join('')
+      setOtpCode(completeCode)
+      
+      // Auto-focus next input
+      if (value.length === 1 && index < 5) {
+        otpInputRefs.current[index + 1]?.focus()
+      }
+    }
+  }
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus()
+    }
+  }
+
   // Send OTP
   const sendOtp = async () => {
     try {
@@ -199,6 +232,7 @@ export default function LoginPage() {
         throw new Error(body?.error || 'Failed to send OTP')
       }
       setOtpSent(true)
+      setShowOtpModal(true)
       setStatus('OTP sent via WhatsApp. Please check your phone.')
     } catch (e: any) {
       setError(e?.message || 'Failed to send OTP. Please try again.')
@@ -208,7 +242,7 @@ export default function LoginPage() {
   }
 
   // Verify OTP
-  const verifyOtp = async () => {
+  const verifyOtp = useCallback(async () => {
     try {
       setError('')
       if (!otpCode || !/^\d{6}$/.test(otpCode)) {
@@ -258,7 +292,7 @@ export default function LoginPage() {
     } finally {
       setOtpVerifying(false)
     }
-  }
+  }, [otpCode, phone])
 
   // Send magic link
   const sendMagic = async () => {
@@ -334,6 +368,29 @@ export default function LoginPage() {
     }
   }
 
+  // Auto-submit when OTP is complete
+  useEffect(() => {
+    if (otpCode.length === 6 && /^\d{6}$/.test(otpCode) && !otpVerifying) {
+      // Clear any existing timer
+      if (autoSubmitTimerRef.current) {
+        clearTimeout(autoSubmitTimerRef.current)
+      }
+      
+      // Small delay to show the last digit before submitting
+      autoSubmitTimerRef.current = setTimeout(() => {
+        verifyOtp()
+      }, 300)
+    }
+    
+    // Cleanup
+    return () => {
+      if (autoSubmitTimerRef.current) {
+        clearTimeout(autoSubmitTimerRef.current)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otpCode, otpVerifying])
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -342,39 +399,40 @@ export default function LoginPage() {
   }, [])
 
   return (
-    <div className={styles.pageWrapper} style={{ paddingTop: '100px' }}>
-      <div className={styles.card}>
-        <div className={styles.brand}>
-          <span className={styles.logoDot} />
-          <h1 className={styles.title}>Sign in</h1>
-        </div>
-        <p className={styles.subtitle}>
-          {!showAuthMethods 
-            ? "Enter your email or phone number. We'll check if you have a passkey first."
-            : "Choose how you'd like to verify your identity:"
-          }
-        </p>
-
+    <div className={styles.pageWrapper}>
+      <div className={styles.container}>
+        <h2 className={styles.title}>Login</h2>
+        
         {!showAuthMethods ? (
-          <form onSubmit={onSubmit}>
-            <label className={styles.fieldLabel} htmlFor="identifier">Email or Phone</label>
-            <input
-              id="identifier"
-              name="identifier"
-              className={styles.input}
-              type="text"
-              placeholder="you@example.com or +1 555 555 5555"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              required
-              autoComplete="username"
-            />
-            <div className={styles.actions}>
-              <button className={styles.primaryBtn} type="submit" disabled={!identifier.trim()}>
-                Continue
-              </button>
-            </div>
-          </form>
+          <div className={styles.loginForm}>
+            <form onSubmit={onSubmit}>
+              <div className={styles.formGroup}>
+                <label htmlFor="identifier" className={styles.fieldLabel}>
+                  Email Address or Mobile Number
+                </label>
+                <input
+                  id="identifier"
+                  name="identifier"
+                  className={styles.input}
+                  type="text"
+                  placeholder="Enter your email or mobile"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                  autoComplete="username"
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <button
+                  className={styles.primaryBtn}
+                  type="submit"
+                  disabled={!identifier.trim()}
+                >
+                  Continue
+                </button>
+              </div>
+            </form>
+          </div>
         ) : (
           <div className={styles.methodSection}>
             <div className={styles.methodTitle}>Select Authentication Method</div>
@@ -411,71 +469,53 @@ export default function LoginPage() {
 
             {authMethod === 'phone' && (
               <div className={styles.authForm}>
-                <label className={styles.fieldLabel} htmlFor="phone">Phone Number (WhatsApp)</label>
-                <input
-                  id="phone"
-                  name="phone"
-                  className={styles.input}
-                  type="text"
-                  placeholder="+1 555 555 5555"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+                <div className={styles.formGroup}>
+                  <label className={styles.fieldLabel} htmlFor="phone">
+                    Phone Number (WhatsApp)
+                  </label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    className={styles.input}
+                    type="text"
+                    placeholder="+1 555 555 5555"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
                 
-                <div className={styles.buttonGroup}>
+                <div className={styles.formGroup}>
                   <button 
-                    className={styles.primaryBtn} 
+                    className={styles.primaryBtn}
                     onClick={sendOtp} 
                     disabled={otpSending || !phone.trim()}
                   >
                     {otpSending ? 'Sending...' : (otpSent ? 'Resend OTP' : 'Send OTP')}
                   </button>
                 </div>
-
-                {otpSent && (
-                  <>
-                    <label className={styles.fieldLabel} htmlFor="otp" style={{ marginTop: '16px' }}>Enter OTP Code</label>
-                    <input
-                      id="otp"
-                      name="otp"
-                      className={styles.input}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder="6-digit code"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                    />
-                    <div className={styles.buttonGroup}>
-                      <button 
-                        className={styles.primaryBtn} 
-                        onClick={verifyOtp} 
-                        disabled={otpVerifying || otpCode.length !== 6}
-                      >
-                        {otpVerifying ? 'Verifying...' : 'Verify OTP'}
-                      </button>
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
             {authMethod === 'email' && (
               <div className={styles.authForm}>
-                <label className={styles.fieldLabel} htmlFor="email">Email Address</label>
-                <input
-                  id="email"
-                  name="email"
-                  className={styles.input}
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+                <div className={styles.formGroup}>
+                  <label className={styles.fieldLabel} htmlFor="email">
+                    Email Address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    className={styles.input}
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
                 
-                <div className={styles.buttonGroup}>
+                <div className={styles.formGroup}>
                   <button 
-                    className={styles.primaryBtn} 
+                    className={styles.primaryBtn}
                     onClick={sendMagic} 
                     disabled={magicSending || !email.trim()}
                   >
@@ -497,21 +537,23 @@ export default function LoginPage() {
               </div>
             )}
 
-            <button 
-              className={styles.secondaryBtn} 
-              onClick={() => {
-                setShowAuthMethods(false)
-                setOtpSent(false)
-                setMagicSent(false)
-                setMagicVerified(false)
-                setOtpCode('')
-                setError('')
-                setStatus('')
-              }}
-              style={{ width: '100%', marginTop: '16px' }}
-            >
-              ← Back
-            </button>
+            <div className={styles.formGroup}>
+              <button 
+                className={styles.secondaryBtn}
+                onClick={() => {
+                  setShowAuthMethods(false)
+                  setOtpSent(false)
+                  setMagicSent(false)
+                  setMagicVerified(false)
+                  setOtpCode('')
+                  setShowOtpModal(false)
+                  setError('')
+                  setStatus('')
+                }}
+              >
+                ← Back
+              </button>
+            </div>
           </div>
         )}
 
@@ -527,10 +569,62 @@ export default function LoginPage() {
           </p>
         )}
 
-        <p className={styles.helperRow}>
-          Having trouble? <a className={styles.link} href="/contact">Contact support</a>
+        <p className={styles.signupText}>
+          <span className={styles.signupLink}>Don&apos;t have an account? Sign up</span>
         </p>
       </div>
+
+      {/* OTP Modal */}
+      {showOtpModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Verify with WhatsApp OTP</h2>
+              <p className={styles.modalDescription}>A 6-digit code has been sent to your WhatsApp number.</p>
+            </div>
+            <div className={styles.otpInputContainer}>
+              {[0, 1, 2, 3, 4, 5].map((index) => (
+                <input
+                  key={index}
+                  ref={(el) => { otpInputRefs.current[index] = el }}
+                  className={styles.otpInput}
+                  maxLength={1}
+                  type="text"
+                  inputMode="numeric"
+                  value={otpCode[index] || ''}
+                  onChange={(e) => handleOtpInputChange(index, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                />
+              ))}
+            </div>
+            <button
+              className={styles.verifyBtn}
+              onClick={verifyOtp}
+              disabled={otpVerifying || otpCode.length !== 6}
+            >
+              {otpVerifying ? 'Verifying...' : 'Verify'}
+            </button>
+            <div className={styles.modalActions}>
+              <button 
+                className={styles.modalLink}
+                onClick={sendOtp}
+                disabled={otpSending}
+              >
+                {otpSending ? 'Sending...' : 'Resend OTP'}
+              </button>
+              <button 
+                className={styles.modalLink}
+                onClick={() => {
+                  setShowOtpModal(false)
+                  setOtpCode('')
+                }}
+              >
+                Change Number
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
