@@ -209,63 +209,6 @@ export default function ReturnPage() {
         backgroundColor: '#F9FAFB',
         color: '#1F2937'
       }}>
-        <header style={{
-          backgroundColor: '#F9FAFB',
-          borderBottom: '1px solid #E5E7EB'
-        }}>
-          <div style={{
-            maxWidth: '1280px',
-            margin: '0 auto',
-            padding: '0 1rem'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              height: '4rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span className="material-icons-outlined" style={{ color: '#111827' }}>temple_hindu</span>
-                <a href="#" style={{ 
-                  marginLeft: '0.5rem', 
-                  fontSize: '1.25rem', 
-                  fontWeight: 'bold',
-                  color: '#111827',
-                  textDecoration: 'none'
-                }}>Shila Murthi</a>
-              </div>
-              <nav style={{ display: 'flex', gap: '2rem' }}>
-                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>Home</a>
-                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>Products</a>
-                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>About</a>
-                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>Contact</a>
-              </nav>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <button style={{
-                  padding: '0.5rem',
-                  borderRadius: '9999px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  color: '#6B7280'
-                }}>
-                  <span className="material-icons-outlined">search</span>
-                </button>
-                <button style={{
-                  padding: '0.5rem',
-                  borderRadius: '9999px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  color: '#6B7280'
-                }}>
-                  <span className="material-icons-outlined">shopping_cart</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
         <main style={{ 
           flexGrow: 1, 
           display: 'flex', 

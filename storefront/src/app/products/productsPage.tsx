@@ -365,7 +365,7 @@ export default function ProductsPage() {
   return (
     <div
       className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
-      style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
+      style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}
     >
       {/* Live region for screen readers to announce product count changes */}
       <div aria-live="polite" className={styles.srOnly}>

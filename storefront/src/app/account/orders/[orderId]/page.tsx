@@ -561,7 +561,7 @@ function OrderDetailsPageContent() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ paddingTop: '100px' }}>
       <div className={styles.mainWrapper}>
         <div className={styles.contentWrapper}>
           {/* Order Header */}

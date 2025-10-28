@@ -554,7 +554,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   return (
     <div
       className={`relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden ${styles.pageContainer}`}
-      style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
+      style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}
     >
       <div className="layout-container flex h-full grow flex-col">
         <NetworkStatus />
