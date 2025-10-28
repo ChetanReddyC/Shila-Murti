@@ -13,6 +13,9 @@ import { getOrderCartMapping } from '@/lib/cashfreeMapping'
 import { validateCheckoutAuth, extractCustomerInfo } from '@/utils/checkoutAuthValidation'
 
 export async function POST(req: NextRequest) {
+  console.log('============ COMPLETE API CALLED ============')
+  console.log('============ COMPLETE API CALLED ============')
+  console.log('============ COMPLETE API CALLED ============')
   try {
     const { searchParams } = new URL(req.url)
     const cartId = searchParams.get('cartId')
@@ -20,10 +23,13 @@ export async function POST(req: NextRequest) {
     const orderId = typeof body?.orderId === 'string' ? body.orderId : undefined
     const customerId = typeof body?.customerId === 'string' ? body.customerId : undefined
     
+    console.log('============ CART ID:', cartId, 'ORDER ID:', orderId, 'CUSTOMER ID:', customerId, '============')
+    
     // DEBUG: Log received parameters without sensitive payloads
-    console.log('[COMPLETE_API][start]', {
+    console.log('[COMPLETE_API][START]', {
       cartId,
       orderId,
+      customerId,
       customerIdPresent: Boolean(customerId),
       bodyKeys: Object.keys(body || {})
     })
@@ -80,19 +86,129 @@ export async function POST(req: NextRequest) {
       customerId: authResult.customerId
     })
 
+    // CRITICAL FIX: Use authenticated customerId for cart association
+    const authenticatedCustomerId = authResult.customerId || customerId
+    
+    console.log('[COMPLETE_API][BEFORE_ASSOCIATE]', {
+      cartId,
+      authenticatedCustomerId,
+      willAttemptAssociation: !!(cartId && authenticatedCustomerId)
+    })
+    
+    // CRITICAL FIX: Get cart details to extract shipping address for pre-completion sync
+    let preCompletionSyncAttempted = false
+    if (cartId && authenticatedCustomerId) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
+        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+        
+        // Fetch cart with shipping address
+        const cartResponse = await fetch(
+          `${baseUrl}/store/carts/${cartId}?fields=*shipping_address`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-publishable-api-key': publishableKey || ''
+            }
+          }
+        )
+
+        if (cartResponse.ok) {
+          const cartData = await cartResponse.json()
+          const cart = cartData?.cart
+          const sa: any = cart?.shipping_address || {}
+          const first_name = (sa?.first_name && String(sa.first_name).trim()) || ''
+          const last_name = (sa?.last_name && String(sa.last_name).trim()) || ''
+          const phone = (sa?.phone && String(sa.phone).trim()) || ''
+
+          // Only sync if we have customer name data from shipping address
+          if (first_name && phone) {
+            console.log('[COMPLETE_API][PRE_COMPLETION_SYNC]', { 
+              customerId: authenticatedCustomerId,
+              hasName: !!first_name,
+              hasPhone: !!phone
+            })
+            
+            const isRealCustomer = authenticatedCustomerId.startsWith('cus_') && !authenticatedCustomerId.includes('@guest.local')
+            const identityMethod = /@guest\.local$/i.test(authenticatedCustomerId) ? 'phone' : 'email'
+            
+            // Sync customer data BEFORE completing cart so order captures correct name
+            const formData = {
+              first_name,
+              last_name,
+              phone,
+              address: {
+                address_1: sa?.address_1 || '',
+                address_2: sa?.address_2 || '',
+                city: sa?.city || '',
+                postal_code: sa?.postal_code || '',
+                province: sa?.province || '',
+                country_code: (sa?.country_code || 'in').toString().toLowerCase(),
+                phone: phone,
+              },
+            }
+            
+            try {
+              const syncRes = await fetch(`${new URL(req.url).origin}/api/checkout/customer/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  customerId: authenticatedCustomerId,
+                  cartId,
+                  formData,
+                  orderCreated: false, // Not yet created
+                  identityMethod,
+                  whatsapp_authenticated: identityMethod === 'phone',
+                  email_authenticated: identityMethod === 'email',
+                }),
+              })
+              
+              preCompletionSyncAttempted = true
+              console.log('[COMPLETE_API][PRE_COMPLETION_SYNC_STATUS]', { 
+                status: syncRes.status,
+                success: syncRes.ok
+              })
+            } catch (syncError: any) {
+              console.log('[COMPLETE_API][PRE_COMPLETION_SYNC_ERROR]', { 
+                error: syncError?.message || String(syncError) 
+              })
+            }
+          } else {
+            console.log('[COMPLETE_API][PRE_COMPLETION_SYNC_SKIPPED]', { 
+              reason: 'missing_name_or_phone',
+              hasFirstName: !!first_name,
+              hasPhone: !!phone
+            })
+          }
+        }
+      } catch (cartFetchError: any) {
+        console.log('[COMPLETE_API][CART_FETCH_ERROR]', { 
+          error: cartFetchError?.message || String(cartFetchError) 
+        })
+      }
+    }
+    
     // Best-effort: if we have both cartId and customerId, try to associate before completing
-    if (cartId && customerId) {
+    if (cartId && authenticatedCustomerId) {
+      console.log('[COMPLETE_API][ASSOCIATING_CUSTOMER]', { cartId, customerId: authenticatedCustomerId })
       try {
         const origin = new URL(req.url).origin
         const assoc = await fetch(`${origin}/api/checkout/customer/associate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cartId, customerId })
+          body: JSON.stringify({ cartId, customerId: authenticatedCustomerId })
         })
-        try { console.log('[COMPLETE_API][associate][status]', { status: assoc.status }) } catch {}
+        console.log('[COMPLETE_API][ASSOCIATE_STATUS]', { status: assoc.status, customerId: authenticatedCustomerId })
       } catch (e: any) {
-        try { console.log('[COMPLETE_API][associate][error]', { error: e?.message || String(e) }) } catch {}
+        console.log('[COMPLETE_API][ASSOCIATE_ERROR]', { error: e?.message || String(e) })
       }
+    } else {
+      console.log('[COMPLETE_API][SKIPPING_ASSOCIATION]', {
+        reason: !cartId ? 'no_cartId' : 'no_customerId',
+        cartId,
+        authenticatedCustomerId
+      })
     }
     if (orderId && !cartId) {
       // SECURITY FIX: Resolve cartId from secure mapping service
@@ -375,15 +491,16 @@ export async function POST(req: NextRequest) {
       }
 
       // If we have a customer and an order, attempt a post-completion sync using order shipping address
-      if (customerId && createdOrderId) {
+      // SKIP if we already synced before completion
+      if (authenticatedCustomerId && createdOrderId && !preCompletionSyncAttempted) {
         try {
           // SECURITY FIX: Skip sync for authenticated real customers to prevent duplicate account creation
-          const isRealCustomer = customerId.startsWith('cus_') && !customerId.includes('@guest.local')
+          const isRealCustomer = authenticatedCustomerId.startsWith('cus_') && !authenticatedCustomerId.includes('@guest.local')
           
           if (isRealCustomer) {
             try { 
               console.log('[COMPLETE_API][sync][skipped_authenticated]', { 
-                customerId, 
+                customerId: authenticatedCustomerId, 
                 orderId: createdOrderId,
                 reason: 'Real authenticated customer - no sync needed' 
               }) 
@@ -398,7 +515,7 @@ export async function POST(req: NextRequest) {
             const phone = (sa?.phone && String(sa.phone).trim()) || ''
 
             if (phone) {
-              const identityMethod = /@guest\.local$/i.test(customerId) ? 'phone' : 'email'
+              const identityMethod = /@guest\.local$/i.test(authenticatedCustomerId) ? 'phone' : 'email'
               const formData = {
                 first_name,
                 last_name,
@@ -416,7 +533,7 @@ export async function POST(req: NextRequest) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  customerId,
+                  customerId: authenticatedCustomerId,
                   cartId,
                   orderId: createdOrderId,
                   formData,
@@ -434,6 +551,13 @@ export async function POST(req: NextRequest) {
         } catch (e: any) {
           try { console.log('[COMPLETE_API][sync][error]', { error: e?.message || String(e) }) } catch {}
         }
+      } else if (preCompletionSyncAttempted) {
+        try { 
+          console.log('[COMPLETE_API][post_sync][skipped]', { 
+            reason: 'already_synced_before_completion',
+            orderId: createdOrderId
+          }) 
+        } catch {}
       }
 
       return NextResponse.json({ ok: true, result })

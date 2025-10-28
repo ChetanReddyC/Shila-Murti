@@ -1,6 +1,7 @@
 // pages/return.js
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 
 export default function ReturnPage() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export default function ReturnPage() {
   const [orderData, setOrderData] = useState(null);
 
   useEffect(() => {
-    if (!orderIdParam) return;
+    if (!router.isReady || !orderIdParam) return;
     (async () => {
       const resp = await fetch(`/api/verify-order?orderId=${encodeURIComponent(orderIdParam)}`);
       const json = await resp.json();
@@ -58,6 +59,13 @@ export default function ReturnPage() {
             mappedCartId,
             orderIdParam,
             hasWindowMap: !!(window.__orderCartMap && window.__orderCartMap[orderIdParam])
+          });
+          
+          console.log('[RETURN_PAGE] About to call complete API with:', {
+            mappedCartId,
+            orderIdParam,
+            customerId,
+            hasCustomerId: !!customerId
           });
           
           let completeRes;
@@ -129,19 +137,250 @@ export default function ReturnPage() {
         setStatus('not_paid');
       }
     })();
-  }, [orderIdParam]);
+  }, [router.isReady, orderIdParam, router]);
 
   if (!orderIdParam) {
     return <div>Order ID missing in URL</div>;
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Processing your payment…</h1>
-      <p>Order: {String(orderIdParam || '')}</p>
-      <p>Status: {status}</p>
-      <p>You will be redirected to your order confirmation shortly.</p>
-    </div>
+    <>
+      <Head>
+        <title>Processing Payment - Shila Murthi</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+      </Head>
+      
+      <style jsx>{`
+        @keyframes radial-pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        @keyframes fill-radial-progress {
+          0% { --progress: 0%; }
+          100% { --progress: 100%; }
+        }
+        .radial-progress {
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          background: conic-gradient(
+            #111827 0% var(--progress),
+            #e5e7eb var(--progress) 100%
+          );
+          --progress: 0%;
+          animation: fill-radial-progress 8s linear forwards, radial-pulse 2s ease-in-out infinite;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .radial-progress::before {
+          content: '';
+          position: absolute;
+          width: calc(100% - 10px);
+          height: calc(100% - 10px);
+          background-color: #F9FAFB;
+          border-radius: 50%;
+          z-index: 1;
+        }
+        .help-tooltip {
+          display: none;
+          visibility: hidden;
+          opacity: 0;
+          transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .help-icon:hover .help-tooltip {
+          display: block;
+          visibility: visible;
+          opacity: 1;
+          transform: translateY(0);
+        }
+      `}</style>
+      
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: '100vh', 
+        fontFamily: 'Inter, sans-serif',
+        backgroundColor: '#F9FAFB',
+        color: '#1F2937'
+      }}>
+        <header style={{
+          backgroundColor: '#F9FAFB',
+          borderBottom: '1px solid #E5E7EB'
+        }}>
+          <div style={{
+            maxWidth: '1280px',
+            margin: '0 auto',
+            padding: '0 1rem'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              height: '4rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span className="material-icons-outlined" style={{ color: '#111827' }}>temple_hindu</span>
+                <a href="#" style={{ 
+                  marginLeft: '0.5rem', 
+                  fontSize: '1.25rem', 
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  textDecoration: 'none'
+                }}>Shila Murthi</a>
+              </div>
+              <nav style={{ display: 'flex', gap: '2rem' }}>
+                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>Home</a>
+                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>Products</a>
+                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>About</a>
+                <a href="#" style={{ color: '#6B7280', textDecoration: 'none' }}>Contact</a>
+              </nav>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <button style={{
+                  padding: '0.5rem',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: '#6B7280'
+                }}>
+                  <span className="material-icons-outlined">search</span>
+                </button>
+                <button style={{
+                  padding: '0.5rem',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: '#6B7280'
+                }}>
+                  <span className="material-icons-outlined">shopping_cart</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main style={{ 
+          flexGrow: 1, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}>
+          <div style={{ 
+            maxWidth: '28rem', 
+            width: '100%', 
+            textAlign: 'center', 
+            padding: '2rem' 
+          }}>
+            <div style={{ 
+              marginBottom: '1.5rem', 
+              position: 'relative', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <div className="radial-progress">
+                <span className="material-icons-outlined" style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  color: '#9CA3AF',
+                  fontSize: '2rem',
+                  zIndex: 20
+                }}>payments</span>
+              </div>
+              <div className="help-icon" style={{ 
+                position: 'relative', 
+                marginTop: '2rem', 
+                cursor: 'pointer' 
+              }}>
+                <button aria-label="Help with payment processing" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: '0.875rem',
+                  color: '#6B7280',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'color 0.2s'
+                }}>
+                  <span className="material-symbols-outlined" style={{ 
+                    fontSize: '1.125rem', 
+                    marginRight: '0.25rem' 
+                  }}>help</span>
+                  <span>Payment taking too long?</span>
+                </button>
+                <div className="help-tooltip" style={{
+                  position: 'absolute',
+                  zIndex: 30,
+                  width: '18rem',
+                  padding: '1rem',
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+                  left: '50%',
+                  transform: 'translateX(-50%) translateY(-0.5rem)',
+                  marginTop: '0.75rem',
+                  textAlign: 'left',
+                  fontSize: '0.875rem',
+                  color: '#374151'
+                }}>
+                  <p style={{ 
+                    fontWeight: '600', 
+                    marginBottom: '0.5rem', 
+                    color: '#111827' 
+                  }}>Common Issues &amp; FAQs:</p>
+                  <ul style={{ 
+                    listStyleType: 'disc', 
+                    paddingLeft: '1.5rem',
+                    margin: 0
+                  }}>
+                    <li style={{ marginBottom: '0.25rem' }}>Double-check your internet connection.</li>
+                    <li style={{ marginBottom: '0.25rem' }}>Ensure payment details are correct.</li>
+                    <li style={{ marginBottom: '0.25rem' }}>Contact your bank if the issue persists.</li>
+                    <li style={{ marginBottom: '0.25rem' }}>
+                      <a href="#" style={{ color: '#2563EB', textDecoration: 'underline' }}>Visit our help center</a> for more.
+                    </li>
+                  </ul>
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '50%',
+                    transform: 'translateX(-50%) translateY(-50%) rotate(45deg)',
+                    width: '0.75rem',
+                    height: '0.75rem',
+                    backgroundColor: 'white',
+                    borderTop: '1px solid #E5E7EB',
+                    borderLeft: '1px solid #E5E7EB'
+                  }}></div>
+                </div>
+              </div>
+            </div>
+            <h1 style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: 'bold', 
+              color: '#111827', 
+              marginBottom: '0.5rem' 
+            }}>Processing your payment...</h1>
+            <p style={{ color: '#4B5563' }}>
+              Please do not close this window or press the back button.
+            </p>
+            <p style={{ color: '#4B5563', marginTop: '0.25rem' }}>
+              You will be redirected to the order confirmation page shortly.
+            </p>
+          </div>
+        </main>
+      </div>
+    </>
   );
 }
 
