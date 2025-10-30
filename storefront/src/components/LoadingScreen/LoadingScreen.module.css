@@ -76,14 +76,12 @@
 .stoneCircle:nth-child(3) {
   animation-delay: 0.8s;
 }
-.tagline {
-  font-size: 1rem;
-  font-weight: 400;
-  color: #e0e0e0;
-  letter-spacing: 0.05em;
-  margin: 0;
+.taglineCanvas {
+  max-width: 600px;
+  width: 100%;
+  height: auto;
   animation: fadeIn 1s ease-out 0.5s both;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.3));
 }
 
 .loaderContainer {

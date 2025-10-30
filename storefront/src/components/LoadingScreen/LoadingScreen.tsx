@@ -33,6 +33,9 @@ export default function LoadingScreen({
   const glRef = useRef<WebGLRenderingContext | null>(null);
   const lastPhaseIndexRef = useRef<number>(-1);
   const PHASE_DURATION = 1.5;
+  
+  const textCanvasRef = useRef<HTMLCanvasElement>(null);
+  const textAnimationRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!show && isVisible) {
@@ -891,6 +894,242 @@ export default function LoadingScreen({
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
   }, [currentImageIndex, imagesFolder, loadedImages]);
 
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const canvas = textCanvasRef.current;
+    if (!canvas) return;
+
+    const gl = canvas.getContext('webgl', { 
+      alpha: true, 
+      premultipliedAlpha: false,
+      antialias: true 
+    });
+    if (!gl) return;
+
+    // Create text as image first
+    const textCanvas = document.createElement('canvas');
+    const textCtx = textCanvas.getContext('2d');
+    if (!textCtx) return;
+
+    textCanvas.width = 800;
+    textCanvas.height = 100;
+    textCtx.font = '20px Inter, sans-serif';
+    textCtx.fillStyle = 'white';
+    textCtx.textAlign = 'center';
+    textCtx.textBaseline = 'middle';
+    textCtx.letterSpacing = '0.05em';
+    textCtx.fillText('Getting things ready for you...', 400, 50);
+
+    canvas.width = 800;
+    canvas.height = 100;
+
+    const vsSource = `
+      attribute vec2 a_position;
+      attribute vec2 a_texCoord;
+      varying vec2 v_texCoord;
+      void main() {
+        gl_Position = vec4(a_position, 0.0, 1.0);
+        v_texCoord = a_texCoord;
+      }
+    `;
+
+    const fsSource = `
+      precision highp float;
+      uniform sampler2D u_image;
+      uniform float u_time;
+      varying vec2 v_texCoord;
+      
+      float hash(vec2 p) {
+        vec3 p3 = fract(vec3(p.xyx) * 0.13);
+        p3 += dot(p3, p3.yzx + 19.19);
+        return fract((p3.x + p3.y) * p3.z);
+      }
+      
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+        
+        float a = hash(i + vec2(0.0, 0.0));
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        
+        return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+      }
+      
+      float fbm(vec2 p) {
+        float value = 0.0;
+        float amplitude = 0.5;
+        float frequency = 1.0;
+        
+        for(int i = 0; i < 6; i++) {
+          value += amplitude * noise(p * frequency);
+          frequency *= 2.3;
+          amplitude *= 0.5;
+        }
+        return value;
+      }
+      
+      void main() {
+        vec2 uv = v_texCoord;
+        float t = u_time * 1.2; // MATCHED to main images speed
+        
+        vec4 originalColor = texture2D(u_image, uv);
+        
+        // LIQUID INK FLOW - smooth breathing cycle (appear + disappear)
+        float cycleTime = mod(t, 3.0); // 3 second full cycle (matches main images)
+        float normalizedCycle = cycleTime / 3.0;
+        
+        // Phase detection: 0-0.5 = materialize, 0.5-1.0 = dissolve
+        bool isMaterializing = normalizedCycle < 0.5;
+        float phaseProgress = isMaterializing ? (normalizedCycle * 2.0) : ((normalizedCycle - 0.5) * 2.0);
+        
+        // Multiple flowing waves with different speeds
+        float wave1 = sin(uv.x * 3.0 - t * 2.5) * 0.5 + 0.5;
+        float wave2 = sin(uv.x * 5.0 - t * 3.0 + 1.0) * 0.5 + 0.5;
+        float wave3 = cos(uv.x * 7.0 - t * 2.0 + 2.0) * 0.5 + 0.5;
+        
+        // Combine waves for liquid flow
+        float flowPattern = (wave1 + wave2 * 0.5 + wave3 * 0.3) / 1.8;
+        
+        // Flowing noise for organic feel
+        float flowNoise = fbm(vec2(uv.x * 3.0 + t * 0.5, uv.y * 2.0 - t * 0.3));
+        flowNoise = flowNoise * 0.5 + 0.5;
+        
+        // Vertical drip effect
+        float dripNoise = fbm(vec2(uv.x * 8.0, uv.y * 4.0 + t * 1.5));
+        float drip = smoothstep(0.3, 0.7, dripNoise) * 0.3;
+        
+        // Smooth reveal calculation - both materialize and dissolve
+        float basePosition = (uv.x + flowNoise * 0.2 + drip) * 0.9;
+        
+        float reveal;
+        if (isMaterializing) {
+          // Appearing: left to right
+          reveal = smoothstep(phaseProgress - 0.15, phaseProgress + 0.15, basePosition);
+        } else {
+          // Disappearing: continue left to right
+          reveal = smoothstep(phaseProgress - 0.15, phaseProgress + 0.15, basePosition);
+          reveal = 1.0 - reveal; // Invert for dissolve
+        }
+        
+        // Edge glow calculation
+        float edgePosition = isMaterializing ? phaseProgress : phaseProgress;
+        float edgeDist = abs(basePosition - edgePosition);
+        float edgeGlow = exp(-edgeDist * 15.0) * flowPattern;
+        edgeGlow = pow(edgeGlow, 2.0) * 1.5;
+        
+        // Liquid shimmer
+        float shimmer = noise(vec2(uv.x * 20.0 - t * 4.0, uv.y * 10.0)) * 0.5 + 0.5;
+        shimmer = pow(shimmer, 8.0) * edgeGlow;
+        
+        // Color mixing - ink bleeding effect
+        vec3 inkColor = vec3(0.9, 0.95, 1.0); // Cool white ink
+        vec3 finalColor = mix(originalColor.rgb, originalColor.rgb + inkColor * 0.4, edgeGlow);
+        
+        // Add shimmer highlights
+        finalColor += vec3(shimmer * 1.5);
+        
+        // Flowing edge brightness
+        float brightness = 1.0 + edgeGlow * 0.6;
+        finalColor *= brightness;
+        
+        gl_FragColor = vec4(finalColor, originalColor.a * reveal);
+      }
+    `;
+
+    function createShader(gl: WebGLRenderingContext, type: number, source: string) {
+      const shader = gl.createShader(type);
+      if (!shader) return null;
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Text shader compile error:', gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    if (!vertexShader || !fragmentShader) return;
+
+    const program = gl.createProgram();
+    if (!program) return;
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+
+    const positionLocation = gl.getAttribLocation(program, 'a_position');
+    const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
+    const imageLocation = gl.getUniformLocation(program, 'u_image');
+    const timeLocation = gl.getUniformLocation(program, 'u_time');
+
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1, 1, -1, -1, 1,
+      -1, 1, 1, -1, 1, 1,
+    ]), gl.STATIC_DRAW);
+
+    const texCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      0, 1, 1, 1, 0, 0,
+      0, 0, 1, 1, 1, 0,
+    ]), gl.STATIC_DRAW);
+
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
+
+    const startTime = Date.now();
+
+    const render = () => {
+      if (!isVisible) return;
+
+      const currentTime = (Date.now() - startTime) * 0.001;
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      gl.useProgram(program);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+      gl.enableVertexAttribArray(texCoordLocation);
+      gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+      gl.uniform1i(imageLocation, 0);
+      gl.uniform1f(timeLocation, currentTime);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      textAnimationRef.current = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      if (textAnimationRef.current) {
+        cancelAnimationFrame(textAnimationRef.current);
+      }
+    };
+  }, [isVisible]);
+
   if (!isVisible) return null;
 
   return (
@@ -912,7 +1151,12 @@ export default function LoadingScreen({
             </div>
           )}
         
-          <p className={styles.tagline}>Getting things ready for you...</p>
+          <canvas 
+            ref={textCanvasRef} 
+            className={styles.taglineCanvas}
+            width={800}
+            height={100}
+          />
         </div>
 
       </div>
