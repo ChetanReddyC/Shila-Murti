@@ -12,6 +12,7 @@ import { usePasskey } from '../../hooks/usePasskey';
 import { PriceCalculationService } from '../../services/PriceCalculationService';
 import { validateIndianAddress, validateAddressField, type AddressInput } from '../../utils/addressValidation';
 import AuthRequiredModal from '../../components/AuthRequiredModal';
+import { useNavigationLoading } from '../../providers/NavigationLoadingProvider';
 
 export default function CheckoutPage() {
 
@@ -20,6 +21,8 @@ export default function CheckoutPage() {
   const { cart, loading, refreshCart, loadSpecificCart, clearCart, setOrderConfirmationProtection, clearCartSilently } = useCart();
 
   const { authenticate } = usePasskey();
+
+  const { showLoading } = useNavigationLoading();
 
   // Performance Enhancement: Removed redundant refreshCart() call
   // CartContext already loads cart on initialization - no need to call it again here
@@ -1800,6 +1803,8 @@ export default function CheckoutPage() {
   // Cashfree payment handler
 
   const handleCashfreePay = async () => {
+
+    showLoading();
 
     try {
 
