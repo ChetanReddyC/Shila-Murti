@@ -8,6 +8,7 @@ export interface LoadingScreenProps {
   onComplete?: () => void;
   duration?: number;
   imageSrc?: string;
+  imagesFolder?: string;
   shaderEffect?: 'smoke';
 }
 
@@ -16,12 +17,22 @@ export default function LoadingScreen({
   onComplete,
   duration = 1200,
   imageSrc,
+  imagesFolder,
   shaderEffect = 'smoke'
 }: LoadingScreenProps) {
   const [isVisible, setIsVisible] = useState(show);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
+  
+  const [imageList, setImageList] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [loadedImages, setLoadedImages] = useState<HTMLImageElement[]>([]);
+  const startTimeRef = useRef<number>(0);
+  const textureRef = useRef<WebGLTexture | null>(null);
+  const glRef = useRef<WebGLRenderingContext | null>(null);
+  const lastPhaseIndexRef = useRef<number>(-1);
+  const PHASE_DURATION = 1.5;
 
   useEffect(() => {
     if (!show && isVisible) {
@@ -38,7 +49,81 @@ export default function LoadingScreen({
   }, [show, isVisible, onComplete]);
 
   useEffect(() => {
-    if (!isVisible || !imageSrc) return;
+    if (!imagesFolder) return;
+
+    const imageFiles = [
+      'Ganesha art white.png',
+      'Godess-lakshmi white.png',
+      'Iravathlineart white.png',
+      'Lions head art white.png',
+      'Nandhi white.png',
+      'peacock art white.png',
+      'Snakeart white.png',
+      'templefront-white.png'
+    ];
+
+    const imagePaths = imageFiles.map(file => `${imagesFolder}/${file}`);
+    setImageList(imagePaths);
+
+    const loadImages = async () => {
+      const images = await Promise.all(
+        imagePaths.map(path => {
+          return new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = path;
+          });
+        })
+      );
+      setLoadedImages(images);
+    };
+
+    loadImages();
+  }, [imagesFolder]);
+
+  useEffect(() => {
+    if (!imagesFolder || imageList.length === 0 || loadedImages.length === 0) return;
+
+    if (startTimeRef.current === 0) {
+      startTimeRef.current = Date.now();
+    }
+
+    const phaseTracker = setInterval(() => {
+      const elapsed = (Date.now() - startTimeRef.current) * 0.001 * 1.2;
+      const phaseIndex = Math.floor(elapsed / PHASE_DURATION);
+      
+      // Only process when we enter a NEW phase
+      if (phaseIndex === lastPhaseIndexRef.current) return;
+      
+      lastPhaseIndexRef.current = phaseIndex;
+      
+      // Each complete cycle = 2 phases (materialize + dissolve)
+      // Change image only at START of materialize phases (even phaseIndex)
+      const isStartOfMaterializePhase = phaseIndex % 2 === 0;
+      
+      if (isStartOfMaterializePhase) {
+        // Which image should show in this cycle
+        const cycleIndex = Math.floor(phaseIndex / 2); // Each cycle = 2 phases
+        const newImageIndex = cycleIndex % imageList.length;
+        
+        if (newImageIndex !== currentImageIndex) {
+          setCurrentImageIndex(newImageIndex);
+        }
+      }
+    }, 50);
+
+    return () => clearInterval(phaseTracker);
+  }, [imagesFolder, imageList, loadedImages, currentImageIndex, PHASE_DURATION]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    
+    const isMultiImageMode = imagesFolder && loadedImages.length > 0;
+    const isSingleImageMode = imageSrc && !isMultiImageMode;
+    
+    if (!isMultiImageMode && !isSingleImageMode) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -48,6 +133,8 @@ export default function LoadingScreen({
       console.warn('WebGL not supported');
       return;
     }
+    
+    glRef.current = gl;
 
     const vsSource = `
       attribute vec2 a_position;
@@ -697,33 +784,39 @@ export default function LoadingScreen({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    
+    textureRef.current = texture;
 
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.onload = () => {
+    const loadAndRenderImage = (imgElement: HTMLImageElement) => {
       // Resize canvas to match image aspect ratio
-      const aspectRatio = image.width / image.height;
+      const aspectRatio = imgElement.width / imgElement.height;
       const maxSize = 300;
       
       if (aspectRatio > 1) {
-        // Wider than tall
         canvas.width = maxSize;
         canvas.height = maxSize / aspectRatio;
       } else {
-        // Taller than wide
         canvas.height = maxSize;
         canvas.width = maxSize * aspectRatio;
       }
       
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgElement);
+    };
+
+    if (isMultiImageMode) {
+      if (startTimeRef.current === 0) {
+        startTimeRef.current = Date.now();
+      }
+      loadAndRenderImage(loadedImages[currentImageIndex]);
+    }
+    
+    const render = () => {
+      if (!isVisible) return;
       
-      const startTime = Date.now();
-      
-      const render = () => {
-        if (!isVisible) return;
-        
-        const currentTime = (Date.now() - startTime) * 0.001;
+      const currentTime = isMultiImageMode 
+        ? (Date.now() - startTimeRef.current) * 0.001
+        : (Date.now() - startTimeRef.current) * 0.001;
         
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clearColor(0, 0, 0, 0);
@@ -745,19 +838,40 @@ export default function LoadingScreen({
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         
         animationRef.current = requestAnimationFrame(render);
-      };
-      
-      render();
     };
-    
-    image.src = imageSrc;
+
+    if (isSingleImageMode) {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.onload = () => {
+        if (startTimeRef.current === 0) {
+          startTimeRef.current = Date.now();
+        }
+        loadAndRenderImage(image);
+        render();
+      };
+      image.src = imageSrc!;
+    } else if (isMultiImageMode) {
+      render();
+    }
 
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isVisible, imageSrc, shaderEffect]);
+  }, [isVisible, imageSrc, imagesFolder, loadedImages, shaderEffect]);
+
+  useEffect(() => {
+    if (!glRef.current || !textureRef.current || !imagesFolder || loadedImages.length === 0) return;
+    
+    const gl = glRef.current;
+    const texture = textureRef.current;
+    const image = loadedImages[currentImageIndex];
+    
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  }, [currentImageIndex, imagesFolder, loadedImages]);
 
   if (!isVisible) return null;
 
@@ -765,7 +879,7 @@ export default function LoadingScreen({
     <div className={`${styles.loadingScreen} ${isAnimatingOut ? styles.fadeOut : ''}`}>
       <div className={styles.content}>
         <div className={styles.logoContainer}>
-          {imageSrc ? (
+          {(imageSrc || imagesFolder) ? (
             <canvas 
               ref={canvasRef} 
               className={styles.shaderCanvas}
