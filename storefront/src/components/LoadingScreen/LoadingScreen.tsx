@@ -911,16 +911,10 @@ export default function LoadingScreen({
               <div className={styles.stoneCircle}></div>
             </div>
           )}
-          
-          <h1 className={styles.brand}>Shila Murthi</h1>
-          <p className={styles.tagline}>Timeless Stone Craftsmanship</p>
+        
+          <p className={styles.tagline}>Getting things ready for you...</p>
         </div>
 
-        <div className={styles.decorativePattern}>
-          <div className={styles.patternLine}></div>
-          <div className={styles.patternDot}></div>
-          <div className={styles.patternLine}></div>
-        </div>
       </div>
     </div>
   );
