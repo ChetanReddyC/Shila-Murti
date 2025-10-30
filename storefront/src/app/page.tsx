@@ -88,7 +88,7 @@ export default function Home() {
         show={showLoadingScreen} 
         onComplete={() => setShowLoadingScreen(false)}
         duration={1200}
-        imageSrc="/templefront-white.png"
+        imagesFolder="/loading-animations"
         shaderEffect="smoke"
       />
       
