@@ -865,9 +865,24 @@ export default function LoadingScreen({
   useEffect(() => {
     if (!glRef.current || !textureRef.current || !imagesFolder || loadedImages.length === 0) return;
     
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
     const gl = glRef.current;
     const texture = textureRef.current;
     const image = loadedImages[currentImageIndex];
+    
+    // Resize canvas to match NEW image's aspect ratio
+    const aspectRatio = image.width / image.height;
+    const maxSize = 300;
+    
+    if (aspectRatio > 1) {
+      canvas.width = maxSize;
+      canvas.height = maxSize / aspectRatio;
+    } else {
+      canvas.height = maxSize;
+      canvas.width = maxSize * aspectRatio;
+    }
     
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
