@@ -128,7 +128,12 @@ export default function LoadingScreen({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
+    const gl = canvas.getContext('webgl', { 
+      alpha: true, 
+      premultipliedAlpha: false,
+      antialias: true,
+      preserveDrawingBuffer: true
+    });
     if (!gl) {
       console.warn('WebGL not supported');
       return;
@@ -246,27 +251,25 @@ export default function LoadingScreen({
               (1.0 - smoothstep(0.0, 0.95, phaseTime)) * 1.8 : 
               smoothstep(0.0, 0.95, phaseTime) * 1.8;
             
-            // Random noise offsets per phase for unique patterns
+            // Random noise offsets per phase for unique patterns (ONLY for smoke, not image)
             vec2 noiseOffset1 = vec2(seed1 * 100.0, seed2 * 100.0);
             vec2 noiseOffset2 = vec2(seed3 * 100.0, seed4 * 100.0);
             vec2 noiseOffset3 = vec2(seed2 * 50.0, seed1 * 50.0);
             
-            // Create natural dissolve pattern with noise - each phase gets unique offsets
+            // Noise pattern for organic dissolve (ORIGINAL animation behavior)
             float dissolveNoise = fbm(uv * 5.0 + phaseTime * 0.5 + noiseOffset1);
             float detailNoise = fbm(uv * 12.0 - phaseTime * 0.8 + noiseOffset2);
             float microDetail = noise(uv * 25.0 + phaseTime * 1.2 + noiseOffset3);
-            
-            // Combine noise layers for organic pattern
             float noisePattern = dissolveNoise * 0.5 + detailNoise * 0.3 + microDetail * 0.2;
             
-            // Create threshold based on distance + noise
+            // ORIGINAL ALPHA CALCULATION - with full noise for organic dissolve
             float threshold = dist - dissolutionWave;
-            threshold += noisePattern * 0.4;
+            threshold += noisePattern * 0.4; // RESTORED original noise intensity
             
-            // Smooth alpha transition - this is the key to avoiding stretching
+            // Smooth alpha transition
             float alpha = smoothstep(-0.1, 0.3, threshold);
             
-            // Image visibility (no displacement, just fade)
+            // Image visibility - original animation behavior
             float imageAlpha = alpha;
             
             // Random smoke direction for each phase (declared here for use in multiple sections)
@@ -788,9 +791,9 @@ export default function LoadingScreen({
     textureRef.current = texture;
 
     const loadAndRenderImage = (imgElement: HTMLImageElement) => {
-      // Resize canvas to match image aspect ratio
+      // Resize canvas to match image aspect ratio with HIGHER RESOLUTION
       const aspectRatio = imgElement.width / imgElement.height;
-      const maxSize = 300;
+      const maxSize = 600; // Increased from 300 to 600 for better quality
       
       if (aspectRatio > 1) {
         canvas.width = maxSize;
@@ -872,9 +875,9 @@ export default function LoadingScreen({
     const texture = textureRef.current;
     const image = loadedImages[currentImageIndex];
     
-    // Resize canvas to match NEW image's aspect ratio
+    // Resize canvas to match NEW image's aspect ratio with HIGHER RESOLUTION
     const aspectRatio = image.width / image.height;
-    const maxSize = 300;
+    const maxSize = 600; // Increased from 300 to 600 for better quality
     
     if (aspectRatio > 1) {
       canvas.width = maxSize;
@@ -898,8 +901,8 @@ export default function LoadingScreen({
             <canvas 
               ref={canvasRef} 
               className={styles.shaderCanvas}
-              width={300}
-              height={300}
+              width={600}
+              height={600}
             />
           ) : (
             <div className={styles.stonePulse}>
