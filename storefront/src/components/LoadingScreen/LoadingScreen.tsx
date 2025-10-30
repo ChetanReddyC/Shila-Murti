@@ -60,7 +60,7 @@ export default function LoadingScreen({
     `;
 
     const getFragmentShader = () => {
-      // Professional Smoke Dissolution Effect
+      // Natural Smoke Dissolution Effect - Particle-based, no stretching
       if (shaderEffect === 'smoke') {
         return `
           precision highp float;
@@ -79,7 +79,7 @@ export default function LoadingScreen({
           float noise(vec2 p) {
             vec2 i = floor(p);
             vec2 f = fract(p);
-            vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0); // Quintic interpolation
+            vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
             
             float a = hash(i + vec2(0.0, 0.0));
             float b = hash(i + vec2(1.0, 0.0));
@@ -89,148 +89,234 @@ export default function LoadingScreen({
             return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
           }
           
-          // High-octave FBM for detailed turbulence
+          // FBM for smoke turbulence
           float fbm(vec2 p) {
             float value = 0.0;
             float amplitude = 0.5;
             float frequency = 1.0;
             
-            for(int i = 0; i < 7; i++) {
+            for(int i = 0; i < 6; i++) {
               value += amplitude * noise(p * frequency);
-              frequency *= 2.17; // Non-integer multiplier for less repetition
-              amplitude *= 0.52;
+              frequency *= 2.3;
+              amplitude *= 0.5;
             }
             return value;
           }
           
-          // Curl noise for natural swirling motion
-          vec2 curlNoise(vec2 p) {
-            float eps = 0.1;
-            float n1 = fbm(p + vec2(eps, 0.0));
-            float n2 = fbm(p - vec2(eps, 0.0));
-            float n3 = fbm(p + vec2(0.0, eps));
-            float n4 = fbm(p - vec2(0.0, eps));
+          // Voronoi-like cells for smoke pockets
+          float voronoi(vec2 p) {
+            vec2 n = floor(p);
+            vec2 f = fract(p);
+            float minDist = 1.0;
             
-            float dx = (n1 - n2) / (2.0 * eps);
-            float dy = (n3 - n4) / (2.0 * eps);
-            
-            return vec2(dy, -dx); // Perpendicular gradient for curl
+            for(int j = -1; j <= 1; j++) {
+              for(int i = -1; i <= 1; i++) {
+                vec2 neighbor = vec2(float(i), float(j));
+                vec2 point = hash(n + neighbor) * vec2(1.0, 1.0);
+                vec2 diff = neighbor + point - f;
+                float dist = length(diff);
+                minDist = min(minDist, dist);
+              }
+            }
+            return minDist;
           }
           
           void main() {
             vec2 uv = v_texCoord;
-            float t = u_time * 0.3; // Continuous time
+            float t = u_time * 0.3;
             
-            // Fixed origin - bottom-left corner for consistent direction
+            // Sample original image without any distortion
+            vec4 originalColor = texture2D(u_image, uv);
+            
+            // Distance from bottom-left corner
             vec2 origin = vec2(0.0, 1.0);
+            float dist = length(uv - origin);
+            vec2 toPixel = normalize(uv - origin + vec2(0.001));
             
-            vec2 toPixel = uv - origin;
-            float dist = length(toPixel);
-            vec2 direction = normalize(toPixel + vec2(0.001));
-            
-            // Two-phase animation: materialize then dissolve
-            float cycle = 8.0; // 8 seconds per full cycle (4s appear + 4s disappear)
+            // Animation cycle: 8 seconds (4s materialize + 4s dissolve)
+            float cycle = 8.0;
             float normalizedTime = mod(t, cycle) / cycle;
             
-            // Phase 1 (0.0-0.5): Materialization from smoke
-            // Phase 2 (0.5-1.0): Dissolution to smoke
             bool isMaterializing = normalizedTime < 0.5;
             float phaseTime = isMaterializing ? (normalizedTime * 2.0) : ((normalizedTime - 0.5) * 2.0);
             
-            // For materialization, reverse the progression (1.0 -> 0.0)
-            // For dissolution, normal progression (0.0 -> 1.0)
-            float dissolutionProgress = isMaterializing ? 
-              (1.0 - smoothstep(0.0, 0.9, phaseTime)) * 2.0 : 
-              smoothstep(0.0, 0.9, phaseTime) * 2.0;
+            // Dissolution wave moving outward from corner
+            float dissolutionWave = isMaterializing ? 
+              (1.0 - smoothstep(0.0, 0.85, phaseTime)) * 1.8 : 
+              smoothstep(0.0, 0.85, phaseTime) * 1.8;
             
-            // Multi-layer noise for complex dissolution pattern
-            // Use phaseTime to keep noise consistent within each phase
-            float primaryNoise = fbm(uv * 4.0 + phaseTime * 2.0);
-            float secondaryNoise = fbm(uv * 8.0 - phaseTime * 1.5);
-            float detailNoise = noise(uv * 16.0 + phaseTime * 3.0);
+            // Create natural dissolve pattern with noise
+            float dissolveNoise = fbm(uv * 5.0 + phaseTime * 0.5);
+            float detailNoise = fbm(uv * 12.0 - phaseTime * 0.8);
+            float microDetail = noise(uv * 25.0 + phaseTime * 1.2);
             
-            // Dissolution threshold - moves from corner outward
-            float threshold = smoothstep(dissolutionProgress - 0.5, dissolutionProgress + 0.3, dist);
+            // Combine noise layers for organic pattern
+            float noisePattern = dissolveNoise * 0.5 + detailNoise * 0.3 + microDetail * 0.2;
             
-            // Complex dissolution mask with multiple noise layers
-            float dissolveMask = threshold;
-            dissolveMask += primaryNoise * 0.25;
-            dissolveMask += secondaryNoise * 0.12;
-            dissolveMask += detailNoise * 0.06;
-            dissolveMask = smoothstep(0.4, 0.8, dissolveMask);
+            // Create threshold based on distance + noise
+            float threshold = dist - dissolutionWave;
+            threshold += noisePattern * 0.4;
             
-            // Gentle curl noise for realistic smoke motion (reduced strength)
-            vec2 curlOffset = curlNoise(uv * 2.0 + phaseTime * 1.5) * 0.04;
-            vec2 flowDirection = direction + curlOffset;
+            // Smooth alpha transition - this is the key to avoiding stretching
+            float alpha = smoothstep(-0.1, 0.3, threshold);
             
-            // Reduced displacement to prevent flipping
-            float displacementStrength = pow(1.0 - dissolveMask, 2.5) * 0.15;
-            vec2 displacement = flowDirection * displacementStrength * smoothstep(0.0, 0.3, 1.0 - dissolveMask);
+            // Image visibility (no displacement, just fade)
+            float imageAlpha = alpha;
             
-            // Subtle swirling only on dissolving edges
-            float swirl = fbm(uv * 2.5 + vec2(phaseTime * 0.8, -phaseTime * 0.6));
-            float angle = swirl * 0.8; // Reduced rotation
-            mat2 rotation = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-            displacement += (rotation * direction) * displacementStrength * 0.25;
+            // --- Smoke Particle Layer (separate from image) ---
             
-            // Sample texture with displacement
-            vec2 sampleUV = uv + displacement;
-            vec4 color = texture2D(u_image, sampleUV);
+            // Create floating smoke where image is dissolving
+            float smokeDensity = 0.0;
+            float dissolveEdge = 1.0 - alpha; // Inverse of image alpha
             
-            // Multi-sample for motion blur effect on dissolving edges (reduced blur)
-            vec4 blurColor = color;
-            if(dissolveMask < 0.7 && dissolveMask > 0.3) {
-              for(int i = 1; i <= 2; i++) {
-                float offset = float(i) * 0.01;
-                vec2 blurUV = uv + displacement * (1.0 + offset);
-                blurColor += texture2D(u_image, blurUV);
+            if(dissolveEdge > 0.01) {
+              // Rising smoke motion
+              vec2 smokeFlow = vec2(
+                sin(phaseTime * 1.2 + uv.x * 3.0) * 0.3,
+                -phaseTime * 2.0  // Upward drift
+              );
+              
+              // Multiple smoke layers at different scales
+              for(int i = 0; i < 4; i++) {
+                float fi = float(i);
+                float scale = 3.0 + fi * 2.5;
+                float speed = 1.0 + fi * 0.4;
+                
+                vec2 smokePos = uv * scale + smokeFlow * speed + toPixel * phaseTime * (0.5 + fi * 0.2);
+                
+                // Turbulent smoke
+                float smokeTurb = fbm(smokePos + phaseTime * 0.5);
+                
+                // Voronoi cells for puffy smoke clouds
+                float smokeCell = voronoi(smokePos * 0.8);
+                smokeCell = 1.0 - smoothstep(0.0, 0.4, smokeCell);
+                
+                // Combine turbulence and cells
+                float layerSmoke = smokeTurb * 0.6 + smokeCell * 0.4;
+                layerSmoke = pow(layerSmoke, 2.0);
+                
+                // Add to total with falloff
+                smokeDensity += layerSmoke * (0.25 / (fi + 1.0));
               }
-              blurColor /= 3.0;
-              color = mix(color, blurColor, 0.4);
+              
+              // Smoke appears at dissolving edges
+              smokeDensity *= dissolveEdge;
+              
+              // Add wispy tendrils
+              float tendrils = 0.0;
+              for(int j = 0; j < 3; j++) {
+                float fj = float(j);
+                vec2 tendrilPos = uv * (8.0 + fj * 4.0) + toPixel * phaseTime * (2.0 + fj * 0.5);
+                tendrilPos.y -= phaseTime * (1.5 + fj * 0.3); // Rise upward
+                
+                float tendril = pow(noise(tendrilPos), 4.0);
+                tendrils += tendril * (0.15 / (fj + 1.0));
+              }
+              
+              smokeDensity += tendrils * dissolveEdge;
             }
             
-            // Only fade during active dissolution/materialization
-            float fadeStart = dissolutionProgress - 0.3;
-            float fadeEnd = dissolutionProgress + 0.6;
-            float fadeMask = 1.0 - smoothstep(fadeStart, fadeEnd, dist);
+            // Clamp smoke density
+            smokeDensity = clamp(smokeDensity, 0.0, 1.0);
             
-            // Prevent dimming in untouched areas
-            fadeMask = max(fadeMask, dissolveMask);
+            // --- Trailing White Smoke (Natural & Wispy) ---
+            float trailingSmoke = 0.0;
             
-            // Edge detection for glow
-            float edgeDetect = abs(dissolveMask - 0.5) * 2.0;
-            float edge = smoothstep(0.5, 1.0, 1.0 - edgeDetect);
+            // ONLY create smoke where original image had content (non-transparent)
+            // This prevents smoke appearing in transparent PNG areas
+            float hasImageContent = originalColor.a; // 0 = transparent, 1 = has content
             
-            // Animated glow on dissolving edges
-            float glowPulse = sin(phaseTime * 8.0 + dist * 6.0) * 0.3 + 0.7;
-            float edgeGlow = edge * glowPulse * 0.6;
+            // Smoke appears at the EDGE where dissolution is happening
+            // Detect the transition zone (not the fully dissolved area)
+            float dissolvingEdge = smoothstep(0.2, 0.5, 1.0 - imageAlpha) * smoothstep(0.9, 0.6, 1.0 - imageAlpha);
             
-            // Wispy smoke particles (consistent direction)
-            float particles = 0.0;
-            for(int i = 0; i < 3; i++) {
-              float fi = float(i);
-              vec2 particlePos = uv * (5.0 + fi * 2.0) + direction * phaseTime * (2.0 + fi * 0.3);
-              particles += pow(noise(particlePos), 3.5) * (1.0 - dissolveMask) * 0.25;
+            // Only show smoke where there was actual image content
+            dissolvingEdge *= hasImageContent;
+            
+            if(dissolvingEdge > 0.05) {
+              // Upward smoke flow
+              vec2 smokeFlow = vec2(
+                sin(phaseTime * 1.2 + uv.x * 3.0) * 0.4,
+                -phaseTime * 3.0 // Strong upward
+              );
+              
+              // Create HEAVY billowing smoke (more layers, lower threshold)
+              for(int i = 0; i < 10; i++) {
+                float fi = float(i);
+                float scale = 3.0 + fi * 1.5;
+                
+                vec2 smokeUV = uv * scale + smokeFlow * (1.5 + fi * 0.3);
+                
+                // Heavy smoke pattern
+                float smoke = fbm(smokeUV);
+                
+                // LOWER threshold = more dense smoke
+                smoke = smoothstep(0.4, 0.7, smoke);
+                
+                // MUCH STRONGER contribution per layer
+                trailingSmoke += smoke * dissolvingEdge * 0.5;
+              }
+              
+              // Add thick flowing smoke trails
+              for(int t = 0; t < 6; t++) {
+                float ft = float(t);
+                vec2 trailUV = uv * (5.0 + ft * 1.5) + smokeFlow * (2.0 + ft * 0.4);
+                
+                float trail = noise(trailUV);
+                trail = pow(trail, 2.0); // Thicker trails
+                
+                trailingSmoke += trail * dissolvingEdge * 0.4;
+              }
+              
+              // Add large billowing clouds for heaviness
+              for(int c = 0; c < 4; c++) {
+                float fc = float(c);
+                vec2 cloudUV = (uv + smokeFlow * 0.5) * (2.5 + fc);
+                
+                float cloud = fbm(cloudUV);
+                cloud = smoothstep(0.35, 0.75, cloud);
+                
+                trailingSmoke += cloud * dissolvingEdge * 0.45;
+              }
             }
             
-            // Combine all alpha effects
-            float finalAlpha = color.a * dissolveMask * fadeMask;
+            // BOOST final smoke intensity significantly
+            trailingSmoke *= 1.8;
+            trailingSmoke = clamp(trailingSmoke, 0.0, 1.0);
+            
+            // --- Edge glow effect ---
+            float edgeGlow = 0.0;
+            float edgeRange = abs(alpha - 0.5) * 2.0;
+            if(edgeRange < 0.5) {
+              float glowPulse = sin(phaseTime * 6.0 + dist * 8.0) * 0.4 + 0.6;
+              edgeGlow = (1.0 - edgeRange * 2.0) * glowPulse * 0.5;
+            }
+            
+            // --- Final composition: Image REPLACED by smoke ---
+            
+            // White smoke color
+            vec3 smokeColor = vec3(1.0, 1.0, 1.0);
+            vec3 glowColor = vec3(1.0, 1.0, 1.05);
+            
+            // Create smoke layer with particle effects
+            vec3 particleSmokeColor = vec3(0.9, 0.92, 0.95);
+            vec3 smokeLayer = mix(smokeColor, particleSmokeColor, smokeDensity * 0.3);
+            smokeLayer = mix(smokeLayer, smokeColor, trailingSmoke);
+            
+            // Add edge glow to smoke
+            smokeLayer += glowColor * edgeGlow * 0.5;
+            
+            // CROSS-FADE: Image fades out, smoke fades in (they replace each other)
+            vec3 finalColor = mix(smokeLayer, originalColor.rgb, imageAlpha);
+            
+            // Alpha composition: Use image alpha where image exists, smoke alpha where it doesn't
+            // Where imageAlpha is high (1.0) = show image
+            // Where imageAlpha is low (0.0) = show smoke
+            float smokeContribution = trailingSmoke * (1.0 - imageAlpha) * originalColor.a;
+            float finalAlpha = originalColor.a * imageAlpha + smokeContribution;
             finalAlpha = clamp(finalAlpha, 0.0, 1.0);
             
-            // Enhanced color with smoke effects
-            vec3 smokeColor = vec3(0.95, 0.95, 1.0); // Slight blue tint for smoke
-            color.rgb = mix(color.rgb, smokeColor, particles * 0.4);
-            
-            // Brighten edges dramatically
-            color.rgb += edgeGlow * vec3(1.2, 1.2, 1.3) * (1.0 - dissolveMask);
-            
-            // Add depth with subtle darkening on outer particles
-            float depth = smoothstep(0.0, 1.0, 1.0 - dissolveMask);
-            color.rgb *= mix(1.0, 0.7, depth * 0.3);
-            
-            color.a = finalAlpha;
-            
-            gl_FragColor = color;
+            gl_FragColor = vec4(finalColor, finalAlpha);
           }
         `;
       }
