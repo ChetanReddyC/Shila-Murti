@@ -1,0 +1,263 @@
+.loadingScreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.6s ease-out;
+}
+
+.loadingScreen.fadeOut {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3rem;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+.logoContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.stonePulse {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shaderCanvas {
+  max-width: 300px;
+  max-height: 300px;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+  animation: fadeIn 1s ease-out;
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+  object-fit: contain;
+}
+
+.stoneCircle {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.stoneCircle:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.stoneCircle:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+.stoneCircle:nth-child(3) {
+  animation-delay: 0.8s;
+}
+
+.brand {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  margin: 0;
+  text-align: center;
+  animation: fadeIn 1s ease-out 0.3s both;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.tagline {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #e0e0e0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  animation: fadeIn 1s ease-out 0.5s both;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.loaderContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 300px;
+  animation: fadeIn 1s ease-out 0.7s both;
+}
+
+.progressBar {
+  width: 100%;
+  height: 3px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffffff 0%, #e0e0e0 50%, #ffffff 100%);
+  background-size: 200% 100%;
+  border-radius: 2px;
+  animation: progress 2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.loadingText {
+  font-size: 0.875rem;
+  color: #cccccc;
+  margin: 0;
+  font-weight: 400;
+  animation: pulse 2s ease-in-out infinite;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.decorativePattern {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  opacity: 0.5;
+  animation: fadeIn 1s ease-out 0.9s both;
+}
+
+.patternLine {
+  width: 60px;
+  height: 1px;
+  background-color: #ffffff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.patternDot {
+  width: 6px;
+  height: 6px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.3;
+  }
+}
+
+@keyframes progress {
+  0% {
+    width: 0%;
+    background-position: 0% 50%;
+  }
+  50% {
+    width: 70%;
+    background-position: 100% 50%;
+  }
+  100% {
+    width: 100%;
+    background-position: 200% 50%;
+  }
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .content {
+    gap: 2rem;
+    padding: 0 1rem;
+  }
+
+  .brand {
+    font-size: 2rem;
+  }
+
+  .tagline {
+    font-size: 0.875rem;
+  }
+
+  .stonePulse {
+    width: 80px;
+    height: 80px;
+  }
+
+  .shaderCanvas {
+    max-width: 200px;
+    max-height: 200px;
+  }
+
+  .loaderContainer {
+    width: 250px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand {
+    font-size: 1.5rem;
+  }
+
+  .tagline {
+    font-size: 0.75rem;
+  }
+
+  .stonePulse {
+    width: 60px;
+    height: 60px;
+  }
+
+  .shaderCanvas {
+    max-width: 150px;
+    max-height: 150px;
+  }
+
+  .loaderContainer {
+    width: 200px;
+  }
+
+  .patternLine {
+    width: 40px;
+  }
+}
