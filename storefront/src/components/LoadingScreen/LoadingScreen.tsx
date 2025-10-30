@@ -14,7 +14,7 @@ export interface LoadingScreenProps {
 export default function LoadingScreen({ 
   show = true, 
   onComplete,
-  duration = 2000,
+  duration = 1200,
   imageSrc,
   shaderEffect = 'smoke'
 }: LoadingScreenProps) {
@@ -123,32 +123,51 @@ export default function LoadingScreen({
           
           void main() {
             vec2 uv = v_texCoord;
-            float t = u_time * 0.3;
+            float t = u_time * 1.2;
             
             // Sample original image without any distortion
             vec4 originalColor = texture2D(u_image, uv);
             
-            // Distance from bottom-left corner
-            vec2 origin = vec2(0.0, 1.0);
+            // Random disintegrate/form pattern - each phase lasts 1.5 seconds
+            float phaseDuration = 1.5;
+            float phaseIndex = floor(t / phaseDuration);
+            float phaseTime = fract(t / phaseDuration);
+            
+            // Multiple random seeds for true variation per phase
+            float seed1 = fract(sin(phaseIndex * 127.43 + 234.56) * 43758.5453);
+            float seed2 = fract(sin(phaseIndex * 891.23 + 456.78) * 43758.5453);
+            float seed3 = fract(sin(phaseIndex * 567.89 + 123.45) * 43758.5453);
+            float seed4 = fract(sin(phaseIndex * 345.67 + 789.12) * 43758.5453);
+            
+            // Alternate between materializing and dissolving for smooth rhythm
+            // This ensures no sudden pops between phases
+            bool isMaterializing = mod(phaseIndex, 2.0) < 1.0;
+            
+            // Randomize the origin point for MAXIMUM variety
+            vec2 randomOrigin = vec2(seed2, seed3);
+            
+            // Also randomize the blend amount for more variation
+            float originBlend = seed4 * 0.6 + 0.2; // Between 0.2 and 0.8
+            
+            vec2 origin = mix(vec2(0.0, 1.0), randomOrigin, originBlend);
             float dist = length(uv - origin);
             vec2 toPixel = normalize(uv - origin + vec2(0.001));
             
-            // Animation cycle: 8 seconds (4s materialize + 4s dissolve)
-            float cycle = 8.0;
-            float normalizedTime = mod(t, cycle) / cycle;
-            
-            bool isMaterializing = normalizedTime < 0.5;
-            float phaseTime = isMaterializing ? (normalizedTime * 2.0) : ((normalizedTime - 0.5) * 2.0);
-            
             // Dissolution wave moving outward from corner
+            // Using full phaseTime range (0.0 to 1.0) for complete transitions
             float dissolutionWave = isMaterializing ? 
-              (1.0 - smoothstep(0.0, 0.85, phaseTime)) * 1.8 : 
-              smoothstep(0.0, 0.85, phaseTime) * 1.8;
+              (1.0 - smoothstep(0.0, 0.95, phaseTime)) * 1.8 : 
+              smoothstep(0.0, 0.95, phaseTime) * 1.8;
             
-            // Create natural dissolve pattern with noise
-            float dissolveNoise = fbm(uv * 5.0 + phaseTime * 0.5);
-            float detailNoise = fbm(uv * 12.0 - phaseTime * 0.8);
-            float microDetail = noise(uv * 25.0 + phaseTime * 1.2);
+            // Random noise offsets per phase for unique patterns
+            vec2 noiseOffset1 = vec2(seed1 * 100.0, seed2 * 100.0);
+            vec2 noiseOffset2 = vec2(seed3 * 100.0, seed4 * 100.0);
+            vec2 noiseOffset3 = vec2(seed2 * 50.0, seed1 * 50.0);
+            
+            // Create natural dissolve pattern with noise - each phase gets unique offsets
+            float dissolveNoise = fbm(uv * 5.0 + phaseTime * 0.5 + noiseOffset1);
+            float detailNoise = fbm(uv * 12.0 - phaseTime * 0.8 + noiseOffset2);
+            float microDetail = noise(uv * 25.0 + phaseTime * 1.2 + noiseOffset3);
             
             // Combine noise layers for organic pattern
             float noisePattern = dissolveNoise * 0.5 + detailNoise * 0.3 + microDetail * 0.2;
@@ -163,6 +182,10 @@ export default function LoadingScreen({
             // Image visibility (no displacement, just fade)
             float imageAlpha = alpha;
             
+            // Random smoke direction for each phase (declared here for use in multiple sections)
+            float smokeAngle = seed1 * 6.28318; // Random angle in radians
+            vec2 smokeDirection = vec2(cos(smokeAngle), sin(smokeAngle)) * 0.2;
+            
             // --- Smoke Particle Layer (separate from image) ---
             
             // Create floating smoke where image is dissolving
@@ -170,11 +193,12 @@ export default function LoadingScreen({
             float dissolveEdge = 1.0 - alpha; // Inverse of image alpha
             
             if(dissolveEdge > 0.01) {
-              // Rising smoke motion
+              
+              // Rising smoke motion with random variation
               vec2 smokeFlow = vec2(
-                sin(phaseTime * 1.2 + uv.x * 3.0) * 0.3,
+                sin(phaseTime * 1.2 + uv.x * 3.0 + seed2 * 10.0) * 0.3,
                 -phaseTime * 2.0  // Upward drift
-              );
+              ) + smokeDirection;
               
               // Multiple smoke layers at different scales
               for(int i = 0; i < 4; i++) {
@@ -182,10 +206,10 @@ export default function LoadingScreen({
                 float scale = 3.0 + fi * 2.5;
                 float speed = 1.0 + fi * 0.4;
                 
-                vec2 smokePos = uv * scale + smokeFlow * speed + toPixel * phaseTime * (0.5 + fi * 0.2);
+                vec2 smokePos = uv * scale + smokeFlow * speed + toPixel * phaseTime * (0.5 + fi * 0.2) + noiseOffset1 * 0.5;
                 
-                // Turbulent smoke
-                float smokeTurb = fbm(smokePos + phaseTime * 0.5);
+                // Turbulent smoke with random offset
+                float smokeTurb = fbm(smokePos + phaseTime * 0.5 + noiseOffset2 * 0.3);
                 
                 // Voronoi cells for puffy smoke clouds
                 float smokeCell = voronoi(smokePos * 0.8);
@@ -202,14 +226,14 @@ export default function LoadingScreen({
               // Smoke appears at dissolving edges
               smokeDensity *= dissolveEdge;
               
-              // Add wispy tendrils
+              // Add wispy tendrils with random variation
               float tendrils = 0.0;
               for(int j = 0; j < 3; j++) {
                 float fj = float(j);
-                vec2 tendrilPos = uv * (8.0 + fj * 4.0) + toPixel * phaseTime * (2.0 + fj * 0.5);
+                vec2 tendrilPos = uv * (8.0 + fj * 4.0) + toPixel * phaseTime * (2.0 + fj * 0.5) + noiseOffset3 * 0.6;
                 tendrilPos.y -= phaseTime * (1.5 + fj * 0.3); // Rise upward
                 
-                float tendril = pow(noise(tendrilPos), 4.0);
+                float tendril = pow(noise(tendrilPos + noiseOffset1), 4.0);
                 tendrils += tendril * (0.15 / (fj + 1.0));
               }
               
@@ -234,21 +258,21 @@ export default function LoadingScreen({
             dissolvingEdge *= hasImageContent;
             
             if(dissolvingEdge > 0.05) {
-              // Upward smoke flow
+              // Upward smoke flow with random variation per phase
               vec2 smokeFlow = vec2(
-                sin(phaseTime * 1.2 + uv.x * 3.0) * 0.4,
+                sin(phaseTime * 1.2 + uv.x * 3.0 + seed3 * 10.0) * 0.4,
                 -phaseTime * 3.0 // Strong upward
-              );
+              ) + smokeDirection * 0.5;
               
               // Create HEAVY billowing smoke (more layers, lower threshold)
               for(int i = 0; i < 10; i++) {
                 float fi = float(i);
                 float scale = 3.0 + fi * 1.5;
                 
-                vec2 smokeUV = uv * scale + smokeFlow * (1.5 + fi * 0.3);
+                vec2 smokeUV = uv * scale + smokeFlow * (1.5 + fi * 0.3) + noiseOffset3 * 0.4;
                 
-                // Heavy smoke pattern
-                float smoke = fbm(smokeUV);
+                // Heavy smoke pattern with random offset
+                float smoke = fbm(smokeUV + noiseOffset1 * 0.2);
                 
                 // LOWER threshold = more dense smoke
                 smoke = smoothstep(0.4, 0.7, smoke);
@@ -260,9 +284,9 @@ export default function LoadingScreen({
               // Add thick flowing smoke trails
               for(int t = 0; t < 6; t++) {
                 float ft = float(t);
-                vec2 trailUV = uv * (5.0 + ft * 1.5) + smokeFlow * (2.0 + ft * 0.4);
+                vec2 trailUV = uv * (5.0 + ft * 1.5) + smokeFlow * (2.0 + ft * 0.4) + noiseOffset2 * 0.5;
                 
-                float trail = noise(trailUV);
+                float trail = noise(trailUV + noiseOffset3);
                 trail = pow(trail, 2.0); // Thicker trails
                 
                 trailingSmoke += trail * dissolvingEdge * 0.4;
@@ -271,9 +295,9 @@ export default function LoadingScreen({
               // Add large billowing clouds for heaviness
               for(int c = 0; c < 4; c++) {
                 float fc = float(c);
-                vec2 cloudUV = (uv + smokeFlow * 0.5) * (2.5 + fc);
+                vec2 cloudUV = (uv + smokeFlow * 0.5) * (2.5 + fc) + noiseOffset1 * 0.3;
                 
-                float cloud = fbm(cloudUV);
+                float cloud = fbm(cloudUV + noiseOffset2 * 0.2);
                 cloud = smoothstep(0.35, 0.75, cloud);
                 
                 trailingSmoke += cloud * dissolvingEdge * 0.45;
