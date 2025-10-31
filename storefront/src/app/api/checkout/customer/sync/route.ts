@@ -41,25 +41,104 @@ export async function POST(req: NextRequest) {
     const isRealCustomer = customerId.startsWith('cus_') && !customerId.includes('@guest.local')
     
     if (isRealCustomer) {
-      // For authenticated real customers, skip full sync to prevent duplicate account creation
-      // The order/cart is already associated with their account during checkout
-      try { 
-        console.log('[SYNC_API][skip_authenticated_customer]', { 
+      // GATE: Verify cart/order actually has this customer linked before skipping sync
+      try {
+        console.log('[SYNC_API][verify_customer_link]', { 
           customerId, 
-          reason: 'Real authenticated customer - no sync needed' 
-        }) 
-      } catch {}
-      
-      return new Response(JSON.stringify({
-        ok: true,
-        customerUpdated: false,
-        skipped: true,
-        reason: 'authenticated_customer',
-        message: 'Sync skipped for authenticated customer - order linked to existing account',
-        customerId,
-        timestamp: Date.now(),
-        duration: Date.now() - startedAt
-      }), { status: 200 })
+          cartId, 
+          orderId,
+          checking: 'Verifying customer is actually linked to cart/order'
+        })
+        
+        // Fetch cart to verify customer association
+        const BACKEND_URL = process.env.MEDUSA_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+        const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+        
+        if (!PUBLISHABLE_KEY) {
+          throw new Error('Missing API configuration')
+        }
+        
+        let cartCustomerId: string | null = null
+        
+        // Try to get cart if cartId is provided
+        if (cartId) {
+          try {
+            const cartResponse = await fetch(`${BACKEND_URL}/store/carts/${cartId}`, {
+              method: 'GET',
+              headers: {
+                'x-publishable-api-key': PUBLISHABLE_KEY
+              },
+              signal: AbortSignal.timeout(5000) // 5 second timeout
+            })
+            
+            if (cartResponse.ok) {
+              const cartData = await cartResponse.json()
+              cartCustomerId = cartData?.cart?.customer_id || null
+              
+              console.log('[SYNC_API][cart_verification]', {
+                cartId,
+                cartCustomerId,
+                expectedCustomerId: customerId,
+                matches: cartCustomerId === customerId
+              })
+            }
+          } catch (cartError: any) {
+            console.warn('[SYNC_API][cart_fetch_failed]', {
+              cartId,
+              error: cartError.message,
+              continuing: 'Will proceed with sync as verification failed'
+            })
+            // If cart fetch fails, we can't verify - proceed with sync to be safe
+          }
+        }
+        
+        // CRITICAL CHECK: Only skip sync if cart actually has the customer linked
+        if (cartCustomerId === customerId) {
+          // Customer is verified to be linked - safe to skip sync
+          console.log('[SYNC_API][skip_authenticated_customer]', { 
+            customerId, 
+            cartId,
+            verified: true,
+            reason: 'Real authenticated customer with verified cart linkage'
+          })
+          
+          return new Response(JSON.stringify({
+            ok: true,
+            customerUpdated: false,
+            skipped: true,
+            verified: true,
+            reason: 'authenticated_customer_verified',
+            message: 'Sync skipped for authenticated customer - cart linkage verified',
+            customerId,
+            cartId,
+            timestamp: Date.now(),
+            duration: Date.now() - startedAt
+          }), { status: 200 })
+        } else {
+          // Customer NOT linked to cart - must proceed with sync!
+          console.warn('[SYNC_API][linkage_verification_failed]', {
+            customerId,
+            cartId,
+            cartCustomerId: cartCustomerId || 'null',
+            expectedCustomerId: customerId,
+            action: 'Proceeding with full sync to establish link'
+          })
+          
+          // Fall through to normal sync flow below
+          // This will create/update customer and link to cart
+        }
+        
+      } catch (verificationError: any) {
+        // If verification fails, be safe and proceed with sync
+        console.error('[SYNC_API][verification_error]', {
+          customerId,
+          cartId,
+          error: verificationError.message,
+          action: 'Proceeding with sync as safety measure'
+        })
+        
+        // Fall through to normal sync flow
+      }
     }
     
     if (!formData || typeof formData !== 'object') {
