@@ -14,7 +14,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const { cartId, customerId } = body
-    try { console.log('[ASSOC_API][start]', { cartId, customerId }) } catch {}
     
     // Validate required parameters
     if (!cartId || typeof cartId !== 'string') {
@@ -35,50 +34,81 @@ export async function POST(req: NextRequest) {
     
     
     // Backend configuration
-    const BACKEND_URL = process.env.MEDUSA_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+    const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || ''
+    
+    if (!INTERNAL_SECRET) {
+      console.error('[ASSOC_API] Internal API secret not configured')
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'configuration_error',
+        message: 'Internal API secret not configured'
+      }), { status: 500 })
+    }
     
     try {
-      // Prefer secure server-side association via backend route (no token in Next runtime required)
+      // CRITICAL FIX: Strict association - must succeed or fail, no fallback
       const response = await storeFetch(`/store/custom/associate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-internal-call': process.env.INTERNAL_API_SECRET || '',
+          'x-internal-call': INTERNAL_SECRET,
         },
         body: JSON.stringify({ cart_id: cartId, customer_id: customerId }),
       })
       
       const responseText = await response.text().catch(() => '')
+      let responseData: any = {}
+      
+      try {
+        responseData = JSON.parse(responseText)
+      } catch {
+        responseData = { raw: responseText }
+      }
       
       if (response.ok) {
-        try { console.log('[ASSOC_API][ok]', { cartId, customerId }) } catch {}
+        // Check if backend actually succeeded
+        if (responseData.ok === false || responseData.cart_associated === false) {
+          const errorDetails = responseData.cart_error || responseData.error || 'Unknown backend error'
+          console.error('[ASSOC_API] Backend association failed:', errorDetails)
+          
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'backend_association_failed',
+            message: `Backend failed to associate customer: ${errorDetails}`,
+            details: responseData
+          }), { status: 500 })
+        }
+        
         return new Response(JSON.stringify({
           ok: true,
           message: 'Customer successfully associated with cart',
           cartId,
-          customerId
+          customerId,
+          backend_result: responseData
         }), { status: 200 })
       } else {
-        try { console.log('[ASSOC_API][fallback]', { cartId, customerId, status: response.status, body: responseText }) } catch {}
+        const errorMessage = `Backend association failed: ${responseText || 'Unknown error'}`
+        console.error('[ASSOC_API] Backend returned error:', response.status, errorMessage)
         
-        // Don't fail the checkout - let the sync handle it
         return new Response(JSON.stringify({
-          ok: true,
-          message: 'Customer association will be handled during checkout sync',
-          fallback: true,
-          adminError: responseText
-        }), { status: 200 })
+          ok: false,
+          error: 'backend_association_failed',
+          message: errorMessage,
+          status: response.status,
+          details: responseText
+        }), { status: response.status >= 500 ? 500 : 400 })
       }
       
     } catch (error: any) {
-      try { console.log('[ASSOC_API][error]', { cartId, customerId, error: error?.message }) } catch {}
-      // Don't fail the checkout - let the sync handle it
+      const errorMessage = `Customer association exception: ${error?.message || String(error)}`
+      console.error('[ASSOC_API] Association error:', errorMessage)
+      
       return new Response(JSON.stringify({
-        ok: true,
-        message: 'Customer association will be handled during checkout sync',
-        fallback: true,
-        error: error.message
-      }), { status: 200 })
+        ok: false,
+        error: 'association_exception',
+        message: errorMessage,
+        details: error.message
+      }), { status: 500 })
     }
     
   } catch (error: any) {

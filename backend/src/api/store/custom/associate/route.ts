@@ -13,6 +13,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     const internalSecret = process.env.INTERNAL_API_SECRET || process.env.internal_api_secret
     const providedSecret = req.headers['x-internal-call']
+    
     if (!internalSecret || providedSecret !== internalSecret) {
       return res.status(401).json({ ok: false, error: 'unauthorized' })
     }

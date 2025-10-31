@@ -91,6 +91,42 @@ function matchesByAmount(option: ShippingOption, targetAmount?: number): boolean
   return false
 }
 
+/**
+ * Helper function to retry an async operation with exponential backoff
+ */
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  options: {
+    maxRetries: number
+    baseDelay: number
+    operationName: string
+  }
+): Promise<T> {
+  const { maxRetries, baseDelay, operationName } = options
+  let lastError: Error
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation()
+    } catch (error: any) {
+      lastError = error
+      
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt)
+        console.log(`[CHECKOUT][${operationName}][retry]`, {
+          attempt: attempt + 1,
+          maxRetries,
+          delayMs: delay,
+          error: error?.message || String(error)
+        })
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+
+  throw lastError!
+}
+
 export async function processCheckout(input: CheckoutInput, client: MedusaApiClient = medusaApiClient): Promise<CheckoutResult> {
   const logs: CheckoutProgressLog[] = []
   const { cartId, cartUpdate } = input
@@ -111,26 +147,127 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
   }
 
   try {
+    // GATE 1: Validate customer ID is provided (BLOCKING)
+    if (!input.customerId) {
+      currentStep = 'validate-customer'
+      const errorMessage = 'Customer ID is required for checkout. Please complete authentication first.'
+      console.error('[CHECKOUT][GATE_1_FAILED]', { cartId, reason: 'no_customer_id' })
+      return {
+        success: false,
+        cartId,
+        logs,
+        error: { step: 'validate-customer', message: errorMessage },
+      }
+    }
+    
+    logs.push({ step: 'validate-customer', details: { customerId: input.customerId, passed: true } })
+    console.log('[CHECKOUT][GATE_1_PASSED]', { cartId, customerId: input.customerId })
+
     // 1) Update cart with email and shipping/billing addresses
     currentStep = 'update-cart'
     const updatedCart = await client.updateCart(cartId, cartUpdate)
     try { console.log('[CHECKOUT][update-cart]', { cartId, email: (cartUpdate as any)?.email, shipping_first_name: (cartUpdate as any)?.shipping_address?.first_name }) } catch {}
     logs.push({ step: 'update-cart', details: { 
       cartId: updatedCart.id,
-      hasCustomerForSync: !!input.customerId
+      customerId: input.customerId
     } })
     
-    // 1.5) Associate customer with cart if available (Medusa v2 optimization)
-    if (input.customerId) {
-      currentStep = 'associate-customer'
+    // GATE 2: Associate customer with cart (BLOCKING with retries)
+    currentStep = 'associate-customer'
+    console.log('[CHECKOUT][GATE_2_START]', { cartId, customerId: input.customerId })
+    
+    try {
+      await retryWithBackoff(
+        async () => {
+          const response = await fetch('/api/checkout/customer/associate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cartId, customerId: input.customerId }),
+          })
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'unknown' }))
+            throw new Error(`Association failed: ${errorData.error || response.statusText}`)
+          }
+          
+          const data = await response.json()
+          // CRITICAL FIX: Check if response indicates fallback (which means actual failure)
+          if (data.fallback === true) {
+            throw new Error(`Association not completed: ${data.adminError || 'Backend association failed'}`)
+          }
+          
+          return data
+        },
+        {
+          maxRetries: 3,
+          baseDelay: 500,
+          operationName: 'associate-customer'
+        }
+      )
       
-      try {
-        await client.associateCustomerWithCart(cartId, input.customerId)
-        try { console.log('[CHECKOUT][associate-customer][ok]', { cartId, customerId: input.customerId }) } catch {}
-        logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: true } })
-      } catch (error: any) {
-        try { console.log('[CHECKOUT][associate-customer][fail]', { cartId, customerId: input.customerId, error: error?.message || String(error) }) } catch {}
-        logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: false, error: error.message } })
+      console.log('[CHECKOUT][GATE_2_PASSED]', { cartId, customerId: input.customerId })
+      logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: true, blocking: true } })
+    } catch (error: any) {
+      const errorMessage = `Failed to link customer to cart after multiple attempts: ${error?.message || String(error)}`
+      console.error('[CHECKOUT][GATE_2_FAILED]', { 
+        cartId, 
+        customerId: input.customerId, 
+        error: error?.message || String(error)
+      })
+      
+      // BLOCKING ERROR - Stop checkout process
+      return {
+        success: false,
+        cartId,
+        logs,
+        error: { 
+          step: 'associate-customer', 
+          message: errorMessage
+        },
+      }
+    }
+    
+    // GATE 3: Verify customer association succeeded (BLOCKING)
+    currentStep = 'verify-association'
+    console.log('[CHECKOUT][GATE_3_START]', { cartId, expectedCustomerId: input.customerId })
+    
+    try {
+      const cartAfterAssociation = await client.getCart(cartId)
+      const actualCustomerId = (cartAfterAssociation as any).customer_id
+      
+      if (actualCustomerId !== input.customerId) {
+        const errorMessage = `Cart customer verification failed. Expected: ${input.customerId}, Got: ${actualCustomerId || 'null'}`
+        console.error('[CHECKOUT][GATE_3_FAILED]', { 
+          cartId, 
+          expectedCustomerId: input.customerId,
+          actualCustomerId: actualCustomerId || 'null'
+        })
+        
+        return {
+          success: false,
+          cartId,
+          logs,
+          error: { step: 'verify-association', message: errorMessage },
+        }
+      }
+      
+      console.log('[CHECKOUT][GATE_3_PASSED]', { cartId, customerId: actualCustomerId })
+      logs.push({ step: 'verify-association', details: { 
+        customerId: actualCustomerId, 
+        verified: true 
+      } })
+    } catch (error: any) {
+      const errorMessage = `Failed to verify cart customer association: ${error?.message || String(error)}`
+      console.error('[CHECKOUT][GATE_3_FAILED]', { 
+        cartId, 
+        error: error?.message || String(error)
+      })
+      
+      return {
+        success: false,
+        cartId,
+        logs,
+        error: { step: 'verify-association', message: errorMessage },
       }
     }
 
@@ -231,8 +368,10 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
       logs.push({ step: 'select-payment-session', details: { providerId, selected: true } })
     }
 
-    // 3.5) SECURITY: Validate prices before completing cart
+    // GATE 4: Validate prices before completing cart (BLOCKING)
     currentStep = 'validate-pricing'
+    console.log('[CHECKOUT][GATE_4_START]', { cartId })
+    
     try {
       // Fetch fresh cart to get accurate totals with shipping methods applied
       const cartForValidation = await client.getCart(cartId)
@@ -248,7 +387,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         const shippingDiff = Math.abs(serverPrices.shipping - targetAmount)
         
         if (shippingDiff > 0.01) {
-          console.error('[CHECKOUT][PRICE_VALIDATION] Shipping amount mismatch', {
+          console.error('[CHECKOUT][GATE_4_FAILED][PRICE_MISMATCH]', {
             cartId,
             serverShipping: serverPrices.shipping,
             clientShipping: targetAmount,
@@ -279,6 +418,12 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         }
       }
       
+      console.log('[CHECKOUT][GATE_4_PASSED]', {
+        cartId,
+        serverTotal: serverPrices.total,
+        serverShipping: serverPrices.shipping
+      })
+      
       logs.push({
         step: 'validate-pricing',
         details: {
@@ -292,33 +437,35 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         }
       })
       
-      console.log('[CHECKOUT][PRICE_VALIDATION] Validation passed', {
-        cartId,
-        serverTotal: serverPrices.total,
-        serverShipping: serverPrices.shipping
-      })
-      
     } catch (validationError: any) {
-      console.error('[CHECKOUT][PRICE_VALIDATION] Validation error', {
+      console.error('[CHECKOUT][GATE_4_FAILED][EXCEPTION]', {
         cartId,
         error: validationError?.message || String(validationError)
       })
       
-      // Don't block checkout on validation errors (fail open for availability)
-      // but log the error for investigation
-      logs.push({
-        step: 'price-validation-error',
-        details: {
-          error: validationError?.message || String(validationError)
+      // BLOCKING ERROR - Price validation is critical for security
+      return {
+        success: false,
+        cartId,
+        logs,
+        error: {
+          step: 'validate-pricing',
+          message: `Price validation failed: ${validationError?.message || 'Unknown error'}. Please refresh and try again.`
         }
-      })
+      }
     }
 
-    // 4) Complete the cart
+    // GATE 5: Complete the cart (customer already verified and linked)
     currentStep = 'complete-cart'
+    console.log('[CHECKOUT][GATE_5_START]', { cartId, customerId: input.customerId })
+    
     const completion: CompleteCartResponse = await client.completeCart(cartId)
-    try { console.log('[CHECKOUT][complete-cart][response]', { cartId, hasOrder: Boolean((completion as any)?.order), hasCart: Boolean((completion as any)?.cart) }) } catch {}
-    logs.push({ step: 'complete-cart', details: { type: completion.type } })
+    console.log('[CHECKOUT][GATE_5_COMPLETED]', { 
+      cartId, 
+      hasOrder: Boolean((completion as any)?.order), 
+      orderId: (completion as any)?.order?.id
+    })
+    logs.push({ step: 'complete-cart', details: { type: completion.type, customerLinked: true } })
 
     if (!completion.order) {
       return {

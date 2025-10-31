@@ -1826,7 +1826,74 @@ export default function CheckoutPage() {
 
       setCashfreeLoading(true)
 
+      // GATE 1: Validate customer ID exists (BLOCKING)
+      if (!customerId) {
+        console.error('[CASHFREE] Customer ID required')
+        alert('Please complete identity verification before payment. Use phone OTP or email magic link in the Identity Verification section.')
+        setCashfreeLoading(false)
+        return
+      }
 
+      // GATE 2: Associate customer with cart (BLOCKING with retries)
+      const associateCustomerWithRetry = async (retries = 3): Promise<boolean> => {
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          try {
+            const response = await fetch('/api/checkout/customer/associate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cartId: cart.id, customerId }),
+            })
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: 'unknown' }))
+              throw new Error(`Association failed: ${errorData.error || response.statusText}`)
+            }
+            
+            const data = await response.json()
+            if (data.fallback === true || data.ok === false) {
+              throw new Error(`Association not completed: ${data.adminError || data.message || 'Backend association failed'}`)
+            }
+            
+            return true
+          } catch (error: any) {
+            if (attempt < retries) {
+              const delay = 500 * Math.pow(2, attempt)
+              await new Promise(resolve => setTimeout(resolve, delay))
+            } else {
+              throw error
+            }
+          }
+        }
+        return false
+      }
+
+      try {
+        await associateCustomerWithRetry(3)
+      } catch (error: any) {
+        console.error('[CASHFREE] Customer association failed:', error?.message)
+        alert('Failed to link your account to the cart. Please refresh the page and try again.')
+        setCashfreeLoading(false)
+        return
+      }
+
+      // GATE 3: Verify customer association (BLOCKING)
+      try {
+        const { medusaApiClient } = await import('../../utils/medusaApiClient')
+        const cartAfterAssociation = await medusaApiClient.getCart(cart.id)
+        const actualCustomerId = (cartAfterAssociation as any).customer_id
+        
+        if (actualCustomerId !== customerId) {
+          console.error('[CASHFREE] Cart verification failed: customer mismatch')
+          alert('Cart verification failed. Please refresh the page and try again.')
+          setCashfreeLoading(false)
+          return
+        }
+      } catch (error: any) {
+        console.error('[CASHFREE] Cart verification error:', error?.message)
+        alert('Failed to verify cart. Please refresh the page and try again.')
+        setCashfreeLoading(false)
+        return
+      }
 
       // 0) Prepare Medusa cart: update addresses/email, add shipping, initiate payment collection
 
