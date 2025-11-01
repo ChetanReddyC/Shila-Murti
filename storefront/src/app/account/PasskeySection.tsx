@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import SetupPasskeyButton from '@/components/SetupPasskeyButton'
+import { getCustomerId } from '../../utils/hybridCustomerStorage'
 
 export default function PasskeySection() {
   const [customerId, setCustomerId] = useState<string>('')
@@ -28,9 +29,17 @@ export default function PasskeySection() {
   }, [customerId, router])
 
   useEffect(() => {
-    // In a full implementation, this would come from session or a prior ensure step
-    const stored = typeof window !== 'undefined' ? window.sessionStorage.getItem('customerId') : null
-    if (stored) setCustomerId(stored)
+    const loadCustomerId = async () => {
+      try {
+        const result = await getCustomerId()
+        if (result.ok && result.customerId) {
+          setCustomerId(result.customerId)
+        }
+      } catch (e) {
+        console.error('[PasskeySection] Failed to get customer ID:', e)
+      }
+    }
+    loadCustomerId()
     // Also try to infer from session identifier if present (best-effort)
     if (!stored) {
       try {

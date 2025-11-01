@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import SetupPasskeyButton from './SetupPasskeyButton'
 import { useSession } from 'next-auth/react'
+import { getCustomerIdentifierForPasskeys } from '../utils/hybridCustomerStorage'
 import {
   detectMfaCompletion,
   detectCheckoutAuthentication,
@@ -1424,7 +1425,7 @@ export default function PasskeyNudge() {
   const identifier = getUserIdentifier()
   if (!identifier) return null
 
-  const userId = (typeof window !== 'undefined' && sessionStorage.getItem('customerId')) || identifier || 'user'
+  const userId = getCustomerIdentifierForPasskeys() || identifier || 'user'
   const username = getOriginalIdentifier() || identifier || 'user'
 
   return (

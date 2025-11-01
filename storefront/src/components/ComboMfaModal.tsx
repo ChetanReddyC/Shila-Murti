@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import styles from './ComboMfaModal.module.css'
+import { setCustomerId as setCustomerIdHybrid } from '../utils/hybridCustomerStorage'
 
 interface ComboMfaModalProps {
   open: boolean
@@ -128,12 +129,14 @@ export default function ComboMfaModal({ open, identifier, onClose, onComplete }:
         const identifierValue = json?.identifier || identifier.email || identifier.phone || 'user'
         console.log('[MFA][CustomerLookup] Identifier:', identifier)
         console.log('[MFA][CustomerLookup] Customer UUID retrieved:', json?.customerId)
-        // Persist customerId for passkey management & future passkey-first login
+        // Persist customerId using hybrid storage
         try {
-          if (json?.customerId && typeof window !== 'undefined') {
-            window.sessionStorage.setItem('customerId', String(json.customerId))
+          if (json?.customerId) {
+            await setCustomerIdHybrid(String(json.customerId))
           }
-        } catch {}
+        } catch (e) {
+          console.error('[MFA] Failed to set customer ID:', e)
+        }
         // Attempt to automatically register a passkey for this device after successful MFA
         try {
           const userId = (json?.customerId || identifierValue) as string

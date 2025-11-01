@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import HeaderGLSLCanvas from './HeaderGLSLCanvas';
 import NavLinkShaderOverlay, { type NavLinkShaderOverlayAPI } from './NavLinkShaderOverlay';
+import { clearCustomerId } from '../utils/hybridCustomerStorage';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
@@ -348,6 +349,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                           try {
                             const logoutRes = await fetch('/api/auth/logout', { method: 'POST' });
                             if (typeof window !== 'undefined') {
+                              await clearCustomerId();
                               sessionStorage.clear();
                               localStorage.removeItem('medusa_cart_id');
                               localStorage.removeItem('checkout_form');

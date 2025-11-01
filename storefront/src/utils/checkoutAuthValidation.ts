@@ -57,6 +57,31 @@ export async function validateCheckoutAuth(
     cartId?: string
   }
 ): Promise<AuthValidationResult> {
+  // PRIORITY 0: Check httpOnly cookie (Hybrid Storage - Option C)
+  // This is the most secure method as it's XSS-protected
+  try {
+    const customerIdCookie = req.cookies.get('customer_id')?.value
+    
+    if (customerIdCookie) {
+      console.log('[CHECKOUT_AUTH] Found customer ID in httpOnly cookie')
+      
+      // If customerId provided in options, verify it matches cookie
+      if (options?.customerId && options.customerId !== customerIdCookie) {
+        console.warn('[CHECKOUT_AUTH] Customer ID mismatch between request and cookie')
+        // Continue to other auth methods
+      } else {
+        return {
+          authenticated: true,
+          customerId: customerIdCookie,
+          method: 'session'
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[CHECKOUT_AUTH] httpOnly cookie check error:', error)
+    // Continue to other auth methods
+  }
+  
   // PRIORITY 1: Check for valid NextAuth session
   try {
     // Get the JWT token to check blacklist

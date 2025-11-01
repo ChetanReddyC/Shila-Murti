@@ -6,6 +6,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSession, signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
+import { setCustomerId as setCustomerIdHybrid, getCustomerId } from '../../utils/hybridCustomerStorage';
 const PasskeySection = dynamic(() => import('./PasskeySection'), { ssr: false })
 
 export default function AccountPage() {
@@ -78,7 +79,11 @@ export default function AccountPage() {
           const json = await res.json()
           const ensuredId = json?.customerId
           if (ensuredId) {
-            if (typeof window !== 'undefined') sessionStorage.setItem('customerId', ensuredId)
+            try {
+              await setCustomerIdHybrid(ensuredId)
+            } catch (e) {
+              console.error('[Account] Failed to set customer ID:', e)
+            }
             setCustomerId(ensuredId)
             try {
               await signIn('session', { identifier, customerId: ensuredId, redirect: false })
