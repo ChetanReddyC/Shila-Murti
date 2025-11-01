@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useCallback } from 'react'
+import { clearCustomerId } from '../utils/hybridCustomerStorage'
 
 const LogoutButton = () => {
   const router = useRouter()
@@ -22,6 +23,9 @@ const LogoutButton = () => {
         sessionStorage.removeItem('customerId')
         sessionStorage.clear() // Clear all session data
       }
+      
+      // Clear hybrid customer storage first
+      await clearCustomerId()
       
       // Clear localStorage cart and checkout data
       if (typeof window !== 'undefined') {

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react'
 import SetupPasskeyButton from './SetupPasskeyButton'
 import styles from './PasskeyPromptModal.module.css'
+import { getCustomerIdentifierForPasskeys } from '../utils/hybridCustomerStorage'
 
 interface PasskeyPromptModalProps {
   isOpen: boolean
@@ -57,7 +58,7 @@ export default function PasskeyPromptModal({
   if (!isOpen) return null
 
   // Extract user ID and username for SetupPasskeyButton
-  const userId = (typeof window !== 'undefined' && sessionStorage.getItem('customerId')) || userIdentifier || 'user'
+  const userId = getCustomerIdentifierForPasskeys() || userIdentifier || 'user'
   const username = userIdentifier || 'user'
 
   return (

@@ -1,13 +1,15 @@
 import type { NextRequest } from 'next/server'
 import { storeFetch } from '@/lib/medusaServer'
+import { validateCheckoutAuth, extractCustomerInfo } from '@/utils/checkoutAuthValidation'
 
 export const runtime = 'nodejs'
 
 /**
  * Customer-Cart Association API
  * 
- * Associates an existing customer with a cart before completion to prevent
- * Medusa from automatically creating a duplicate customer.
+ * SECURITY: Associates an existing customer with a cart before completion.
+ * This endpoint is protected with authentication validation to prevent
+ * malicious actors from linking carts to unauthorized customer accounts.
  */
 
 export async function POST(req: NextRequest) {
@@ -31,6 +33,58 @@ export async function POST(req: NextRequest) {
         message: 'Valid customer ID is required'
       }), { status: 400 })
     }
+    
+    // CRITICAL SECURITY FIX (Issue #4): Validate authentication before association
+    // This prevents attackers from linking carts to arbitrary customer accounts
+    console.log('[ASSOC_API][SECURITY] Validating authentication for cart-customer association')
+    
+    const customerInfo = extractCustomerInfo(body)
+    const authResult = await validateCheckoutAuth(req, {
+      ...customerInfo,
+      cartId,
+      customerId
+    })
+    
+    if (!authResult.authenticated) {
+      console.error('[ASSOC_API][SECURITY] Authentication failed for association attempt:', {
+        cartId,
+        requestedCustomerId: customerId,
+        reason: authResult.reason
+      })
+      
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'authentication_required',
+        message: 'You must complete identity verification (OTP, Magic Link, or Login) before associating customer with cart.',
+        reason: authResult.reason
+      }), { status: 403 })
+    }
+    
+    // CRITICAL SECURITY FIX (Issue #4): Verify ownership of customer ID
+    // Ensure the authenticated user can only associate THEIR OWN customer ID
+    const authenticatedCustomerId = authResult.customerId
+    
+    if (authenticatedCustomerId && authenticatedCustomerId !== customerId) {
+      console.error('[ASSOC_API][SECURITY] Customer ID ownership violation:', {
+        cartId,
+        requestedCustomerId: customerId,
+        authenticatedCustomerId: authenticatedCustomerId,
+        authMethod: authResult.method
+      })
+      
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'unauthorized_customer_id',
+        message: 'You can only associate your own customer ID with a cart. Authentication mismatch detected.',
+        securityNote: 'This incident has been logged.'
+      }), { status: 403 })
+    }
+    
+    console.log('[ASSOC_API][SECURITY] Authentication and ownership verified:', {
+      cartId,
+      customerId,
+      authMethod: authResult.method
+    })
     
     
     // Backend configuration

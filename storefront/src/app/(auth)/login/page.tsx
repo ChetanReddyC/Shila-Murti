@@ -4,6 +4,7 @@ import React, { useCallback, useState, useRef, useEffect } from 'react'
 import { usePasskey, PublicKeyRequestOptionsJSON } from '@/hooks/usePasskey'
 import { signIn } from 'next-auth/react'
 import styles from './loginPage.module.css'
+import { setCustomerId as setCustomerIdHybrid } from '../../../utils/hybridCustomerStorage'
 
 type Identifier = {
   email?: string
@@ -135,8 +136,12 @@ export default function LoginPage() {
                         body: JSON.stringify(id) 
                       })
                       const ej = await ensure.json().catch(() => ({}))
-                      if (ej?.customerId && typeof window !== 'undefined') {
-                        window.sessionStorage.setItem('customerId', String(ej.customerId))
+                      if (ej?.customerId) {
+                        try {
+                          await setCustomerIdHybrid(String(ej.customerId))
+                        } catch (e) {
+                          console.error('[Login] Failed to set customer ID:', e)
+                        }
                       }
                     } catch {}
                     
@@ -273,9 +278,11 @@ export default function LoginPage() {
         throw new Error('Failed to create account')
       }
 
-      // Store customer ID
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('customerId', String(ej.customerId))
+      // Store customer ID using hybrid storage
+      try {
+        await setCustomerIdHybrid(String(ej.customerId))
+      } catch (e) {
+        console.error('[Login] Failed to set customer ID:', e)
       }
 
       setStatus('Phone verified successfully! Redirecting...')
@@ -339,8 +346,10 @@ export default function LoginPage() {
             })
             const ej = await ensure.json().catch(() => ({}))
             if (ensure.ok && ej?.customerId) {
-              if (typeof window !== 'undefined') {
-                sessionStorage.setItem('customerId', String(ej.customerId))
+              try {
+                await setCustomerIdHybrid(String(ej.customerId))
+              } catch (e) {
+                console.error('[Login] Failed to set customer ID:', e)
               }
               setStatus('Email verified successfully! Redirecting...')
               

@@ -13,6 +13,7 @@ import { PriceCalculationService } from '../../services/PriceCalculationService'
 import { validateIndianAddress, validateAddressField, type AddressInput } from '../../utils/addressValidation';
 import AuthRequiredModal from '../../components/AuthRequiredModal';
 import { useNavigationLoading } from '../../providers/NavigationLoadingProvider';
+import { setCustomerId as setCustomerIdHybrid } from '../../utils/hybridCustomerStorage';
 
 export default function CheckoutPage() {
 
@@ -614,18 +615,15 @@ export default function CheckoutPage() {
 
             setCustomerId(json.customerId);
 
-            // Store customerId in sessionStorage for passkey detection
+            // Store customerId using hybrid storage (Option C)
 
             try {
 
-              if (typeof window !== 'undefined') {
-
-                sessionStorage.setItem('customerId', json.customerId);
-
-              }
+              await setCustomerIdHybrid(json.customerId);
 
             } catch (storageError) {
 
+              console.error('[Checkout] Failed to set customer ID:', storageError);
 
             }
 
@@ -761,7 +759,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
 
-    const checkCrossTabVerification = () => {
+    const checkCrossTabVerification = async () => {
 
       try {
 
@@ -796,18 +794,15 @@ export default function CheckoutPage() {
 
                 setCustomerId(data.customerId);
 
-                // Store customerId in sessionStorage for passkey detection
+                // Store customerId using hybrid storage (Option C)
 
                 try {
 
-                  if (typeof window !== 'undefined') {
-
-                    sessionStorage.setItem('customerId', data.customerId);
-
-                  }
+                  await setCustomerIdHybrid(data.customerId);
 
                 } catch (storageError) {
 
+                  console.error('[Checkout] Failed to set customer ID:', storageError);
 
                 }
 
@@ -1522,18 +1517,15 @@ export default function CheckoutPage() {
 
       setCustomerId(customerIdValue);
 
-      // Store customerId in sessionStorage for passkey detection
+      // Store customerId using hybrid storage (Option C)
 
       try {
 
-        if (typeof window !== 'undefined') {
-
-          sessionStorage.setItem('customerId', customerIdValue);
-
-        }
+        await setCustomerIdHybrid(customerIdValue);
 
       } catch (storageError) {
 
+        console.error('[Checkout] Failed to set customer ID:', storageError);
 
       }
 
@@ -1681,18 +1673,15 @@ export default function CheckoutPage() {
 
               setCustomerId(customerIdValue)
 
-              // Store customerId in sessionStorage for passkey detection
+              // Store customerId using hybrid storage (Option C)
 
               try {
 
-                if (typeof window !== 'undefined') {
-
-                  sessionStorage.setItem('customerId', customerIdValue);
-
-                }
+                await setCustomerIdHybrid(customerIdValue);
 
               } catch (storageError) {
 
+                console.error('[Checkout] Failed to set customer ID:', storageError);
 
               }
 
@@ -2628,7 +2617,7 @@ export default function CheckoutPage() {
 
         // Fire-and-forget post-purchase side effects without blocking navigation
 
-        setTimeout(() => {
+        setTimeout(async () => {
 
           // Customer sync is now handled by the checkout orchestrator
 
@@ -2653,14 +2642,11 @@ export default function CheckoutPage() {
 
               try {
 
-                if (typeof window !== 'undefined') {
-
-                  sessionStorage.setItem('customerId', customerId);
-
-                }
+                await setCustomerIdHybrid(customerId);
 
               } catch (storageError) {
 
+                console.error('[Checkout] Failed to set customer ID:', storageError);
 
               }
 
@@ -2999,14 +2985,11 @@ export default function CheckoutPage() {
 
                     try {
 
-                      if (typeof window !== 'undefined') {
-
-                        sessionStorage.setItem('customerId', customerIdValue)
-
-                      }
+                      await setCustomerIdHybrid(customerIdValue);
 
                     } catch (storageError) {
 
+                      console.error('[Checkout] Failed to set customer ID:', storageError);
 
                     }
 
