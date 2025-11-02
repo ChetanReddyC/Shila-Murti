@@ -316,7 +316,34 @@ export async function POST(req: NextRequest) {
       }
 
       // Complete cart inline so we can trigger post-completion sync
-      const result = await medusaApiClient.completeCart(cartId)
+      // Use atomic workflow if enabled (Issue #5 fix)
+      const useAtomicWorkflow = process.env.NEXT_PUBLIC_USE_ATOMIC_CHECKOUT === 'true'
+      let result: any
+      
+      if (useAtomicWorkflow && authenticatedCustomerId) {
+        console.log('[COMPLETE_API][atomic_workflow_start]', { 
+          cartId, 
+          customerId: authenticatedCustomerId 
+        })
+        
+        result = await medusaApiClient.completeCartAtomic(
+          cartId, 
+          authenticatedCustomerId
+        )
+        
+        console.log('[COMPLETE_API][atomic_workflow_success]', { 
+          cartId, 
+          orderId: result?.order?.id 
+        })
+      } else {
+        console.log('[COMPLETE_API][legacy_complete]', { 
+          cartId, 
+          useAtomicWorkflow,
+          hasCustomerId: !!authenticatedCustomerId 
+        })
+        
+        result = await medusaApiClient.completeCart(cartId)
+      }
       try { console.log('[COMPLETE_API][complete][response]', { cartId, hasOrder: Boolean((result as any)?.order), hasCart: Boolean((result as any)?.cart) }) } catch {}
 
       const createdOrder = (result as any)?.order

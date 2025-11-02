@@ -891,6 +891,85 @@ export class MedusaApiClient {
     throw lastError;
   }
 
+  /** 
+   * Complete cart using atomic workflow (Issue #5 fix)
+   * Provides ACID transaction guarantees for customer linking + order creation
+   */
+  async completeCartAtomic(
+    cartId: string, 
+    customerId: string,
+    customerData?: {
+      first_name: string
+      last_name: string
+      phone: string
+      email?: string
+      addresses?: any[]
+    }
+  ): Promise<CompleteCartResponse> {
+    const endpoint = `/store/custom/complete-order-atomic`;
+    const maxRetries = 3;
+    let lastError: any;
+    
+    console.log('[API_CLIENT][completeCartAtomic][start]', { cartId, customerId })
+    
+    // Retry logic for workflow execution
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.makeRequestWithRetry<any>(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({
+            cart_id: cartId,
+            customer_id: customerId,
+            customer_data: customerData
+          })
+        });
+        
+        console.log('[API_CLIENT][completeCartAtomic][success]', { 
+          cartId, 
+          orderId: response?.order?.id,
+          workflowUsed: response?.metadata?.workflow_used
+        })
+        
+        // Transform response to match CompleteCartResponse format
+        return {
+          type: 'order',
+          order: response.order
+        };
+      } catch (error: any) {
+        lastError = error;
+        
+        console.error('[API_CLIENT][completeCartAtomic][error]', {
+          cartId,
+          attempt: attempt + 1,
+          maxRetries: maxRetries + 1,
+          error: error?.message || String(error)
+        })
+        
+        // Retry on specific retryable errors
+        const isRetryable = error instanceof ApiError && 
+                           (error.status === 404 || 
+                            error.status === 409 || 
+                            error.status === 504 || // Timeout
+                            error.type === 'network');
+        
+        if (isRetryable && attempt < maxRetries) {
+          // Exponential backoff: 500ms, 1000ms, 2000ms
+          const delay = 500 * Math.pow(2, attempt);
+          console.log('[API_CLIENT][completeCartAtomic][retry]', { 
+            attempt: attempt + 1, 
+            delayMs: delay 
+          })
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        throw error;
+      }
+    }
+    
+    throw lastError;
+  }
+
   /** Retrieve an order by id (minimal fields) */
   async getOrder(orderId: string): Promise<OrderMinimal> {
     // Request expanded fields so the order confirmation page can render

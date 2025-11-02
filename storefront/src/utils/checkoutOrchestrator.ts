@@ -459,13 +459,46 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     currentStep = 'complete-cart'
     console.log('[CHECKOUT][GATE_5_START]', { cartId, customerId: input.customerId })
     
-    const completion: CompleteCartResponse = await client.completeCart(cartId)
-    console.log('[CHECKOUT][GATE_5_COMPLETED]', { 
-      cartId, 
-      hasOrder: Boolean((completion as any)?.order), 
-      orderId: (completion as any)?.order?.id
+    // Use atomic workflow if enabled (Issue #5 fix)
+    const useAtomicWorkflow = process.env.NEXT_PUBLIC_USE_ATOMIC_CHECKOUT === 'true'
+    let completion: CompleteCartResponse
+    
+    if (useAtomicWorkflow) {
+      console.log('[CHECKOUT][GATE_5][ATOMIC_WORKFLOW]', { cartId, customerId: input.customerId })
+      
+      // Call atomic workflow endpoint that provides ACID transaction guarantees
+      completion = await client.completeCartAtomic(
+        cartId, 
+        input.customerId,
+        input.checkoutFormData
+      )
+      
+      console.log('[CHECKOUT][GATE_5][ATOMIC_WORKFLOW_SUCCESS]', { 
+        cartId, 
+        orderId: completion?.order?.id,
+        workflowUsed: true
+      })
+    } else {
+      console.log('[CHECKOUT][GATE_5][LEGACY_METHOD]', { cartId })
+      
+      // Legacy method: separate blocking gates (Issues #1-4 fixes)
+      completion = await client.completeCart(cartId)
+      
+      console.log('[CHECKOUT][GATE_5_COMPLETED]', { 
+        cartId, 
+        hasOrder: Boolean((completion as any)?.order), 
+        orderId: (completion as any)?.order?.id
+      })
+    }
+    
+    logs.push({ 
+      step: 'complete-cart', 
+      details: { 
+        type: completion.type, 
+        customerLinked: true,
+        atomicWorkflow: useAtomicWorkflow
+      } 
     })
-    logs.push({ step: 'complete-cart', details: { type: completion.type, customerLinked: true } })
 
     if (!completion.order) {
       return {
