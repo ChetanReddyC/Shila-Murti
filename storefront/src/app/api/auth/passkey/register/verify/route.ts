@@ -6,7 +6,8 @@ const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost'
 const ORIGIN = process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000'
 
 export async function POST(req: NextRequest) {
-  const { userId, credential } = await req.json().catch(() => ({}))
+  const { userId, credential, username } = await req.json().catch(() => ({}))
+  console.log('[PASSKEY_REGISTER_VERIFY] Request:', { userId, username, hasCredential: !!credential })
   if (!userId || !credential) return new Response(JSON.stringify({ error: 'missing_params' }), { status: 400 })
 
   const reg = await kvGet<{ challenge: string }>(`webauthn:reg:${userId}`)
@@ -32,7 +33,19 @@ export async function POST(req: NextRequest) {
     credentialBackedUp: info.credentialBackedUp,
     transports: info.transports,
   }
-  await kvSet(`webauthn:cred:${userId}:${record.credentialID}`, record)
+  
+  // Store credential with userId as part of the key
+  const credKey = `webauthn:cred:${userId}:${record.credentialID}`
+  await kvSet(credKey, record)
+  console.log('[PASSKEY_REGISTER_VERIFY] Stored credential at:', credKey)
+  
+  // CRITICAL: Store reverse mapping for conditional UI lookups
+  // This allows finding userId from credentialID without listing keys
+  // Also store the username (original identifier: email or phone) for proper user identification
+  const mapKey = `webauthn:cred-map:${record.credentialID}`
+  await kvSet(mapKey, { userId, username })
+  console.log('[PASSKEY_REGISTER_VERIFY] Stored reverse mapping:', mapKey, '→', { userId, username })
+  
   await kvDel(`webauthn:reg:${userId}`)
 
   // Mark presence counter/flag for policy gate

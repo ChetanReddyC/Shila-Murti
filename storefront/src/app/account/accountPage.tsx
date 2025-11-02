@@ -47,6 +47,14 @@ export default function AccountPage() {
 
   useEffect(() => {
     try {
+      // First, try to get customerId from session (most reliable)
+      const sessionCustomerId = (session as any)?.customerId
+      if (sessionCustomerId && typeof sessionCustomerId === 'string') {
+        setCustomerId(sessionCustomerId)
+        return
+      }
+      
+      // Fallback: try sessionStorage for backward compatibility
       const cid = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null
       const normalized = cid && cid !== 'undefined' && cid !== 'null' ? cid : null
       if (normalized) {
@@ -55,10 +63,19 @@ export default function AccountPage() {
         sessionStorage.removeItem('customerId')
       }
     } catch {}
-  }, [])
+  }, [session])
 
   useEffect(() => {
+    // Skip if we already have customerId or ensure is in flight
     if (customerId || ensureInFlight) return
+    
+    // Skip if session already has customerId - no need to ensure again
+    const sessionCustomerId = (session as any)?.customerId
+    if (sessionCustomerId && typeof sessionCustomerId === 'string') {
+      setCustomerId(sessionCustomerId)
+      return
+    }
+    
     const originalEmail = session?.user?.originalEmail as string | undefined
     const originalPhone = session?.user?.originalPhone as string | undefined
     const identifier = originalPhone || originalEmail
@@ -85,15 +102,16 @@ export default function AccountPage() {
               console.error('[Account] Failed to set customer ID:', e)
             }
             setCustomerId(ensuredId)
-            try {
-              await signIn('session', { identifier, customerId: ensuredId, redirect: false })
-            } catch {}
+            // IMPORTANT: Only update session if customerId was missing
+            // Don't call signIn here as it can cause re-renders and close modals
+            // The session already has the customerId from login, we just needed to ensure it exists
+            console.log('[Account] Customer ensured, customerId set:', ensuredId)
           }
         }
       } catch {}
       setEnsureInFlight(false)
     })()
-  }, [customerId, ensureInFlight, session?.user?.originalEmail, session?.user?.originalPhone])
+  }, [customerId, ensureInFlight, session?.user?.originalEmail, session?.user?.originalPhone, session])
 
   useEffect(() => {
     if (!customerId) return
