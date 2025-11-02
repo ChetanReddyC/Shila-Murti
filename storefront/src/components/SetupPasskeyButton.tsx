@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 
 async function registerPasskey(userId: string, username: string) {
+  console.log('[PasskeyReg] Starting registration with userId:', userId, 'username:', username)
   const res = await fetch('/api/auth/passkey/register/options', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -10,6 +11,7 @@ async function registerPasskey(userId: string, username: string) {
   })
   if (!res.ok) throw new Error('options_failed')
   const { options } = await res.json()
+  console.log('[PasskeyReg] Got options:', { userId: options.user.id, username: options.user.name })
   // Convert to proper types for WebAuthn
   const b64ToBytes = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
   const publicKey: PublicKeyCredentialCreationOptions = {
@@ -38,10 +40,12 @@ async function registerPasskey(userId: string, username: string) {
       transports: (cred as any).response.getTransports?.() || [],
     },
   }
+  console.log('[PasskeyReg] Verifying with userId:', userId, 'username:', username, 'credentialId:', payload.id)
   const verify = await fetch('/api/auth/passkey/register/verify', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, credential: payload }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, username, credential: payload }),
   })
   if (!verify.ok) throw new Error('verify_failed')
+  console.log('[PasskeyReg] Registration successful!')
   return true
 }
 

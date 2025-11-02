@@ -35,6 +35,10 @@ export async function setCustomerId(customerId: string): Promise<{ ok: boolean; 
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('customerToken', encryptedToken)
       
+      // Also store actual customerId for backward compatibility with legacy code
+      // Note: Real customerId is also in httpOnly cookie (XSS protected)
+      sessionStorage.setItem('customerId', customerId)
+      
       // Also store a flag indicating hybrid storage is active
       sessionStorage.setItem('customerStorageType', 'hybrid')
     }
@@ -100,7 +104,7 @@ export async function clearCustomerId(): Promise<void> {
     // Clear sessionStorage
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('customerToken')
-      sessionStorage.removeItem('customerId') // Clear legacy storage too
+      sessionStorage.removeItem('customerId')
       sessionStorage.removeItem('customerStorageType')
     }
     

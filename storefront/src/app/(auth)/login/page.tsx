@@ -6,6 +6,11 @@ import { signIn } from 'next-auth/react'
 import styles from './loginPage.module.css'
 import { setCustomerId as setCustomerIdHybrid } from '../../../utils/hybridCustomerStorage'
 
+// Load debug helper in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  import('../../../utils/passkeyDebugHelper').catch(() => {})
+}
+
 type Identifier = {
   email?: string
   phone?: string
@@ -43,10 +48,11 @@ async function verifyPasskey(assertion: unknown, identifier: Identifier, canonic
 }
 
 export default function LoginPage() {
-  const { authenticate } = usePasskey()
+  const { authenticate, authenticateConditional, isConditionalMediationAvailable } = usePasskey()
   const [identifier, setIdentifier] = useState<string>('')
   const [status, setStatus] = useState<string>('')
   const [error, setError] = useState<string>('')
+  const [conditionalUIActive, setConditionalUIActive] = useState<boolean>(false)
   
   // Authentication method selection
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone')
@@ -74,6 +80,169 @@ export default function LoginPage() {
     const stored = typeof window !== 'undefined' ? (sessionStorage.getItem('identifier') || '') : ''
     if (stored && !identifier) setIdentifier(stored)
   }, [identifier])
+
+  // Conditional UI: Start listening for passkey autofill on page load
+  useEffect(() => {
+    let abortController: AbortController | null = null
+    
+    const startConditionalUI = async () => {
+      try {
+        // Check if conditional mediation is supported
+        const isSupported = await isConditionalMediationAvailable()
+        if (!isSupported) {
+          console.log('[ConditionalUI] Not supported on this browser')
+          return
+        }
+
+        console.log('[ConditionalUI] Starting conditional mediation...')
+        setConditionalUIActive(true)
+        
+        // Create abort controller to cancel the request if needed
+        abortController = new AbortController()
+        
+        // Get a generic challenge for conditional UI (doesn't need user identifier)
+        const optionsRes = await fetch('/api/auth/passkey/options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conditionalUI: true }),
+          signal: abortController.signal,
+        })
+        
+        if (!optionsRes.ok) {
+          console.warn('[ConditionalUI] Failed to get options')
+          return
+        }
+        
+        const { options, userId: canonicalUserId } = await optionsRes.json()
+        
+        // Start conditional authentication (non-blocking, waits for user input)
+        const { data, error: authError } = await authenticateConditional(options)
+        
+        if (authError) {
+          // User cancelled or no passkey available - this is normal, not an error
+          console.log('[ConditionalUI] Not used:', authError)
+          return
+        }
+        
+        if (data) {
+          console.log('[ConditionalUI] Passkey selected from autofill!')
+          setStatus('Authenticating with passkey...')
+          
+          // Verify the passkey
+          const verifyRes = await fetch('/api/auth/passkey/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...data,
+              userId: canonicalUserId,
+              conditionalUI: true,
+            }),
+          })
+          
+          if (!verifyRes.ok) {
+            setError('Passkey authentication failed')
+            return
+          }
+          
+          const result = await verifyRes.json()
+          console.log('🔵 [ConditionalUI] Verify response:', result)
+          
+          // Extract identifier from result (email or phone)
+          const userIdentifier = result.email || result.phone || canonicalUserId
+          console.log('🔵 [ConditionalUI] Extracted userIdentifier:', userIdentifier, 'from result.email:', result.email, 'result.phone:', result.phone, 'fallback:', canonicalUserId)
+          
+          // Mark passkey authentication success
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('hasPasskey', 'true')
+              if (result?.credentialId) {
+                sessionStorage.setItem('lastPasskeyCredential', result.credentialId)
+                sessionStorage.setItem('currentPasskeyCredential', result.credentialId)
+              }
+              const policyKey = `passkeyPolicy_${userIdentifier}`
+              const cacheData = { hasPasskey: true, expiresAt: Date.now() + (60 * 60 * 1000) }
+              localStorage.setItem(policyKey, JSON.stringify(cacheData))
+              const registeredKey = `passkeyRegistered_${userIdentifier}`
+              localStorage.setItem(registeredKey, JSON.stringify({ timestamp: Date.now() }))
+            }
+          } catch (storageError) {
+            console.warn('[ConditionalUI] Failed to update storage:', storageError)
+          }
+          
+          // Ensure customer exists
+          let ensuredCustomerId: string | undefined
+          try {
+            const id = userIdentifier.includes('@') ? { email: userIdentifier } : { phone: userIdentifier }
+            console.log('🔵 [ConditionalUI] Ensuring customer for:', id)
+            const ensure = await fetch('/api/account/customer/ensure', { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify(id) 
+            })
+            const ej = await ensure.json().catch(() => ({}))
+            console.log('🔵 [ConditionalUI] Customer ensure response:', ej)
+            if (ej?.customerId) {
+              ensuredCustomerId = String(ej.customerId)
+              try {
+                await setCustomerIdHybrid(ensuredCustomerId)
+                console.log('✅ [ConditionalUI] Customer ID set in hybrid storage:', ensuredCustomerId)
+              } catch (e) {
+                console.error('❌ [ConditionalUI] Failed to set customer ID:', e)
+              }
+            }
+          } catch (err) {
+            console.error('❌ [ConditionalUI] Customer ensure failed:', err)
+          }
+          
+          // Sign in with the ensured customer ID
+          // IMPORTANT: Use redirect: false to wait for session creation
+          console.log('🔵 [ConditionalUI] About to sign in with:', { 
+            identifier: userIdentifier, 
+            customerId: ensuredCustomerId, 
+            hasPasskey: true 
+          })
+          
+          setStatus('Authenticated! Redirecting...')
+          const conditionalSignInResult = await signIn('session', { 
+            identifier: userIdentifier, 
+            customerId: ensuredCustomerId, 
+            hasPasskey: true, 
+            redirect: false  // Don't redirect immediately - wait for session
+          })
+          
+          console.log('✅ [ConditionalUI] signIn result:', conditionalSignInResult)
+          
+          if (conditionalSignInResult?.ok) {
+            console.log('✅ [ConditionalUI] Session created, redirecting to /account...')
+            // Small delay to ensure session cookie is set
+            await new Promise(resolve => setTimeout(resolve, 300))
+            window.location.href = '/account'
+          } else {
+            console.error('❌ [ConditionalUI] SignIn failed:', conditionalSignInResult?.error)
+            setError('Failed to create session. Please try again.')
+          }
+        }
+      } catch (err: any) {
+        // AbortError is expected when user navigates away
+        if (err?.name !== 'AbortError') {
+          console.warn('[ConditionalUI] Error:', err)
+        }
+      }
+    }
+    
+    // Only run conditional UI if we're not already showing auth methods
+    if (!showAuthMethods) {
+      startConditionalUI()
+    }
+    
+    // Cleanup: abort the request if component unmounts or auth methods are shown
+    return () => {
+      if (abortController) {
+        abortController.abort()
+      }
+      setConditionalUIActive(false)
+    }
+  }, [showAuthMethods, isConditionalMediationAvailable, authenticateConditional])
 
   const onSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -128,7 +297,8 @@ export default function LoginPage() {
                       console.warn('[Login] Failed to update passkey storage flags:', storageError)
                     }
                     
-                    // Ensure customer exists
+                    // Ensure customer exists and get customerId
+                    let ensuredCustomerId: string | undefined
                     try {
                       const ensure = await fetch('/api/account/customer/ensure', { 
                         method: 'POST', 
@@ -137,29 +307,36 @@ export default function LoginPage() {
                       })
                       const ej = await ensure.json().catch(() => ({}))
                       if (ej?.customerId) {
+                        ensuredCustomerId = String(ej.customerId)
                         try {
-                          await setCustomerIdHybrid(String(ej.customerId))
+                          await setCustomerIdHybrid(ensuredCustomerId)
                         } catch (e) {
                           console.error('[Login] Failed to set customer ID:', e)
                         }
                       }
-                    } catch {}
+                    } catch (err) {
+                      console.error('[Login] Failed to ensure customer:', err)
+                    }
                     
-                    // Sign in
-                    let customerId: string | undefined
-                    try { 
-                      if (typeof window !== 'undefined') {
-                        customerId = sessionStorage.getItem('customerId') || undefined 
-                      }
-                    } catch {}
-                    
-                    await signIn('session', { 
+                    // Sign in with the ensured customer ID
+                    // IMPORTANT: Use redirect: false to wait for session creation
+                    const passkeySignInResult = await signIn('session', { 
                       identifier: (id.email || id.phone) as string, 
-                      customerId, 
+                      customerId: ensuredCustomerId, 
                       hasPasskey: true, 
-                      redirect: true, 
-                      callbackUrl: '/account' 
+                      redirect: false  // Don't redirect immediately - wait for session
                     })
+                    console.log('[Login] Passkey signIn result:', passkeySignInResult)
+                    
+                    if (passkeySignInResult?.ok) {
+                      console.log('[Login] Session created, redirecting to /account...')
+                      // Small delay to ensure session cookie is set
+                      await new Promise(resolve => setTimeout(resolve, 300))
+                      window.location.href = '/account'
+                    } else {
+                      console.error('[Login] Passkey signIn failed:', passkeySignInResult?.error)
+                      setStatus('Session creation failed. Please try again.')
+                    }
                     return
                   }
                 } catch (err) {
@@ -285,15 +462,82 @@ export default function LoginPage() {
         console.error('[Login] Failed to set customer ID:', e)
       }
 
+      // CRITICAL: Clear passkey flags since this is OTP login (not passkey)
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('hasPasskey', 'false')
+          sessionStorage.removeItem('lastPasskeyCredential')
+          sessionStorage.removeItem('currentPasskeyCredential')
+          
+          // CRITICAL: Clear ALL passkey-related cache from localStorage
+          // This is more aggressive but ensures the nudge shows regardless of identifier format
+          try {
+            const keysToRemove: string[] = []
+            
+            // Find all passkey-related keys
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i)
+              if (key && (
+                key.startsWith('passkeyPolicy_') || 
+                key.startsWith('passkeyRegistered_') ||
+                key.startsWith('passkeyNudgeDismissed_') ||
+                key.startsWith('passkeyNudgeLastShown_')
+              )) {
+                keysToRemove.push(key)
+              }
+            }
+            
+            // Remove all found keys
+            keysToRemove.forEach(key => {
+              try {
+                localStorage.removeItem(key)
+              } catch (e) {
+                console.warn('[Login] Failed to remove key:', key, e)
+              }
+            })
+            
+            console.log('[Login] Cleared ALL passkey cache for OTP login:', keysToRemove.length, 'keys removed')
+          } catch (e) {
+            console.warn('[Login] Failed to clear passkey cache:', e)
+          }
+        }
+      } catch (clearError) {
+        console.warn('[Login] Failed to clear passkey flags:', clearError)
+      }
+
       setStatus('Phone verified successfully! Redirecting...')
       
-      // Sign in
-      await signIn('session', { 
+      // CRITICAL: Logout first to clear any old JWT token with hasPasskey: true
+      try {
+        await fetch('/api/auth/signout', { method: 'POST' })
+        console.log('[Login] Logged out to clear old session')
+        // Small delay to ensure logout completes
+        await new Promise(resolve => setTimeout(resolve, 300))
+      } catch (e) {
+        console.warn('[Login] Logout failed, continuing:', e)
+      }
+      
+      // Sign in without hasPasskey flag (this is OTP login)
+      // IMPORTANT: Use redirect: false to wait for session creation
+      console.log('[Login] Signing in with:', { phone, customerId: ej.customerId, hasPasskey: false })
+      const signInResult = await signIn('session', { 
         identifier: phone, 
-        customerId: ej.customerId, 
-        redirect: true, 
-        callbackUrl: '/account' 
+        customerId: ej.customerId,
+        hasPasskey: false,
+        redirect: false  // Don't redirect immediately - wait for session
       })
+      console.log('[Login] SignIn result:', signInResult)
+      
+      if (signInResult?.ok) {
+        console.log('[Login] Session created successfully, redirecting to /account...')
+        // Small delay to ensure session cookie is set
+        await new Promise(resolve => setTimeout(resolve, 300))
+        // Manual redirect after session is confirmed
+        window.location.href = '/account'
+      } else {
+        console.error('[Login] SignIn failed:', signInResult?.error)
+        throw new Error(signInResult?.error || 'Failed to create session')
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to verify OTP. Please try again.')
     } finally {
@@ -351,15 +595,86 @@ export default function LoginPage() {
               } catch (e) {
                 console.error('[Login] Failed to set customer ID:', e)
               }
+              
+              // CRITICAL: Clear passkey flags since this is Magic Link login (not passkey)
+              try {
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('hasPasskey', 'false')
+                  sessionStorage.removeItem('lastPasskeyCredential')
+                  sessionStorage.removeItem('currentPasskeyCredential')
+                  
+                  // CRITICAL: Clear ALL passkey-related cache from localStorage
+                  // This is more aggressive but ensures the nudge shows regardless of identifier format
+                  try {
+                    const keysToRemove: string[] = []
+                    
+                    // Find all passkey-related keys
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i)
+                      if (key && (
+                        key.startsWith('passkeyPolicy_') || 
+                        key.startsWith('passkeyRegistered_') ||
+                        key.startsWith('passkeyNudgeDismissed_') ||
+                        key.startsWith('passkeyNudgeLastShown_')
+                      )) {
+                        keysToRemove.push(key)
+                      }
+                    }
+                    
+                    // Remove all found keys
+                    keysToRemove.forEach(key => {
+                      try {
+                        localStorage.removeItem(key)
+                      } catch (e) {
+                        console.warn('[Login] Failed to remove key:', key, e)
+                      }
+                    })
+                    
+                    console.log('[Login] Cleared ALL passkey cache for Magic Link login:', keysToRemove.length, 'keys removed')
+                  } catch (e) {
+                    console.warn('[Login] Failed to clear passkey cache:', e)
+                  }
+                  
+                  console.log('[Login] Cleared passkey flags for Magic Link login')
+                }
+              } catch (clearError) {
+                console.warn('[Login] Failed to clear passkey flags:', clearError)
+              }
+              
               setStatus('Email verified successfully! Redirecting...')
               
-              // Sign in
-              await signIn('session', { 
+              // CRITICAL: Logout first to clear any old JWT token with hasPasskey: true
+              try {
+                await fetch('/api/auth/signout', { method: 'POST' })
+                console.log('[Login] Logged out to clear old session')
+                // Small delay to ensure logout completes
+                await new Promise(resolve => setTimeout(resolve, 300))
+              } catch (e) {
+                console.warn('[Login] Logout failed, continuing:', e)
+              }
+              
+              // Sign in without hasPasskey flag (this is Magic Link login)
+              // IMPORTANT: Use redirect: false to wait for session creation
+              console.log('[Login] Signing in with:', { email: em, customerId: ej.customerId, hasPasskey: false })
+              const signInResult = await signIn('session', { 
                 identifier: em, 
-                customerId: ej.customerId, 
-                redirect: true, 
-                callbackUrl: '/account' 
+                customerId: ej.customerId,
+                hasPasskey: false,
+                redirect: false  // Don't redirect immediately - wait for session
               })
+              console.log('[Login] SignIn result:', signInResult)
+              
+              if (signInResult?.ok) {
+                console.log('[Login] Session created successfully, redirecting to /account...')
+                // Small delay to ensure session cookie is set
+                await new Promise(resolve => setTimeout(resolve, 300))
+                // Manual redirect after session is confirmed
+                window.location.href = '/account'
+              } else {
+                console.error('[Login] SignIn failed:', signInResult?.error)
+                // Don't throw error here, just show status
+                setStatus('Failed to create session. Please try again.')
+              }
             }
           }
         } catch {}
@@ -428,7 +743,7 @@ export default function LoginPage() {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
-                  autoComplete="username"
+                  autoComplete="username webauthn"
                 />
               </div>
               <div className={styles.formGroup}>

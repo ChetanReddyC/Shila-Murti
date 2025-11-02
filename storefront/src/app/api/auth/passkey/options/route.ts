@@ -40,6 +40,30 @@ async function ensureCustomerId(identifier: { email?: string; phone?: string; us
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
+  
+  // Handle Conditional UI requests (no specific identifier yet)
+  if (body.conditionalUI === true) {
+    console.log('[PASSKEY_OPTIONS][CONDITIONAL_UI] Generating generic challenge')
+    
+    const options = await generateAuthenticationOptions({
+      rpID: RP_ID,
+      userVerification: 'preferred',
+      timeout: 300000, // 5 minutes for conditional UI
+      allowCredentials: [], // Let browser show all available passkeys
+    })
+    
+    // Store challenge under a temporary conditional UI key
+    const conditionalKey = `webauthn:auth:conditional:${options.challenge}`
+    await kvSet(conditionalKey, { challenge: options.challenge, timestamp: Date.now() }, 10 * 60)
+    
+    return new Response(JSON.stringify({ 
+      options, 
+      userId: 'conditional-ui',
+      isConditionalUI: true 
+    }), { status: 200 })
+  }
+  
+  // Regular flow with specific identifier
   const result = await ensureCustomerId(body)
   if (!result) return new Response(JSON.stringify({ error: 'missing_identifier' }), { status: 400 })
 

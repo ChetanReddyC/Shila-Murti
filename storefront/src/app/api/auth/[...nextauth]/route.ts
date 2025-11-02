@@ -65,8 +65,10 @@ export const authOptions: NextAuthOptions = {
         // comboRequired resolved when we call this after MFA
         user.comboRequired = false
         if (credentials?.customerId) user.customerId = String(credentials.customerId)
-        // Set hasPasskey flag if provided
-        if (credentials?.hasPasskey) user.hasPasskey = Boolean(credentials.hasPasskey)
+        // Set hasPasskey flag if provided (explicitly handle both true and false)
+        if (credentials?.hasPasskey !== undefined) {
+          user.hasPasskey = credentials.hasPasskey === 'true' || credentials.hasPasskey === true
+        }
         return user
       },
     }),
@@ -131,8 +133,21 @@ export const authOptions: NextAuthOptions = {
       // Session composition
       if (user && (user as any).comboRequired !== undefined) (token as any).comboRequired = (user as any).comboRequired
       if (user && (user as any)?.customerId) (token as any).customerId = (user as any).customerId
-      // Set hasPasskey flag when comboRequired is false (passkey auth)
-      if (user && (user as any).comboRequired === false) (token as any).hasPasskey = true
+      
+      // CRITICAL: Set hasPasskey flag - explicitly handle both true and false values
+      if (user && (user as any).hasPasskey !== undefined) {
+        // User object has explicit hasPasskey value - use it (true OR false)
+        (token as any).hasPasskey = (user as any).hasPasskey
+        console.log('[AUTH] Setting hasPasskey from user object:', (user as any).hasPasskey)
+      } else if (user && (user as any).comboRequired === false) {
+        // Legacy: if comboRequired is false (passkey auth), set hasPasskey to true
+        (token as any).hasPasskey = true
+        console.log('[AUTH] Setting hasPasskey to true (legacy comboRequired=false)')
+      } else if (user) {
+        // User object present but no hasPasskey field - default to false
+        (token as any).hasPasskey = false
+        console.log('[AUTH] User present but no hasPasskey field, defaulting to false')
+      }
 
       // Compute MFA completion
       // If comboRequired is false (passkey auth), then MFA is complete

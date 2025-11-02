@@ -35,8 +35,8 @@ async function ensureCustomerIdFromBody(identifier: { email?: string; phone?: st
 function normalizeCandidatesFromBody(body: any): string[] {
   const candidates = new Set<string>()
   
-  // Add userId if present
-  if (body?.userId) {
+  // Add userId if present (but skip generic conditional-ui)
+  if (body?.userId && body.userId !== 'conditional-ui') {
     candidates.add(String(body.userId))
   }
   
@@ -68,6 +68,19 @@ function normalizeCandidatesFromBody(body: any): string[] {
 export async function POST(req: NextRequest) {
   const startedAt = Date.now()
   const body = await req.json().catch(() => ({}))
+  
+  console.log('[PASSKEY_VERIFY] Request body:', { 
+    id: body.id, 
+    userId: body.userId, 
+    conditionalUI: body.conditionalUI,
+    hasEmail: !!body.email,
+    hasPhone: !!body.phone
+  })
+  
+  // Handle Conditional UI requests
+  const isConditionalUI = body.conditionalUI === true || body.userId === 'conditional-ui'
+  console.log('[PASSKEY_VERIFY] isConditionalUI:', isConditionalUI)
+  
   let cid = await ensureCustomerIdFromBody(body)
   if (!cid) {
     // Fallback to a deterministic id when ensure failed (e.g., admin 401)
@@ -89,6 +102,26 @@ export async function POST(req: NextRequest) {
 
   // Try to find challenge using primary ID first, then fall back to candidates
   let auth = await kvGet<{ challenge: string }>(`webauthn:auth:${cid}`)
+  
+  // For conditional UI, also check the conditional challenge storage
+  if (!auth?.challenge && isConditionalUI) {
+    // Try to extract challenge from the clientDataJSON
+    try {
+      const clientDataJSON = JSON.parse(Buffer.from(body.response.clientDataJSON, 'base64').toString())
+      const challenge = clientDataJSON.challenge
+      if (challenge) {
+        const conditionalKey = `webauthn:auth:conditional:${challenge}`
+        const conditionalAuth = await kvGet<{ challenge: string }>(conditionalKey)
+        if (conditionalAuth?.challenge) {
+          auth = conditionalAuth
+          console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Challenge found in conditional storage')
+        }
+      }
+    } catch (err) {
+      console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] Failed to extract challenge:', err)
+    }
+  }
+  
   if (!auth?.challenge) {
     // Try candidates as fallback
     for (const candidate of rawCandidates) {
@@ -100,24 +133,96 @@ export async function POST(req: NextRequest) {
     }
   }
   if (!auth?.challenge) {
-    console.warn('[PASSKEY_VERIFY][MISSING_CHALLENGE]', { cid, candidates: rawCandidates })
+    console.warn('[PASSKEY_VERIFY][MISSING_CHALLENGE]', { cid, candidates: rawCandidates, isConditionalUI })
     return new Response(JSON.stringify({ comboRequired: true, reason: 'missing_challenge' }), { status: 200 })
   }
 
+  // For Conditional UI: ALWAYS try to get the username from the mapping first
+  // This ensures we have the actual phone/email even if credential is found in cache
+  let mappedUsername: string | undefined
+  if (isConditionalUI) {
+    try {
+      console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Looking up username from credential map:', body.id)
+      
+      // Get the username from reverse mapping
+      const mapping = await kvGet<{ userId: string; username?: string }>(`webauthn:cred-map:${body.id}`)
+      
+      if (mapping?.username) {
+        mappedUsername = mapping.username
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Found username in mapping:', mappedUsername)
+      } else {
+        console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] No username in mapping for credential:', body.id)
+      }
+    } catch (mappingErr) {
+      console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] Failed to get username from mapping:', mappingErr)
+    }
+  }
+  
   // Load stored authenticator for this credential id
+  console.log('[PASSKEY_VERIFY] Looking for credential:', {
+    primaryKey: `webauthn:cred:${cid}:${body.id}`,
+    cid,
+    credentialId: body.id,
+    candidates: rawCandidates
+  })
+  
   let credRecord = await kvGet<{ credentialID: string; credentialPublicKey: string; counter: number }>(`webauthn:cred:${cid}:${body.id}`)
+  let actualUserId = cid // Track which userId actually has this credential
+  
+  console.log('[PASSKEY_VERIFY] Primary lookup result:', credRecord ? 'FOUND' : 'NOT FOUND')
+  
   // Fallback: search older namespaces and migrate if found
   if (!credRecord) {
+    console.log('[PASSKEY_VERIFY] Searching candidates:', rawCandidates)
     for (const cand of rawCandidates) {
-      const rec = await kvGet<{ credentialID: string; credentialPublicKey: string; counter: number }>(`webauthn:cred:${cand}:${body.id}`)
+      const key = `webauthn:cred:${cand}:${body.id}`
+      console.log('[PASSKEY_VERIFY] Trying candidate key:', key)
+      const rec = await kvGet<{ credentialID: string; credentialPublicKey: string; counter: number }>(key)
       if (rec) {
+        console.log('[PASSKEY_VERIFY] Found with candidate:', cand)
         credRecord = rec
+        actualUserId = cand // Remember the actual userId
         try { await kvSet(`webauthn:cred:${cid}:${body.id}`, rec) } catch {}
         break
       }
     }
   }
+  
+  // For Conditional UI: if we still don't have credential AND no username yet, use reverse mapping for both
+  if (!credRecord && isConditionalUI && !mappedUsername) {
+    try {
+      console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Looking up userId from credential map:', body.id)
+      
+      // Use reverse mapping: webauthn:cred-map:{credentialID} -> { userId, username }
+      const mapping = await kvGet<{ userId: string; username?: string }>(`webauthn:cred-map:${body.id}`)
+      
+      if (mapping?.userId) {
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Found mapping:', { userId: mapping.userId, username: mapping.username })
+        
+        // Store the username for later use
+        mappedUsername = mapping.username
+        
+        // Load the actual credential using the userId from mapping
+        const credKey = `webauthn:cred:${mapping.userId}:${body.id}`
+        const rec = await kvGet<{ credentialID: string; credentialPublicKey: string; counter: number }>(credKey)
+        
+        if (rec) {
+          credRecord = rec
+          actualUserId = mapping.userId
+          console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Successfully loaded credential for userId:', mapping.userId)
+        } else {
+          console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] Mapping found but credential missing at:', credKey)
+        }
+      } else {
+        console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] No mapping found for credential:', body.id)
+      }
+    } catch (searchErr) {
+      console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] Mapping lookup failed:', searchErr)
+    }
+  }
+  
   if (!credRecord) {
+    console.warn('[PASSKEY_VERIFY][MISSING_CREDENTIAL]', { cid, credentialId: body.id, isConditionalUI, candidates: rawCandidates })
     return new Response(JSON.stringify({ comboRequired: true, reason: 'missing_credential' }), { status: 200 })
   }
 
@@ -166,6 +271,50 @@ export async function POST(req: NextRequest) {
   try { const h = await getHistogram({ name: 'auth_passkey_verify_latency_ms', help: 'Passkey verification latency (ms)' }); h.observe(Date.now() - startedAt) } catch {}
   try { const c = await getCounter({ name: 'auth_passkey_success_total', help: 'Passkey verify success total' }); c.inc() } catch {}
   
-  const response = { comboRequired: false, hasPasskey: true, credentialId: body.id, counter: newCounter ?? credRecord.counter }
+  const response: any = { 
+    comboRequired: false, 
+    hasPasskey: true, 
+    credentialId: body.id, 
+    counter: newCounter ?? credRecord.counter 
+  }
+  
+  // For conditional UI, include user identifier information
+  if (isConditionalUI) {
+    // Use the actualUserId (the one we found the credential under)
+    const userIdToUse = actualUserId || cid
+    console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Using actualUserId:', userIdToUse, 'mappedUsername:', mappedUsername)
+    
+    // CRITICAL: Use the stored username (original identifier) if available
+    // This ensures we return the actual phone/email, not the customerId
+    if (mappedUsername) {
+      // The username is the original identifier (phone or email)
+      if (mappedUsername.includes('@')) {
+        response.email = mappedUsername
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Using stored username as email:', mappedUsername)
+      } else {
+        response.phone = mappedUsername
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Using stored username as phone:', mappedUsername)
+      }
+    } else if (body.email) {
+      response.email = body.email
+    } else if (body.phone) {
+      response.phone = body.phone
+    } else {
+      // Fallback: Determine from actualUserId if it looks like email or phone
+      if (userIdToUse.includes('@')) {
+        response.email = userIdToUse
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Identified as email from userId:', userIdToUse)
+      } else if (userIdToUse.includes('+') || /^\d+$/.test(userIdToUse.replace(/[\s\-\(\)]/g, ''))) {
+        response.phone = userIdToUse
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Identified as phone from userId:', userIdToUse)
+      } else {
+        // Try to look up from stored user data or fallback
+        console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] Could not identify user type from:', userIdToUse)
+        // Fallback: treat as phone if not email
+        response.phone = userIdToUse
+      }
+    }
+  }
+  
   return new Response(JSON.stringify(response), { status: 200 })
 }

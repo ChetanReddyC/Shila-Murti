@@ -575,15 +575,42 @@ export default function PasskeyNudge() {
           if (typeof window !== 'undefined') {
             const hasPasskeySession = sessionStorage.getItem('hasPasskey')
             // If session indicates no passkey, then user has removed it from device
-            if (hasPasskeySession === 'false' || hasPasskeySession === null) {
+            // or logged in with OTP/Magic Link (not passkey)
+            if (hasPasskeySession === 'false') {
+              // User explicitly logged in without passkey - clear the stale cache
+              logger.current.info('SKIP_CHECK', 'Passkey cache exists but session indicates no passkey - clearing stale cache', {
+                identifier,
+                hasPasskeySession
+              })
+              
+              try {
+                // Clear the stale policy cache
+                const policyKey = `passkeyPolicy_${identifier}`
+                const registeredKey = `passkeyRegistered_${identifier}`
+                localStorage.removeItem(policyKey)
+                localStorage.removeItem(registeredKey)
+              } catch (clearError) {
+                // Continue - cache will be overwritten when they register
+              }
+              
               // Don't skip - show the nudge to allow re-registration
+              return { skip: false, reason: 'passkey-removed-or-not-used' }
+            } else if (hasPasskeySession === null) {
+              // No session storage flag set - might be first visit in this session
+              // Keep the policy cache and skip nudge
+              return { skip: true, reason: 'user-has-passkey' }
             } else {
               return { skip: true, reason: 'user-has-passkey' }
             }
           }
         } catch (sessionError) {
-          // Continue with policy check only
-          return { skip: true, reason: 'user-has-passkey' }
+          // On storage error, be conservative and don't skip
+          // Better to show the nudge than to miss an opportunity for re-registration
+          logger.current.warn('SKIP_CHECK', 'Storage access error during passkey check', {
+            identifier,
+            sessionError
+          })
+          return { skip: false, reason: 'storage-error-allow-reregistration' }
         }
       }
 
