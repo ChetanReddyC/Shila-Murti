@@ -21,7 +21,7 @@ export default function CheckoutPage() {
 
   const { cart, loading, refreshCart, loadSpecificCart, clearCart, setOrderConfirmationProtection, clearCartSilently } = useCart();
 
-  const { authenticate } = usePasskey();
+  const { authenticate, authenticateConditional, isConditionalMediationAvailable } = usePasskey();
 
   const { showLoading } = useNavigationLoading();
 
@@ -91,7 +91,7 @@ export default function CheckoutPage() {
 
   // Identity method and state (Task 2)
 
-  const [identityMethod, setIdentityMethod] = useState<'login' | 'phone' | 'email'>('phone')
+  const [identityMethod, setIdentityMethod] = useState<'login' | 'phone' | 'email'>('login')
 
   const [phone, setPhone] = useState('')
 
@@ -145,6 +145,12 @@ export default function CheckoutPage() {
   const [isFromMagicLink, setIsFromMagicLink] = useState(false)
 
   const [cartIdFromUrl, setCartIdFromUrl] = useState<string | null>(null)
+
+  
+
+  // Conditional mediation state
+
+  const [conditionalUIActive, setConditionalUIActive] = useState<boolean>(false)
 
 
 
@@ -450,6 +456,350 @@ export default function CheckoutPage() {
     validateSession();
 
   }, [status, session]);
+
+
+
+  // Conditional UI: Start listening for passkey autofill when identity method is login
+
+  // CRITICAL: Must start IMMEDIATELY when login method is selected, before input field is focused
+
+  useEffect(() => {
+
+    let abortController: AbortController | null = null
+
+    
+
+    const startConditionalUI = async () => {
+
+      try {
+
+        // Don't run if already verified
+
+        if (purchaseReady || status === 'authenticated') {
+
+          return
+
+        }
+
+
+
+        console.log('[Checkout ConditionalUI] Starting conditional mediation on mount...')
+
+        setConditionalUIActive(true)
+
+        
+
+        // Check if conditional mediation is supported
+
+        const isSupported = await isConditionalMediationAvailable()
+
+        if (!isSupported) {
+
+          console.log('[Checkout ConditionalUI] Not supported on this browser')
+
+          setConditionalUIActive(false)
+
+          return
+
+        }
+
+        
+
+        // Create abort controller to cancel the request if needed
+
+        abortController = new AbortController()
+
+        
+
+        // Get a generic challenge for conditional UI (doesn't need user identifier)
+
+        const optionsRes = await fetch('/api/auth/passkey/options', {
+
+          method: 'POST',
+
+          headers: { 'Content-Type': 'application/json' },
+
+          body: JSON.stringify({ conditionalUI: true }),
+
+          signal: abortController.signal,
+
+        })
+
+        
+
+        if (!optionsRes.ok) {
+
+          console.warn('[Checkout ConditionalUI] Failed to get options')
+
+          return
+
+        }
+
+        
+
+        const { options, userId: canonicalUserId } = await optionsRes.json()
+
+        
+
+        // Start conditional authentication (non-blocking, waits for user input)
+
+        const { data, error: authError } = await authenticateConditional(options)
+
+        
+
+        if (authError) {
+
+          // User cancelled or no passkey available - this is normal, not an error
+
+          console.log('[Checkout ConditionalUI] Not used:', authError)
+
+          return
+
+        }
+
+        
+
+        if (data) {
+
+          console.log('[Checkout ConditionalUI] Passkey selected from autofill!')
+
+          setIdentityError('Authenticating with passkey...')
+
+          
+
+          // Verify the passkey
+
+          const verifyRes = await fetch('/api/auth/passkey/verify', {
+
+            method: 'POST',
+
+            headers: { 'Content-Type': 'application/json' },
+
+            body: JSON.stringify({
+
+              ...data,
+
+              userId: canonicalUserId,
+
+              conditionalUI: true,
+
+            }),
+
+          })
+
+          
+
+          if (!verifyRes.ok) {
+
+            setIdentityError('Passkey authentication failed')
+
+            return
+
+          }
+
+          
+
+          const result = await verifyRes.json()
+
+          console.log('🔵 [Checkout ConditionalUI] Verify response:', result)
+
+          
+
+          // Extract identifier from result (email or phone)
+
+          const userIdentifier = result.email || result.phone || canonicalUserId
+
+          console.log('🔵 [Checkout ConditionalUI] Extracted userIdentifier:', userIdentifier)
+
+          
+
+          // Mark passkey authentication success
+
+          try {
+
+            if (typeof window !== 'undefined') {
+
+              sessionStorage.setItem('hasPasskey', 'true')
+
+              if (result?.credentialId) {
+
+                sessionStorage.setItem('lastPasskeyCredential', result.credentialId)
+
+                sessionStorage.setItem('currentPasskeyCredential', result.credentialId)
+
+              }
+
+              const policyKey = `passkeyPolicy_${userIdentifier}`
+
+              const cacheData = { hasPasskey: true, expiresAt: Date.now() + (60 * 60 * 1000) }
+
+              localStorage.setItem(policyKey, JSON.stringify(cacheData))
+
+              const registeredKey = `passkeyRegistered_${userIdentifier}`
+
+              localStorage.setItem(registeredKey, JSON.stringify({ timestamp: Date.now() }))
+
+            }
+
+          } catch (storageError) {
+
+            console.warn('[Checkout ConditionalUI] Failed to update storage:', storageError)
+
+          }
+
+          
+
+          // Ensure customer exists
+
+          let ensuredCustomerId: string | undefined
+
+          try {
+
+            const id = userIdentifier.includes('@') ? { email: userIdentifier } : { phone: userIdentifier }
+
+            console.log('🔵 [Checkout ConditionalUI] Ensuring customer for:', id)
+
+            const ensure = await fetch('/api/account/customer/ensure', { 
+
+              method: 'POST', 
+
+              headers: { 'Content-Type': 'application/json' }, 
+
+              body: JSON.stringify(id) 
+
+            })
+
+            const ej = await ensure.json().catch(() => ({}))
+
+            console.log('🔵 [Checkout ConditionalUI] Customer ensure response:', ej)
+
+            if (ej?.customerId) {
+
+              ensuredCustomerId = String(ej.customerId)
+
+              try {
+
+                await setCustomerIdHybrid(ensuredCustomerId)
+
+                console.log('✅ [Checkout ConditionalUI] Customer ID set in hybrid storage:', ensuredCustomerId)
+
+              } catch (e) {
+
+                console.error('❌ [Checkout ConditionalUI] Failed to set customer ID:', e)
+
+              }
+
+            }
+
+          } catch (err) {
+
+            console.error('❌ [Checkout ConditionalUI] Customer ensure failed:', err)
+
+          }
+
+          
+
+          // Set purchase ready state
+
+          if (ensuredCustomerId) {
+
+            setCustomerId(ensuredCustomerId)
+
+            setPurchaseReady(true)
+
+            setIdentityError('✅ Authenticated with passkey! You can now place your order.')
+
+            
+
+            // Update NextAuth session
+
+            try {
+
+              const { signIn } = await import('next-auth/react')
+
+              await signIn('session', { 
+
+                identifier: userIdentifier, 
+
+                customerId: ensuredCustomerId, 
+
+                hasPasskey: true, 
+
+                redirect: false
+
+              })
+
+              console.log('✅ [Checkout ConditionalUI] Session created')
+
+            } catch (e) {
+
+              console.error('❌ [Checkout ConditionalUI] SignIn failed:', e)
+
+            }
+
+            
+
+            // Auto-hide success message after 5 seconds
+
+            setTimeout(() => {
+
+              setIdentityError((prev) => prev === '✅ Authenticated with passkey! You can now place your order.' ? null : prev)
+
+            }, 5000)
+
+          } else {
+
+            setIdentityError('Failed to get customer information. Please try again.')
+
+          }
+
+        }
+
+      } catch (err: any) {
+
+        // AbortError is expected when user navigates away
+
+        if (err?.name !== 'AbortError') {
+
+          console.warn('[Checkout ConditionalUI] Error:', err)
+
+        }
+
+      }
+
+    }
+
+    
+
+    // CRITICAL: Start immediately on component mount (just like login page)
+
+    // The conditional mediation request MUST be active BEFORE user switches to login method
+
+    // and BEFORE user clicks the input field
+
+    if (!purchaseReady && status !== 'authenticated') {
+
+      startConditionalUI()
+
+    }
+
+    
+
+    // Cleanup: abort the request if component unmounts
+
+    return () => {
+
+      if (abortController) {
+
+        abortController.abort()
+
+      }
+
+      setConditionalUIActive(false)
+
+    }
+
+  }, [purchaseReady, status, isConditionalMediationAvailable, authenticateConditional])
 
 
 
@@ -3660,6 +4010,7 @@ export default function CheckoutPage() {
                           value={loginIdentifier}
                           onChange={(e) => setLoginIdentifier(e.target.value)}
                           placeholder="Enter your email or phone number"
+                          autoComplete="username webauthn"
                         />
                       </div>
                       <div className="flex gap-2 mb-2">
