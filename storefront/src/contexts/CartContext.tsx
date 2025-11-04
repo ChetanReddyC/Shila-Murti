@@ -554,7 +554,7 @@ export function CartProvider({ children }: CartProviderProps) {
   }, []);
 
   // Add item to cart with enhanced session management
-  const addToCart = React.useCallback(async (variantId: string, quantity: number): Promise<void> => {
+  const addToCart = React.useCallback(async (variantId: string, quantity: number, estimatedUnitPrice?: number): Promise<void> => {
     // Lock removed - backend guard handles duplicate prevention
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
@@ -615,17 +615,8 @@ export function CartProvider({ children }: CartProviderProps) {
       }
 
       // Validate cart limits before adding (with estimated price for value check)
-      let estimatedUnitPrice: number | undefined;
-      try {
-        // Fetch variant to get price for cart value validation
-        const variant = await medusaApiClient.getVariant(variantId);
-        if (variant && variant.prices && variant.prices.length > 0) {
-          // Use first price (should match cart's region/currency)
-          estimatedUnitPrice = Number(variant.prices[0].amount || 0) / 100; // Convert from cents
-        }
-      } catch (priceError) {
-        // If we can't fetch price, proceed without value check (fail open)
-      }
+      // Use the estimatedUnitPrice passed from the caller (e.g., ProductDetailPage)
+      // If not provided, validation will proceed without value check (fail open)
 
       const limitValidation = CartLimitService.validateAddToCart(
         currentCart,

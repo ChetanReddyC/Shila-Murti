@@ -358,7 +358,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     });
 
     try {
-      await addToCart(selectedVariant.id, state.selectedQuantity);
+      // Extract price from the selected variant for cart limit validation
+      let estimatedUnitPrice: number | undefined;
+      if (selectedVariant.prices && selectedVariant.prices.length > 0) {
+        estimatedUnitPrice = Number(selectedVariant.prices[0].amount || 0) / 100; // Convert from cents
+      }
+
+      await addToCart(selectedVariant.id, state.selectedQuantity, estimatedUnitPrice);
 
       // Show success feedback
       updateState({ 
