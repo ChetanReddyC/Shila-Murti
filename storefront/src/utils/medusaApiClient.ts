@@ -737,8 +737,14 @@ export class MedusaApiClient {
     return response.product;
   }
 
+  /**
+   * @deprecated This endpoint does not exist in Medusa v2.8.8
+   * In Medusa v2, variants should be accessed through the /store/products endpoint
+   * This method is kept for backward compatibility but will fail with CORS errors
+   */
   async getVariant(variantId: string): Promise<any> {
-    // Fetch variant details including prices
+    // NOTE: The /store/variants/{id} endpoint does not exist in Medusa v2
+    // This will result in a 400 Bad Request without CORS headers
     const endpoint = `/store/variants/${variantId}`;
     try {
       const response = await this.makeRequestWithRetry<{ variant: any }>(endpoint);
