@@ -6,6 +6,7 @@
  */
 
 import { Session } from 'next-auth'
+import { getCustomerToken } from './hybridCustomerStorage'
 
 // Types for session state tracking
 export interface SessionState {
@@ -237,21 +238,22 @@ export function getUserIdentifierFromSession(session: Session | null): string | 
     
     const primary = user.phone || user.email
     
-    // Try to get customerId from sessionStorage with error handling
-    let customerId: string | null = null
+    // SECURITY: Use encrypted token instead of real customer ID
+    // This is only for tracking/identification purposes
+    let customerToken: string | null = null
     try {
       if (typeof window !== 'undefined') {
-        customerId = sessionStorage.getItem('customerId')
-        // Validate customerId if present
-        if (customerId && typeof customerId !== 'string') {
-          customerId = null
+        customerToken = getCustomerToken()
+        // Validate token if present
+        if (customerToken && typeof customerToken !== 'string') {
+          customerToken = null
         }
       }
     } catch (storageError) {
-      // Continue without customerId
+      // Continue without token
     }
     
-    const identifier = customerId || primary || null
+    const identifier = customerToken || primary || null
     
     // Validate final identifier
     if (identifier && typeof identifier !== 'string') {
@@ -280,22 +282,23 @@ export function getOriginalIdentifierFromSession(session: Session | null): strin
     
     const original = user.originalPhone || user.originalEmail
     
-    // Try to get customerId from sessionStorage with error handling (only as fallback)
-    let customerId: string | null = null
+    // SECURITY: Use encrypted token instead of real customer ID
+    // Only as fallback for passkey display name
+    let customerToken: string | null = null
     try {
       if (typeof window !== 'undefined') {
-        customerId = sessionStorage.getItem('customerId')
-        // Validate customerId if present
-        if (customerId && typeof customerId !== 'string') {
-          customerId = null
+        customerToken = getCustomerToken()
+        // Validate token if present
+        if (customerToken && typeof customerToken !== 'string') {
+          customerToken = null
         }
       }
     } catch (storageError) {
-      // Continue without customerId
+      // Continue without token
     }
     
-    // Prefer original phone/email over customerId for passkey display name
-    const identifier = original || customerId || null
+    // Prefer original phone/email over token for passkey display name
+    const identifier = original || customerToken || null
     
     // Validate final identifier
     if (identifier && typeof identifier !== 'string') {
@@ -309,19 +312,20 @@ export function getOriginalIdentifierFromSession(session: Session | null): strin
 }
 
 /**
- * Extracts customerId from session or sessionStorage with enhanced error handling
+ * Extracts customer token from session with enhanced error handling
+ * NOTE: Returns encrypted token for tracking, NOT real customer ID
+ * For real customer ID, use getCustomerId() API which reads httpOnly cookie
  */
 export function getCustomerIdFromSession(session: Session | null): string | null {
   try {
-    // First try sessionStorage
+    // SECURITY: Use encrypted token instead of real customer ID
     try {
       if (typeof window !== 'undefined') {
-        const customerId = sessionStorage.getItem('customerId')
-        if (customerId) {
-          // Validate customerId
-          if (typeof customerId === 'string' && customerId.trim().length > 0) {
-            return customerId
-          } else {
+        const customerToken = getCustomerToken()
+        if (customerToken) {
+          // Validate token
+          if (typeof customerToken === 'string' && customerToken.trim().length > 0) {
+            return customerToken
           }
         }
       }
@@ -329,7 +333,7 @@ export function getCustomerIdFromSession(session: Session | null): string | null
       // Continue to fallback
     }
     
-    // Fallback to session data if available
+    // Fallback to session data if available (may contain customer ID for backward compat)
     if (session && typeof session === 'object') {
       const sessionCustomerId = (session as any)?.customerId
       if (sessionCustomerId && typeof sessionCustomerId === 'string') {

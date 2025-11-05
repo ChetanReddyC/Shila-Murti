@@ -54,14 +54,8 @@ export default function AccountPage() {
         return
       }
       
-      // Fallback: try sessionStorage for backward compatibility
-      const cid = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null
-      const normalized = cid && cid !== 'undefined' && cid !== 'null' ? cid : null
-      if (normalized) {
-        setCustomerId(normalized)
-      } else if (cid && (cid === 'undefined' || cid === 'null')) {
-        sessionStorage.removeItem('customerId')
-      }
+      // Fallback: No longer use insecure sessionStorage
+      // Customer ID should come from session or be fetched via secure API in the next useEffect
     } catch {}
   }, [session])
 

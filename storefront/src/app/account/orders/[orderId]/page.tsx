@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import SessionGuard from '@/components/SessionGuard';
 import styles from './page.module.css';
+import { getCustomerId as getCustomerIdHybrid } from '@/utils/hybridCustomerStorage';
 
 type OrderStage = 'Placed' | 'Processed' | 'Shipped' | 'Delivered';
 
@@ -197,11 +198,13 @@ function OrderDetailsPageContent() {
   useEffect(() => {
     const fetchOrderData = async () => {
       try {
-        const customerId = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null;
-        if (!customerId || !orderId) {
+        // SECURITY: Get customer ID from secure httpOnly cookie via API
+        const result = await getCustomerIdHybrid();
+        if (!result.ok || !result.customerId || !orderId) {
           setLoading(false);
           return;
         }
+        const customerId = result.customerId;
 
         // Fetch the specific order directly instead of all orders
         const res = await fetch(`/api/account/orders/${orderId}`);
@@ -366,11 +369,13 @@ function OrderDetailsPageContent() {
   const handleCancelOrder = async () => {
     if (!orderId) return;
     
-    const customerId = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null;
-    if (!customerId) {
+    // SECURITY: Get customer ID from secure httpOnly cookie via API
+    const result = await getCustomerIdHybrid();
+    if (!result.ok || !result.customerId) {
       setCancelError('Unable to cancel order: Customer not found');
       return;
     }
+    const customerId = result.customerId;
     
     setIsCancelling(true);
     setCancelError(null);
@@ -411,11 +416,13 @@ function OrderDetailsPageContent() {
   const downloadInvoice = async () => {
     if (!orderId) return;
     
-    const customerId = typeof window !== 'undefined' ? sessionStorage.getItem('customerId') : null;
-    if (!customerId) {
+    // SECURITY: Get customer ID from secure httpOnly cookie via API
+    const result = await getCustomerIdHybrid();
+    if (!result.ok || !result.customerId) {
       alert('Unable to download invoice: Customer not found');
       return;
     }
+    const customerId = result.customerId;
     
     setIsDownloading(true);
     
