@@ -147,9 +147,28 @@ export async function POST(req: NextRequest) {
       // Get the username from reverse mapping
       const mapping = await kvGet<{ userId: string; username?: string }>(`webauthn:cred-map:${body.id}`)
       
-      if (mapping?.username) {
+      if (mapping?.userId) {
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Found mapping:', { userId: mapping.userId, username: mapping.username })
+        
+        // Store the username for returning to client
         mappedUsername = mapping.username
-        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Found username in mapping:', mappedUsername)
+        
+        // CRITICAL FIX: Update cid with the actual userId from mapping (customer ID or phone)
+        // The credential was stored with this userId, not the username
+        cid = mapping.userId
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Updated cid to use mapped userId:', cid)
+        
+        // CRITICAL FIX: Regenerate candidates with the actual userId
+        const updatedBody = { ...body, userId: mapping.userId }
+        if (mapping.username?.includes('@')) {
+          updatedBody.email = mapping.username
+        } else {
+          updatedBody.phone = mapping.username
+        }
+        const newCandidates = normalizeCandidatesFromBody(updatedBody)
+        rawCandidates.length = 0
+        rawCandidates.push(...newCandidates)
+        console.log('[PASSKEY_VERIFY][CONDITIONAL_UI] Updated candidates:', rawCandidates)
       } else {
         console.warn('[PASSKEY_VERIFY][CONDITIONAL_UI] No username in mapping for credential:', body.id)
       }

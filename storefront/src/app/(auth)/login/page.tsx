@@ -5,6 +5,7 @@ import { usePasskey, PublicKeyRequestOptionsJSON } from '@/hooks/usePasskey'
 import { signIn } from 'next-auth/react'
 import styles from './loginPage.module.css'
 import { setCustomerId as setCustomerIdHybrid } from '../../../utils/hybridCustomerStorage'
+import LoadingScreen from '@/components/LoadingScreen'
 
 // Load debug helper in development
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -74,6 +75,9 @@ export default function LoginPage() {
   const [magicSent, setMagicSent] = useState<boolean>(false)
   const [magicVerified, setMagicVerified] = useState<boolean>(false)
   const magicPollTimerRef = useRef<any>(null)
+  
+  // Loading screen state
+  const [showLoadingScreen, setShowLoadingScreen] = useState<boolean>(false)
 
   // Attempt passkey silently when identifier is prefilled via sessionStorage
   React.useEffect(() => {
@@ -431,6 +435,10 @@ export default function LoginPage() {
         setError('Please enter a valid 6-digit OTP code')
         return
       }
+      
+      // Show loading screen immediately when verification starts
+      setShowLoadingScreen(true)
+      setShowOtpModal(false)
       setOtpVerifying(true)
       
       // Verify OTP
@@ -539,6 +547,9 @@ export default function LoginPage() {
         throw new Error(signInResult?.error || 'Failed to create session')
       }
     } catch (e: any) {
+      // Hide loading screen on error
+      setShowLoadingScreen(false)
+      setShowOtpModal(true)
       setError(e?.message || 'Failed to verify OTP. Please try again.')
     } finally {
       setOtpVerifying(false)
@@ -723,8 +734,15 @@ export default function LoginPage() {
   }, [])
 
   return (
-    <div className={styles.pageWrapper}>
-      <div className={styles.container}>
+    <>
+      <LoadingScreen
+        show={showLoadingScreen}
+        duration={1200}
+        imagesFolder="/loading-animations"
+        shaderEffect="smoke"
+      />
+      <div className={styles.pageWrapper}>
+        <div className={styles.container}>
         <h2 className={styles.title}>Login</h2>
         
         {!showAuthMethods ? (
@@ -949,6 +967,7 @@ export default function LoginPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
