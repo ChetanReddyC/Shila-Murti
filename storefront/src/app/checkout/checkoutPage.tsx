@@ -13,7 +13,7 @@ import { PriceCalculationService } from '../../services/PriceCalculationService'
 import { validateIndianAddress, validateAddressField, type AddressInput } from '../../utils/addressValidation';
 import AuthRequiredModal from '../../components/AuthRequiredModal';
 import { useNavigationLoading } from '../../providers/NavigationLoadingProvider';
-import { setCustomerId as setCustomerIdHybrid } from '../../utils/hybridCustomerStorage';
+import { setCustomerId as setCustomerIdHybrid, getCustomerId as getCustomerIdHybrid } from '../../utils/hybridCustomerStorage';
 
 export default function CheckoutPage() {
 
@@ -419,6 +419,34 @@ export default function CheckoutPage() {
 
               setCustomerId(sessionCustomerId);
 
+            } else {
+
+              // Fallback: Try to get customer ID from hybrid storage
+
+              console.log('[CHECKOUT] Session has no customerId, checking hybrid storage...');
+
+              try {
+
+                const result = await getCustomerIdHybrid();
+
+                if (result.ok && result.customerId) {
+
+                  console.log('[CHECKOUT] Retrieved customerId from hybrid storage:', result.customerId);
+
+                  setCustomerId(result.customerId);
+
+                } else {
+
+                  console.log('[CHECKOUT] No customer ID in hybrid storage:', result.error);
+
+                }
+
+              } catch (error) {
+
+                console.error('[CHECKOUT] Failed to retrieve customer ID from hybrid storage:', error);
+
+              }
+
             }
 
           } else {
@@ -456,6 +484,64 @@ export default function CheckoutPage() {
     validateSession();
 
   }, [status, session]);
+
+  
+
+  // On mount: Try to retrieve customer ID from hybrid storage if not already set
+
+  // This handles cases where user logged in from /login page and navigated here
+
+  useEffect(() => {
+
+    const retrieveCustomerId = async () => {
+
+      // Skip if we already have a customer ID or if authenticated session is loading
+
+      if (customerId || status === 'loading') {
+
+        return;
+
+      }
+
+      
+
+      console.log('[CHECKOUT] Checking for existing customer ID in hybrid storage on mount...');
+
+      
+
+      try {
+
+        const result = await getCustomerIdHybrid();
+
+        
+
+        if (result.ok && result.customerId) {
+
+          console.log('[CHECKOUT] Found customer ID in hybrid storage:', result.customerId);
+
+          setCustomerId(result.customerId);
+
+          setPurchaseReady(true);
+
+        } else {
+
+          console.log('[CHECKOUT] No customer ID found in hybrid storage');
+
+        }
+
+      } catch (error) {
+
+        console.error('[CHECKOUT] Error retrieving customer ID from hybrid storage:', error);
+
+      }
+
+    };
+
+    
+
+    retrieveCustomerId();
+
+  }, [customerId, status]);
 
 
 
@@ -2166,12 +2252,30 @@ export default function CheckoutPage() {
       setCashfreeLoading(true)
 
       // GATE 1: Validate customer ID exists (BLOCKING)
-      if (!customerId) {
+      // CRITICAL FIX: Re-check hybrid storage as fallback if state is empty (timing issue)
+      let actualCustomerId = customerId
+      if (!actualCustomerId) {
+        console.warn('[CASHFREE] Customer ID not in state, checking hybrid storage...')
+        try {
+          const result = await getCustomerIdHybrid()
+          if (result.ok && result.customerId) {
+            actualCustomerId = result.customerId
+            setCustomerId(actualCustomerId) // Update state for next time
+            console.log('[CASHFREE] Retrieved customer ID from hybrid storage:', actualCustomerId)
+          }
+        } catch (error) {
+          console.error('[CASHFREE] Failed to retrieve customer ID from hybrid storage:', error)
+        }
+      }
+      
+      if (!actualCustomerId) {
         console.error('[CASHFREE] Customer ID required')
         alert('Please complete identity verification before payment. Use phone OTP or email magic link in the Identity Verification section.')
         setCashfreeLoading(false)
         return
       }
+      
+      console.log('[CASHFREE] Using customer ID:', actualCustomerId)
 
       // GATE 2: Associate customer with cart (BLOCKING with retries)
       const associateCustomerWithRetry = async (retries = 3): Promise<boolean> => {
@@ -2180,7 +2284,7 @@ export default function CheckoutPage() {
             const response = await fetch('/api/checkout/customer/associate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ cartId: cart.id, customerId }),
+              body: JSON.stringify({ cartId: cart.id, customerId: actualCustomerId }),
             })
             
             if (!response.ok) {
@@ -2219,9 +2323,9 @@ export default function CheckoutPage() {
       try {
         const { medusaApiClient } = await import('../../utils/medusaApiClient')
         const cartAfterAssociation = await medusaApiClient.getCart(cart.id)
-        const actualCustomerId = (cartAfterAssociation as any).customer_id
+        const verifiedCustomerId = (cartAfterAssociation as any).customer_id
         
-        if (actualCustomerId !== customerId) {
+        if (verifiedCustomerId !== actualCustomerId) {
           console.error('[CASHFREE] Cart verification failed: customer mismatch')
           alert('Cart verification failed. Please refresh the page and try again.')
           setCashfreeLoading(false)
@@ -2447,7 +2551,7 @@ export default function CheckoutPage() {
 
           customer: {
 
-            id: customerId || undefined,
+            id: actualCustomerId || undefined,
 
             name: formData.name || 'Customer',
 
