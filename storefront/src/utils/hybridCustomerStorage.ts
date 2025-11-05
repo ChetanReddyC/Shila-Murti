@@ -35,11 +35,9 @@ export async function setCustomerId(customerId: string): Promise<{ ok: boolean; 
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('customerToken', encryptedToken)
       
-      // Also store actual customerId for backward compatibility with legacy code
-      // Note: Real customerId is also in httpOnly cookie (XSS protected)
-      sessionStorage.setItem('customerId', customerId)
-      
-      // Also store a flag indicating hybrid storage is active
+      // Store flag indicating hybrid storage is active
+      // NOTE: We do NOT store the actual customerId in sessionStorage for security
+      // Real customer ID is ONLY in httpOnly cookie (XSS protected)
       sessionStorage.setItem('customerStorageType', 'hybrid')
     }
     
@@ -104,8 +102,10 @@ export async function clearCustomerId(): Promise<void> {
     // Clear sessionStorage
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('customerToken')
-      sessionStorage.removeItem('customerId')
       sessionStorage.removeItem('customerStorageType')
+      
+      // Also clear legacy customerId if it exists (for migration)
+      sessionStorage.removeItem('customerId')
     }
     
   } catch (error) {
@@ -170,14 +170,7 @@ export async function migrateLegacyStorage(): Promise<boolean> {
  * @returns Customer token for passkeys
  */
 export function getCustomerIdentifierForPasskeys(): string | null {
-  // Try hybrid storage first
-  const token = getCustomerToken()
-  if (token) return token
-  
-  // Fallback to legacy storage (will be migrated)
-  if (typeof window !== 'undefined') {
-    return sessionStorage.getItem('customerId')
-  }
-  
-  return null
+  // Return only the encrypted token (secure)
+  // Real customer ID is in httpOnly cookie and can only be retrieved via API
+  return getCustomerToken()
 }

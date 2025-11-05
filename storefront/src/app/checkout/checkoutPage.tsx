@@ -159,6 +159,9 @@ export default function CheckoutPage() {
   const [purchaseReady, setPurchaseReady] = useState(false)
 
   const [customerId, setCustomerId] = useState<string | null>(null)
+  
+  // Cache flag to avoid repeated API calls for customer ID retrieval
+  const [customerIdFetched, setCustomerIdFetched] = useState(false)
 
   // Persist readiness and form data across refresh and tabs
 
@@ -419,6 +422,8 @@ export default function CheckoutPage() {
 
               setCustomerId(sessionCustomerId);
 
+              setCustomerIdFetched(true); // Mark as fetched from session
+
             } else {
 
               // Fallback: Try to get customer ID from hybrid storage
@@ -435,15 +440,21 @@ export default function CheckoutPage() {
 
                   setCustomerId(result.customerId);
 
+                  setCustomerIdFetched(true); // Mark as fetched from storage
+
                 } else {
 
                   console.log('[CHECKOUT] No customer ID in hybrid storage:', result.error);
+
+                  setCustomerIdFetched(true); // Mark as attempted
 
                 }
 
               } catch (error) {
 
                 console.error('[CHECKOUT] Failed to retrieve customer ID from hybrid storage:', error);
+
+                setCustomerIdFetched(true); // Mark as attempted
 
               }
 
@@ -495,9 +506,9 @@ export default function CheckoutPage() {
 
     const retrieveCustomerId = async () => {
 
-      // Skip if we already have a customer ID or if authenticated session is loading
+      // Skip if we already have a customer ID or if authenticated session is loading or already fetched
 
-      if (customerId || status === 'loading') {
+      if (customerId || status === 'loading' || customerIdFetched) {
 
         return;
 
@@ -521,17 +532,23 @@ export default function CheckoutPage() {
 
           setCustomerId(result.customerId);
 
+          setCustomerIdFetched(true); // Mark as fetched
+
           setPurchaseReady(true);
 
         } else {
 
           console.log('[CHECKOUT] No customer ID found in hybrid storage');
 
+          setCustomerIdFetched(true); // Mark as attempted
+
         }
 
       } catch (error) {
 
         console.error('[CHECKOUT] Error retrieving customer ID from hybrid storage:', error);
+
+        setCustomerIdFetched(true); // Mark as attempted
 
       }
 
@@ -541,7 +558,7 @@ export default function CheckoutPage() {
 
     retrieveCustomerId();
 
-  }, [customerId, status]);
+  }, [customerId, status, customerIdFetched]);
 
 
 
@@ -2253,19 +2270,27 @@ export default function CheckoutPage() {
 
       // GATE 1: Validate customer ID exists (BLOCKING)
       // CRITICAL FIX: Re-check hybrid storage as fallback if state is empty (timing issue)
+      // Optimization: Cache the result to avoid repeated API calls
       let actualCustomerId = customerId
-      if (!actualCustomerId) {
+      if (!actualCustomerId && !customerIdFetched) {
         console.warn('[CASHFREE] Customer ID not in state, checking hybrid storage...')
         try {
           const result = await getCustomerIdHybrid()
           if (result.ok && result.customerId) {
             actualCustomerId = result.customerId
             setCustomerId(actualCustomerId) // Update state for next time
+            setCustomerIdFetched(true) // Mark as fetched to avoid repeated calls
             console.log('[CASHFREE] Retrieved customer ID from hybrid storage:', actualCustomerId)
+          } else {
+            setCustomerIdFetched(true) // Mark as attempted even if failed
           }
         } catch (error) {
           console.error('[CASHFREE] Failed to retrieve customer ID from hybrid storage:', error)
+          setCustomerIdFetched(true) // Mark as attempted even if error
         }
+      } else if (actualCustomerId && !customerIdFetched) {
+        // If we have customerId in state, mark it as fetched
+        setCustomerIdFetched(true)
       }
       
       if (!actualCustomerId) {
