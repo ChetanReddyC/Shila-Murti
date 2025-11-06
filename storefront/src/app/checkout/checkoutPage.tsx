@@ -534,7 +534,7 @@ export default function CheckoutPage() {
 
           setCustomerIdFetched(true); // Mark as fetched
 
-          setPurchaseReady(true);
+          // Note: Don't set purchaseReady here - let session validation or identity verification handle it
 
         } else {
 
@@ -4074,16 +4074,10 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
-              {/* Identity Verification Section (Task 2) - Only show for unauthenticated users who haven't verified */}
-              {status !== 'authenticated' && !purchaseReady && (
+              {/* Identity Verification Section (Task 2) - Only show for unauthenticated users */}
+              {status !== 'authenticated' && (
                 <div ref={identityVerificationRef} className={styles.section}>
                   <h2 className={styles.sectionTitle}>Identity Verification</h2>
-                  {purchaseReady && (
-                    <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-md">
-                      <div className="text-green-800 font-medium">✅ Identity verified successfully!</div>
-                      <div className="text-green-600 text-sm mt-1">You can now place your order.</div>
-                    </div>
-                  )}
                   {identityError && (
                     <div className={`mb-3 p-3 rounded-md ${identityError.startsWith('✅') ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
                       {identityError}
