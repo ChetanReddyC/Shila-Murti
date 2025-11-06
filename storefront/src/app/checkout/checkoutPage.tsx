@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Script from 'next/script';
 import styles from './checkoutPage.module.css';
+import loginStyles from '../(auth)/login/loginPage.module.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
@@ -123,6 +124,11 @@ export default function CheckoutPage() {
   const [otpCode, setOtpCode] = useState('')
 
   const [otpVerifying, setOtpVerifying] = useState(false)
+
+  const [showOtpModal, setShowOtpModal] = useState(false)
+
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const autoSubmitTimerRef = useRef<any>(null)
 
 
 
@@ -1853,6 +1859,7 @@ export default function CheckoutPage() {
       }
 
       setOtpSent(true)
+      setShowOtpModal(true)
 
     } catch (e: any) {
 
@@ -1867,6 +1874,28 @@ export default function CheckoutPage() {
   }
 
 
+
+  const handleOtpInputChange = (index: number, value: string) => {
+    if (value.length <= 1 && /^\d*$/.test(value)) {
+      const newOtpArray = Array(6).fill('')
+      const currentCode = otpCode.padEnd(6, '')
+      for (let i = 0; i < 6; i++) {
+        newOtpArray[i] = currentCode[i] || ''
+      }
+      newOtpArray[index] = value
+      const completeCode = newOtpArray.join('')
+      setOtpCode(completeCode)
+      if (value.length === 1 && index < 5) {
+        otpInputRefs.current[index + 1]?.focus()
+      }
+    }
+  }
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus()
+    }
+  }
 
   // Verify OTP, then checkout-verify
 
@@ -1979,9 +2008,13 @@ export default function CheckoutPage() {
       } catch (storageError) {
 
         console.error('[Checkout] Failed to set customer ID:', storageError);
-
       }
 
+      // Close modal and clear OTP code after success
+      setShowOtpModal(false);
+      setOtpCode('');
+      setOtpSent(false);
+      
       setPurchaseReady(true);
 
 
@@ -2207,6 +2240,23 @@ export default function CheckoutPage() {
   }
 
 
+
+  // Auto-submit when OTP is complete
+  useEffect(() => {
+    if (otpCode.length === 6 && /^\d{6}$/.test(otpCode) && !otpVerifying) {
+      if (autoSubmitTimerRef.current) {
+        clearTimeout(autoSubmitTimerRef.current)
+      }
+      autoSubmitTimerRef.current = setTimeout(() => {
+        verifyOtp()
+      }, 300)
+    }
+    return () => {
+      if (autoSubmitTimerRef.current) {
+        clearTimeout(autoSubmitTimerRef.current)
+      }
+    }
+  }, [otpCode, otpVerifying, verifyOtp])
 
   // Cleanup polling on unmount and clean up localStorage on successful order
 
@@ -4166,25 +4216,6 @@ export default function CheckoutPage() {
                           {otpSending ? 'Sending...' : (otpSent ? 'Resend OTP' : 'Send OTP')}
                         </button>
                       </div>
-                      {otpSent && (
-                        <div className={styles.formGroup}>
-                          <label htmlFor="otp" className={styles.label}>Enter OTP</label>
-                          <input
-                            type="text"
-                            id="otp"
-                            name="otp"
-                            className={styles.input}
-                            value={otpCode}
-                            onChange={(e) => setOtpCode(e.target.value)}
-                            placeholder="6-digit code"
-                          />
-                          <div className="mt-2">
-                            <button type="button" className={styles.placeOrderButton} onClick={verifyOtp} disabled={otpVerifying || !otpCode}>
-                              {otpVerifying ? 'Verifying...' : 'Verify'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ) : (
                     <div>
@@ -4286,6 +4317,59 @@ export default function CheckoutPage() {
         onVerifyNow={handleScrollToVerification}
         message={authModalMessage}
       />
+
+      {/* OTP Modal */}
+      {showOtpModal && (
+        <div className={loginStyles.modalOverlay}>
+          <div className={loginStyles.modal}>
+            <div className={loginStyles.modalHeader}>
+              <h2 className={loginStyles.modalTitle}>Verify with WhatsApp OTP</h2>
+              <p className={loginStyles.modalDescription}>A 6-digit code has been sent to your WhatsApp number.</p>
+            </div>
+            <div className={loginStyles.otpInputContainer}>
+              {[0, 1, 2, 3, 4, 5].map((index) => (
+                <input
+                  key={index}
+                  ref={(el) => { otpInputRefs.current[index] = el }}
+                  className={loginStyles.otpInput}
+                  maxLength={1}
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus={index === 0}
+                  value={otpCode[index] || ''}
+                  onChange={(e) => handleOtpInputChange(index, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                />
+              ))}
+            </div>
+            <button
+              className={loginStyles.verifyBtn}
+              onClick={verifyOtp}
+              disabled={otpVerifying || otpCode.length !== 6}
+            >
+              {otpVerifying ? 'Verifying...' : 'Verify'}
+            </button>
+            <div className={loginStyles.modalActions}>
+              <button 
+                className={loginStyles.modalLink}
+                onClick={sendOtp}
+                disabled={otpSending}
+              >
+                {otpSending ? 'Sending...' : 'Resend OTP'}
+              </button>
+              <button 
+                className={loginStyles.modalLink}
+                onClick={() => {
+                  setShowOtpModal(false)
+                  setOtpCode('')
+                }}
+              >
+                Change Number
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
