@@ -2,52 +2,67 @@
 
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { clearCustomerId } from '../utils/hybridCustomerStorage'
+import LogoutConfirmModal from './LogoutConfirmModal'
+import LoadingScreen from './LoadingScreen'
 
 const LogoutButton = () => {
   const router = useRouter()
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   
   const handleLogout = useCallback(async () => {
+    setIsLoggingOut(true)
+    
+
     try {
-      // CRITICAL: Blacklist JWT FIRST before signOut
-      // This ensures the JWT is revoked even if signOut fails
-      const logoutRes = await fetch('/api/auth/logout', { method: 'POST' })
-      
-      if (!logoutRes.ok) {
-        console.error('[LOGOUT] Failed to blacklist JWT, but proceeding with signOut')
-      }
-      
-      // Clear sessionStorage
+      // Clear storage immediately for instant UX
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('customerId')
-        sessionStorage.clear() // Clear all session data
-      }
-      
-      // Clear hybrid customer storage first
-      await clearCustomerId()
-      
-      // Clear localStorage cart and checkout data
-      if (typeof window !== 'undefined') {
+        sessionStorage.clear()
         localStorage.removeItem('medusa_cart_id')
         localStorage.removeItem('checkout_form')
         localStorage.removeItem('checkout_identity')
         localStorage.removeItem('magic_verification_success')
       }
       
-      // Terminate session and redirect to login
-      // This clears the session cookie
-      await signOut({ callbackUrl: '/login', redirect: true })
+      // Fire off cleanup in background (non-blocking)
+      // Use sendBeacon for reliable delivery during page unload
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/auth/logout', JSON.stringify({}))
+      } else {
+        fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {})
+      }
+      clearCustomerId().catch(() => {})
+      
+      // Sign out without waiting for redirect
+      await signOut({ redirect: false })
+      
+      // Redirect immediately - loading screen will show during actual logout process
+      window.location.href = '/login'
     } catch (error) {
       console.error('[LOGOUT] Error during logout:', error)
-      // Force redirect even if logout fails
-      router.push('/login')
+      setIsLoggingOut(false)
+      window.location.href = '/login'
     }
   }, [router])
   
   return (
-    <button 
-      onClick={handleLogout}
+    <>
+      <LoadingScreen 
+        show={isLoggingOut}
+        duration={1200}
+        imagesFolder="/loading-animations"
+        shaderEffect="smoke"
+      />
+      <LogoutConfirmModal 
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleLogout}
+      />
+      <button 
+        onClick={() => setShowConfirmModal(true)}
       style={{ 
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         border: 'none', 
@@ -76,6 +91,7 @@ const LogoutButton = () => {
     >
       Logout
     </button>
+    </>
   )
 }
 

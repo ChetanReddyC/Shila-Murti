@@ -11,6 +11,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import HeaderGLSLCanvas from './HeaderGLSLCanvas';
 import NavLinkShaderOverlay, { type NavLinkShaderOverlayAPI } from './NavLinkShaderOverlay';
 import { clearCustomerId } from '../utils/hybridCustomerStorage';
+import LogoutConfirmModal from './LogoutConfirmModal';
+import LoadingScreen from './LoadingScreen';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
   const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
@@ -23,6 +25,8 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const [lastSeenCount, setLastSeenCount] = useState<number>(0);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
   const [toggleCount, setToggleCount] = useState<number>(0);
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState<boolean>(false);
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
   const navLinkShaderRef = useRef<NavLinkShaderOverlayAPI | null>(null);
 
   useEffect(() => {
@@ -89,8 +93,53 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const totalItems = preventCartNavigation ? 0 : getTotalItems();
   const shouldShowBadge = hasVisitedCart && !isOnCartPage && totalItems > lastSeenCount;
 
+  const handleLogoutConfirm = async () => {
+    setIsLoggingOut(true);
+    
+    try {
+      // Clear storage immediately
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear();
+        localStorage.removeItem('medusa_cart_id');
+        localStorage.removeItem('checkout_form');
+        localStorage.removeItem('checkout_identity');
+        localStorage.removeItem('magic_verification_success');
+      }
+      
+      // Fire cleanup in background (non-blocking)
+      // Use sendBeacon for reliable delivery during page unload
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/auth/logout', JSON.stringify({}));
+      } else {
+        fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
+      }
+      clearCustomerId().catch(() => {});
+      
+      // Sign out without waiting for redirect
+      await signOut({ redirect: false });
+      
+      // Redirect immediately - loading screen will show during actual logout process
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('[LOGOUT] Error:', error);
+      setIsLoggingOut(false);
+      window.location.href = '/login';
+    }
+  };
+
   return (
     <>
+      <LoadingScreen 
+        show={isLoggingOut}
+        duration={1200}
+        imagesFolder="/loading-animations"
+        shaderEffect="smoke"
+      />
+      <LogoutConfirmModal 
+        isOpen={showLogoutConfirmModal}
+        onClose={() => setShowLogoutConfirmModal(false)}
+        onConfirm={handleLogoutConfirm}
+      />
       <header className={styles.header}>
         <svg style={{ display: 'none' }}>
           <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
@@ -344,22 +393,9 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                             }
                           }
                         }}
-                        onClick={async () => {
+                        onClick={() => {
                           setIsProfileMenuOpen(false);
-                          try {
-                            const logoutRes = await fetch('/api/auth/logout', { method: 'POST' });
-                            if (typeof window !== 'undefined') {
-                              await clearCustomerId();
-                              sessionStorage.clear();
-                              localStorage.removeItem('medusa_cart_id');
-                              localStorage.removeItem('checkout_form');
-                              localStorage.removeItem('checkout_identity');
-                              localStorage.removeItem('magic_verification_success');
-                            }
-                            await signOut({ callbackUrl: '/login', redirect: true });
-                          } catch (error) {
-                            console.error('[LOGOUT] Error:', error);
-                          }
+                          setShowLogoutConfirmModal(true);
                         }}
                       >
                         Logout

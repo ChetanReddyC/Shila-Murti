@@ -438,7 +438,6 @@ export default function LoginPage() {
       
       // Show loading screen immediately when verification starts
       setShowLoadingScreen(true)
-      setShowOtpModal(false)
       setOtpVerifying(true)
       
       // Verify OTP
@@ -549,7 +548,6 @@ export default function LoginPage() {
     } catch (e: any) {
       // Hide loading screen on error
       setShowLoadingScreen(false)
-      setShowOtpModal(true)
       setError(e?.message || 'Failed to verify OTP. Please try again.')
     } finally {
       setOtpVerifying(false)
@@ -933,6 +931,7 @@ export default function LoginPage() {
                   maxLength={1}
                   type="text"
                   inputMode="numeric"
+                  autoFocus={index === 0}
                   value={otpCode[index] || ''}
                   onChange={(e) => handleOtpInputChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
