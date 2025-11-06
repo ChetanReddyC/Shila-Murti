@@ -914,7 +914,7 @@ export default function LoadingScreen({
 
     textCanvas.width = 800;
     textCanvas.height = 100;
-    textCtx.font = '20px Inter, sans-serif';
+    textCtx.font = 'bold 24px Inter, sans-serif';
     textCtx.fillStyle = 'white';
     textCtx.textAlign = 'center';
     textCtx.textBaseline = 'middle';
