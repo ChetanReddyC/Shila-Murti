@@ -3,13 +3,9 @@
 import styles from './page.module.css';
 import GLSLCanvas from '../components/GLSLCanvas';
 import DynamicSvgEffect from '../components/DynamicSvgEffect';
-import LoadingScreen from '../components/LoadingScreen';
-import PaymentProcessingScreen from '../components/PaymentProcessingScreen'; // TODO: REMOVE AFTER DEVELOPMENT
 import { useState, useEffect, useRef } from 'react';
 
 export default function Home() {
-  // TODO: REMOVE THIS STATE AFTER DEVELOPMENT
-  const [showPaymentScreen, setShowPaymentScreen] = useState(true);
   const heroes = [
     {
       img: "https://lh3.googleusercontent.com/aida-public/AB6AXuDhueADB8ZtBUYTHeeqKcelefoBApqLPbZ-2m9ggoHGf4MriDJ00W3nc-Nd9apu1pe50qXwMnjKcybXilTnWVAZuUxuC7Uqgr6QUq031Z6SwW9ffES0sHmt0Fj4IlikSx0km5mqjAmVM6zmU90rHwi-5NqPpWdBphgfYjz1OJSuzjGUa10Q3BRPMxhAW8CDyJcY5OktxWcPiyZ-24dQTfH03NsapHGav3fyli1FuX6WEssUIEw6f0yFTGnbE8s0FzQfP7w3kIAttzWr",
@@ -40,7 +36,6 @@ export default function Home() {
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [direction, setDirection] = useState(1);
-  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   // Shader is always active now; removed debug toggle logic that caused flicker
   const shaderActive = true;
 
@@ -87,81 +82,7 @@ export default function Home() {
 
   return (
     <>
-      {/* TODO: REMOVE AFTER DEVELOPMENT - Payment Processing Screen for testing */}
-      {showPaymentScreen && <PaymentProcessingScreen />}
-      
-      <LoadingScreen 
-        show={showLoadingScreen} 
-        onComplete={() => setShowLoadingScreen(false)}
-        duration={1200}
-        imagesFolder="/loading-animations"
-        shaderEffect="smoke"
-      />
-      
       <div className="relative w-full overflow-hidden" style={{ paddingTop: '100px' }}>
-        {/* Test Toggle Button - Remove in production */}
-        {/* TODO: REMOVE AFTER DEVELOPMENT - Payment Screen Toggle Button */}
-        <button
-          onClick={() => setShowPaymentScreen(!showPaymentScreen)}
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            left: '20px',
-            zIndex: 10000,
-            padding: '12px 24px',
-            backgroundColor: '#1E40AF',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px',
-            boxShadow: '0 4px 12px rgba(30, 64, 175, 0.3)',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#1E3A8A';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#1E40AF';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          {showPaymentScreen ? 'Hide Payment Screen' : 'Show Payment Screen'}
-        </button>
-        
-        {/* Test Toggle Button - Remove in production */}
-        <button
-          onClick={() => setShowLoadingScreen(!showLoadingScreen)}
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            zIndex: 10000,
-            padding: '12px 24px',
-            backgroundColor: '#000000',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#333333';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#000000';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          {showLoadingScreen ? 'Hide' : 'Show'} Loading
-        </button>
-
         <div
           className="relative min-h-screen w-full bg-white"
           style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
