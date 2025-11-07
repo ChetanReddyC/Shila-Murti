@@ -51,6 +51,59 @@ export default function LoadingScreen({
     }
   }, [show, isVisible, onComplete]);
 
+  // Prevent scrolling when loading screen is visible (keep scrollbar visible)
+  useEffect(() => {
+    if (isVisible) {
+      // Store the current scroll position
+      const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
+      
+      // Prevent scroll via wheel (mouse scroll)
+      const preventScroll = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      };
+      
+      // Prevent scroll and restore position
+      const preventScrollRestore = () => {
+        window.scrollTo(scrollX, scrollY);
+      };
+      
+      // Prevent keyboard scrolling (arrow keys, space, page up/down, home, end)
+      const preventKeyboardScroll = (e: KeyboardEvent) => {
+        const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', ' ', 'PageUp', 'PageDown', 'Home', 'End'];
+        if (keys.includes(e.key) || e.keyCode === 32) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      };
+      
+      // Prevent touch scrolling (mobile)
+      const preventTouchScroll = (e: TouchEvent) => {
+        if (e.touches.length > 1) return; // Allow pinch zoom
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      };
+      
+      // Add event listeners with passive: false to allow preventDefault
+      document.addEventListener('wheel', preventScroll, { passive: false });
+      document.addEventListener('touchmove', preventTouchScroll, { passive: false });
+      document.addEventListener('scroll', preventScrollRestore, { passive: false });
+      document.addEventListener('keydown', preventKeyboardScroll, { passive: false });
+      
+      return () => {
+        // Remove all event listeners
+        document.removeEventListener('wheel', preventScroll);
+        document.removeEventListener('touchmove', preventTouchScroll);
+        document.removeEventListener('scroll', preventScrollRestore);
+        document.removeEventListener('keydown', preventKeyboardScroll);
+      };
+    }
+  }, [isVisible]);
+
   useEffect(() => {
     if (!imagesFolder) return;
 
