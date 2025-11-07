@@ -350,14 +350,14 @@ export class ProductDataMapper {
   static calculatePrice(variants: ProductVariant[]): PriceCalculationResult {
 
     if (!variants || variants.length === 0) {
-      return { price: 0 };
+      return { price: 0, currency: 'INR' };
     }
 
     const priceData = this.extractPricesFromVariants(variants);
     
     
     if (priceData.length === 0) {
-      return { price: 0 };
+      return { price: 0, currency: 'INR' };
     }
 
     // Sort prices to find min and max

@@ -554,8 +554,8 @@ export class MedusaApiClient {
       sorted.forEach(id => queryParams.append('category_id[]', id));
     }
 
-    // For Medusa v2 Store API, only inventory_quantity is available (not deep inventory_items)
-    queryParams.append('fields', '+variants.inventory_quantity');
+    // Medusa v2 official approach: use calculated_price with region for proper pricing
+    queryParams.append('fields', '*variants.calculated_price');
 
     const endpoint = `/store/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
@@ -758,16 +758,32 @@ export class MedusaApiClient {
   }
 
   async getProductByHandle(handle: string): Promise<Product> {
+    // Get default region for calculated_price (required by Medusa v2 for proper pricing)
+    let regionId: string | undefined;
+    try {
+      const indiaRegion = await this.getIndiaRegion();
+      if (indiaRegion) {
+        regionId = indiaRegion.id;
+      }
+    } catch (e) {
+      // Proceed without region if fetch fails
+    }
+
     // For Medusa v2, we can use the handle parameter directly
     const queryParams = new URLSearchParams();
     queryParams.append('handle', handle);
-    // For Medusa v2 Store API, only inventory_quantity is available
-    queryParams.append('fields', '+variants.inventory_quantity');
-    // Do not append sales_channel_id by default; rely on key mapping. If needed, callers
-    // can include it explicitly.
+    
+    // Medusa v2 requires region_id when using calculated_price
+    if (regionId) {
+      queryParams.append('region_id', regionId);
+      queryParams.append('fields', '*variants.calculated_price');
+    } else {
+      // Fallback without calculated_price if no region available
+      queryParams.append('fields', '*variants,*variants.prices');
+    }
 
     const endpoint = `/store/products?${queryParams.toString()}`;
-    console.log('[MedusaApiClient] Fetching product by handle:', { handle, endpoint });
+    console.log('[MedusaApiClient] Fetching product by handle:', { handle, endpoint, hasRegion: !!regionId });
     const response = await this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
     
     if (!response.products || response.products.length === 0) {

@@ -654,7 +654,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     {/* Price visually separated lower, creating a tighter title/subtitle pair */}
                     <div className="flex items-center gap-1 mt-5">
                       <span className="text-[#141414] text-3xl lg:text-4xl font-bold leading-tight">
-                        {product.currency && product.price ?
+                        {(product.currency && product.price !== undefined) ?
                           `${product.currency} ${product.price.toLocaleString()}` :
                           'Price not available'
                         }
@@ -845,7 +845,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                               {item.title}
                             </h4>
                             <p className="text-[#141414] text-lg font-bold leading-tight">
-                              {item.currency && item.price ?
+                              {(item.currency && item.price !== undefined) ?
                                 `${item.currency} ${item.price.toLocaleString()}` :
                                 'Price not available'
                               }
