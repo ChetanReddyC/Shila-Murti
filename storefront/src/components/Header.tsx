@@ -140,7 +140,28 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         onClose={() => setShowLogoutConfirmModal(false)}
         onConfirm={handleLogoutConfirm}
       />
-      <header className={styles.header}>
+      <motion.header 
+        className={styles.header}
+        animate={isProfileMenuOpen ? "stretch" : "shrink"}
+        variants={{
+          shrink: {
+            scaleX: [1, 0.98, 1],
+            transition: {
+              duration: 1,
+              ease: [0.25, 0.8, 0.5, 1],
+              times: [0, 0.5, 1]
+            }
+          },
+          stretch: {
+            scaleX: [1, 1.020, 1],
+            transition: {
+              duration: 1,
+              ease: [0.25, 0.8, 0.5, 1],
+              times: [0, 0.5, 1]
+            }
+          }
+        }}
+      >
         <svg style={{ display: 'none' }}>
           <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
             <feTurbulence type="fractalNoise" baseFrequency="0.000 0.000" numOctaves="1" seed="17" result="turbulence" />
@@ -464,7 +485,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
             </div>
           </div>
         </div>
-      </header>
+      </motion.header>
       <NavLinkShaderOverlay ref={navLinkShaderRef} />
     </>
   );
