@@ -280,25 +280,52 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   // Add to cart handler
   const handleAddToCart = useCallback(async () => {
+    console.log('🛒 handleAddToCart called', { 
+      hasProductData: !!state.productData, 
+      hasProduct: !!state.product,
+      inStock: state.productData?.inStock,
+      variants: state.product?.variants?.length,
+      hasAddToCart: !!addToCart 
+    });
+
+    if (!addToCart) {
+      console.log('❌ addToCart function not available from useCart');
+      updateState({ 
+        addToCartError: 'Cart is not ready. Please refresh the page.',
+        addToCartSuccess: false 
+      });
+      return;
+    }
+
     if (!state.productData || !state.product) {
+      console.log('❌ Missing product data or product');
       return;
     }
 
     // Check if product is in stock or available via backorder/unmanaged inventory
+    console.log('📦 Stock check:', { 
+      inStock: state.productData.inStock,
+      allowBackorder: state.productData.inventory?.allowBackorder 
+    });
+
     if (!state.productData.inStock) {
       // Allow proceeding if backorders are allowed or inventory is unmanaged (mapped as allowBackorder)
       const allowBackorder = state.productData.inventory?.allowBackorder;
       if (!allowBackorder) {
+        console.log('❌ Product out of stock and no backorder');
         updateState({ 
           addToCartError: 'This product is currently out of stock.',
           addToCartSuccess: false 
         });
         return;
       }
+      console.log('✅ Product out of stock but backorder allowed');
     }
 
     // Check if product has variants
+    console.log('🔍 Checking variants:', state.product.variants?.length);
     if (!state.product.variants || state.product.variants.length === 0) {
+      console.log('❌ No variants available');
       updateState({ 
         addToCartError: 'This product has no available variants.',
         addToCartSuccess: false 
@@ -308,13 +335,23 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
     // Find the first available variant with stock/backorder/unmanaged
     let selectedVariant = null;
+    console.log('🔎 Starting variant selection loop...');
     for (const variant of state.product.variants) {
+      console.log('🔍 Checking variant:', {
+        id: variant.id,
+        inventory_quantity: variant.inventory_quantity,
+        manage_inventory: variant.manage_inventory,
+        allow_backorder: variant.allow_backorder,
+        has_inventory_items: !!variant.inventory_items
+      });
+
       // Check variant inventory
       let hasStock = false;
       
       // Check Medusa v1 style inventory
       if (typeof variant.inventory_quantity === 'number' && variant.inventory_quantity > 0) {
         hasStock = true;
+        console.log('✅ Has stock via inventory_quantity:', variant.inventory_quantity);
       }
       // Check Medusa v2 style inventory
       else if (variant.inventory_items && variant.inventory_items.length > 0) {
@@ -326,30 +363,47 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           }
         }
         hasStock = availableQuantity >= state.selectedQuantity;
+        console.log('📊 Inventory items check:', { availableQuantity, requiredQuantity: state.selectedQuantity, hasStock });
       }
       // If inventory is not managed, assume it's available
       else if (!variant.manage_inventory) {
         hasStock = true;
+        console.log('✅ Unmanaged inventory - always available');
+      }
+      // Fallback: if manage_inventory is true but no inventory data provided,
+      // trust the product-level inStock status from ProductDataMapper
+      else if (variant.manage_inventory && state.productData.inStock) {
+        hasStock = true;
+        console.log('✅ Using product-level stock status (inventory data not in variant)');
+      } else {
+        console.log('⚠️ No inventory method matched');
       }
 
       // Allow selection when backorder is enabled even if no stock
       if (!hasStock && variant.allow_backorder) {
         hasStock = true;
+        console.log('✅ No stock but backorder allowed');
       }
 
       if (hasStock) {
         selectedVariant = variant;
+        console.log('✅ Selected variant:', variant.id);
         break;
+      } else {
+        console.log('❌ Variant rejected - no stock');
       }
     }
     
     if (!selectedVariant) {
+      console.log('❌ No variant selected after loop');
       updateState({ 
         addToCartError: 'No product variant with sufficient stock is available.',
         addToCartSuccess: false 
       });
       return;
     }
+
+    console.log('🎯 Proceeding with selected variant:', selectedVariant.id);
 
     updateState({ 
       isAddingToCart: true, 
@@ -364,7 +418,15 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         estimatedUnitPrice = Number(selectedVariant.prices[0].amount || 0) / 100; // Convert from cents
       }
 
+      console.log('🚀 Calling addToCart with:', {
+        variantId: selectedVariant.id,
+        quantity: state.selectedQuantity,
+        estimatedUnitPrice
+      });
+
       await addToCart(selectedVariant.id, state.selectedQuantity, estimatedUnitPrice);
+
+      console.log('✅ addToCart completed successfully');
 
       // Show success feedback
       updateState({ 
@@ -378,6 +440,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       }, 3000);
 
     } catch (error) {
+      console.log('❌ addToCart failed:', error);
       
       // Handle specific error types
       let errorMessage = 'Failed to add item to cart. Please try again.';
@@ -406,7 +469,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     } finally {
       updateState({ isAddingToCart: false });
     }
-  }, [state.productData, state.product, state.selectedQuantity, addToCart, updateState]);
+  }, [state, addToCart, updateState]);
 
   // Image zoom handlers
   const handleImageMouseEnter = useCallback(() => {

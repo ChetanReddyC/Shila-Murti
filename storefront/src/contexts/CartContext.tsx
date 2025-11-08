@@ -41,7 +41,7 @@ interface CartContextType {
   error: string | null;
   calculatedTotals: CartTotals | null;
   priceValidation: PriceConsistencyResult | null;
-  addToCart: (variantId: string, quantity: number) => Promise<void>;
+  addToCart: (variantId: string, quantity: number, estimatedUnitPrice?: number) => Promise<void>;
   removeFromCart: (lineItemId: string) => Promise<void>;
   updateQuantity: (lineItemId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -555,6 +555,8 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Add item to cart with enhanced session management
   const addToCart = React.useCallback(async (variantId: string, quantity: number, estimatedUnitPrice?: number): Promise<void> => {
+    console.log('[CartContext] addToCart called with:', { variantId, quantity, estimatedUnitPrice });
+    
     // Lock removed - backend guard handles duplicate prevention
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
@@ -603,11 +605,14 @@ export function CartProvider({ children }: CartProviderProps) {
 
       // Create new cart if needed
       if (!currentCart) {
+        console.log('[CartContext] Creating new cart...');
         try {
           currentCart = await medusaApiClient.createCart({}); // Pass empty object
+          console.log('[CartContext] Cart created successfully:', currentCart.id);
           dispatch({ type: 'SET_CART', payload: currentCart });
           await saveCartIdToSession(currentCart.id);
         } catch (createError) {
+          console.error('[CartContext] Cart creation failed:', createError);
           const errorMessage = handleApiError(createError);
           dispatch({ type: 'SET_ERROR', payload: errorMessage });
           throw createError;
@@ -639,11 +644,18 @@ export function CartProvider({ children }: CartProviderProps) {
         console.warn('[CART] Cart limit warnings:', limitValidation.warnings);
       }
 
+      console.log('[CartContext] Adding line item to cart:', {
+        cartId: currentCart.id,
+        variantId,
+        quantity
+      });
+
       const updatedCart = await medusaApiClient.addLineItem(currentCart.id, {
         variant_id: variantId,
         quantity,
       });
 
+      console.log('[CartContext] Line item added successfully');
       dispatch({ type: 'SET_CART', payload: updatedCart });
       setLastOperation(null); // Clear last operation on success
     } catch (error) {
@@ -658,6 +670,8 @@ export function CartProvider({ children }: CartProviderProps) {
       }
 
       throw error; // Re-throw so calling components can handle it
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [state.cart, state.cartId, handleApiError, handleCartExpiration, getCartIdFromSession, saveCartIdToSession, removeCartIdFromSession]);
 
