@@ -3,6 +3,9 @@
 import { useEffect } from 'react'
 import { registerPasskey } from '@/lib/passkey/register'
 
+// Disable static generation for this page since it uses URL params
+export const dynamic = 'force-dynamic';
+
 export default function MagicDonePage() {
   useEffect(() => {
     (async () => {

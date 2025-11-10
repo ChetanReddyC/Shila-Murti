@@ -67,7 +67,7 @@ export const authOptions: NextAuthOptions = {
         if (credentials?.customerId) user.customerId = String(credentials.customerId)
         // Set hasPasskey flag if provided (explicitly handle both true and false)
         if (credentials?.hasPasskey !== undefined) {
-          user.hasPasskey = credentials.hasPasskey === 'true' || credentials.hasPasskey === true
+          user.hasPasskey = String(credentials.hasPasskey) === 'true'
         }
         return user
       },
@@ -132,7 +132,10 @@ export const authOptions: NextAuthOptions = {
 
       // Session composition
       if (user && (user as any).comboRequired !== undefined) (token as any).comboRequired = (user as any).comboRequired
-      if (user && (user as any)?.customerId) (token as any).customerId = (user as any).customerId
+      if (user && (user as any)?.customerId) {
+        (token as any).customerId = (user as any).customerId
+        console.log('[AUTH][JWT] Setting customerId in token:', (user as any).customerId)
+      }
       
       // CRITICAL: Set hasPasskey flag - explicitly handle both true and false values
       if (user && (user as any).hasPasskey !== undefined) {
@@ -182,6 +185,11 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
+      console.log('[AUTH][SESSION] Building session from token:', {
+        hasCustomerId: !!(token as any).customerId,
+        customerId: (token as any).customerId,
+        hasJti: !!(token as any).jti
+      })
       
       Object.assign(session, {
         comboRequired: (token as any).comboRequired ?? false,

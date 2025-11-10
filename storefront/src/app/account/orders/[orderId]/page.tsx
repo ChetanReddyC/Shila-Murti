@@ -628,7 +628,7 @@ function OrderDetailsPageContent() {
               {/* Order Placed */}
               <div 
                 className={`${styles.timelineItem} ${visibleItems[0] ? styles.visible : ''}`}
-                ref={(el) => (timelineItemRefs.current[0] = el)}
+                ref={(el) => { timelineItemRefs.current[0] = el }}
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
@@ -686,10 +686,10 @@ function OrderDetailsPageContent() {
                           <p className={styles.summaryLabel}>Shipping</p>
                           <p className={styles.summaryValue}>{formatCurrency(orderData.shipping_total || 0, orderData.currency_code || 'inr')}</p>
                         </div>
-                        {orderData.discount_total > 0 && (
+                        {(orderData.discount_total || 0) > 0 && (
                           <div className={styles.summaryRow}>
                             <p className={styles.summaryLabel}>Discount</p>
-                            <p className={styles.summaryValue} style={{ color: '#10b981' }}>-{formatCurrency(orderData.discount_total, orderData.currency_code || 'inr')}</p>
+                            <p className={styles.summaryValue} style={{ color: '#10b981' }}>-{formatCurrency(orderData.discount_total || 0, orderData.currency_code || 'inr')}</p>
                           </div>
                         )}
                         <div className={styles.summaryRow}>
@@ -709,7 +709,7 @@ function OrderDetailsPageContent() {
               {/* Order Processed */}
               <div 
                 className={`${styles.timelineItem} ${visibleItems[1] ? styles.visible : ''}`}
-                ref={(el) => (timelineItemRefs.current[1] = el)}
+                ref={(el) => { timelineItemRefs.current[1] = el }}
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
@@ -834,7 +834,7 @@ function OrderDetailsPageContent() {
               {/* Order Shipped */}
               <div 
                 className={`${styles.timelineItem} ${visibleItems[2] ? styles.visible : ''}`}
-                ref={(el) => (timelineItemRefs.current[2] = el)}
+                ref={(el) => { timelineItemRefs.current[2] = el }}
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>
@@ -884,7 +884,7 @@ function OrderDetailsPageContent() {
               {/* Delivered */}
               <div 
                 className={`${styles.timelineItem} ${visibleItems[3] ? styles.visible : ''}`}
-                ref={(el) => (timelineItemRefs.current[3] = el)}
+                ref={(el) => { timelineItemRefs.current[3] = el }}
               >
                 <div className={styles.timelineIcon}>
                   <div className={styles.timelineDot}>

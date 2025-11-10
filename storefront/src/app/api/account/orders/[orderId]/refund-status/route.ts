@@ -17,10 +17,10 @@ async function getCustomerIdFromSession(): Promise<string | null> {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const { orderId } = params
+    const { orderId } = await params
     const customerId = await getCustomerIdFromSession()
 
     if (!customerId) {

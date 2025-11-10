@@ -7,6 +7,8 @@ import styles from './loginPage.module.css'
 import { setCustomerId as setCustomerIdHybrid } from '../../../utils/hybridCustomerStorage'
 import LoadingScreen from '@/components/LoadingScreen'
 
+export const dynamic = 'force-dynamic';
+
 // Load debug helper in development
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   import('../../../utils/passkeyDebugHelper').catch(() => {})

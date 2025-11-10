@@ -23,10 +23,11 @@ async function getCustomerIdFromSession(): Promise<string | null> {
 
 export async function GET(req: NextRequest) {
   const startedAt = Date.now()
-  const customerId = resolveCustomerId(req)
+  const customerId = await getCustomerIdFromSession()
   if (!customerId) {
+    console.error('[account/addresses] Session expired or not authenticated')
     try { const c = await getCounter({ name: 'account_addresses_failure_total', help: 'Account addresses failures' }); c.inc() } catch {}
-    return new Response(JSON.stringify({ ok: false, error: 'customer_id_required' }), { status: 400 })
+    return new Response(JSON.stringify({ ok: false, error: 'session_expired' }), { status: 401 })
   }
   
   const token = await signBridgeToken({ sub: customerId, mfaComplete: true })

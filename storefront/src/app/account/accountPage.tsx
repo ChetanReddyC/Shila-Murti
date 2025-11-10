@@ -11,7 +11,7 @@ const PasskeySection = dynamic(() => import('./PasskeySection'), { ssr: false })
 
 export default function AccountPage() {
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get('tab');
+  const tabParam = searchParams?.get('tab') ?? null;
   const [activeTab, setActiveTab] = useState(tabParam || 'Account Details');
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');

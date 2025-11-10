@@ -105,13 +105,13 @@ export const checkWebGLSupport = (): {
     const canvas = document.createElement('canvas');
     
     // Try WebGL 2 first
-    let gl = canvas.getContext('webgl2');
+    let gl: WebGL2RenderingContext | WebGLRenderingContext | null = canvas.getContext('webgl2');
     if (gl) {
       return { supported: true, version: 2 };
     }
     
     // Fall back to WebGL 1
-    gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl') as WebGLRenderingContext;
+    gl = (canvas.getContext('webgl') as WebGLRenderingContext | null) || (canvas.getContext('experimental-webgl') as WebGLRenderingContext | null);
     if (gl) {
       return { supported: true, version: 1 };
     }

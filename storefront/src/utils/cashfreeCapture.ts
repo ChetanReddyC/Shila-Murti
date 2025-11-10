@@ -17,6 +17,7 @@ interface CashfreeCaptureResponse {
   payment_amount?: number
   error?: string
   message?: string
+  code?: string
 }
 
 /**

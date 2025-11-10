@@ -153,7 +153,7 @@ export function detectMfaCompletion(
       return {
         type: 'mfa-complete',
         timestamp: Date.now(),
-        customerId: getCustomerIdFromSession(currentData),
+        customerId: getCustomerIdFromSession(currentData) || undefined,
         identifier
       }
     }
@@ -210,7 +210,7 @@ export function detectLoginCompletion(
     return {
       type: isFirstTime ? 'first-time-login' : 'returning-login',
       timestamp: Date.now(),
-      customerId: getCustomerIdFromSession(currentData),
+      customerId: getCustomerIdFromSession(currentData) || undefined,
       identifier
     }
   }

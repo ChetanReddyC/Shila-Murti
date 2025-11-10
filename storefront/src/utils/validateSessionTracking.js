@@ -80,18 +80,15 @@ const sessionStateTracking = {
 // Validation tests
 function runValidation() {
   
-  let passed = 0;
   let failed = 0;
   
   function test(description, testFn) {
     try {
       const result = testFn();
-      if (result) {
-        passed++;
-      } else {
+      if (!result) {
         failed++;
       }
-    } catch (error) {
+    } catch {
       failed++;
     }
   }

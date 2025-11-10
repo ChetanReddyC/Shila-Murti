@@ -169,6 +169,7 @@ export interface ShippingMethod {
   cart_id: string;
   name: string;
   amount: number;
+  shipping_option_id?: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

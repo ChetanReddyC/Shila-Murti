@@ -1,4 +1,4 @@
-import type { JWTPayload, JWK } from 'jose'
+import type { JWTPayload, JWK, KeyLike } from 'jose'
 
 export type BridgeClaims = JWTPayload & {
   sub: string
@@ -9,7 +9,7 @@ export type BridgeClaims = JWTPayload & {
   purpose?: string
 }
 
-async function importPrivateKey(): Promise<{ key: CryptoKey; kid: string } | null> {
+async function importPrivateKey(): Promise<{ key: KeyLike | Uint8Array; kid: string } | null> {
   const jwkPrivateRaw = process.env.AUTH_SIGNING_JWK
   if (!jwkPrivateRaw) {
     console.error('[signing] AUTH_SIGNING_JWK environment variable is not set')

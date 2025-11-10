@@ -270,7 +270,7 @@ export class PriceErrorHandler {
    * Check if error is recoverable
    */
   private static isRecoverableError(code: string): boolean {
-    const recoverableCodes = [
+    const recoverableCodes: string[] = [
       this.ERROR_CODES.API_TIMEOUT,
       this.ERROR_CODES.NETWORK_ERROR,
       this.ERROR_CODES.SHIPPING_UNAVAILABLE,
@@ -310,7 +310,7 @@ export class PriceErrorHandler {
 
     // Convert generic Error to PriceError
     const genericError = error as Error;
-    let code = this.ERROR_CODES.CALCULATION_FAILED;
+    let code: string = this.ERROR_CODES.CALCULATION_FAILED;
     let severity: PriceError['severity'] = 'medium';
 
     // Try to determine error type from message
@@ -374,11 +374,12 @@ export class PriceErrorHandler {
       name: 'Backend Fallback',
       description: 'Use backend cart totals when calculation fails',
       canRecover: (error: PriceError) => {
-        return [
+        const recoverableCodes: string[] = [
           this.ERROR_CODES.CALCULATION_FAILED,
           this.ERROR_CODES.VALIDATION_FAILED,
           this.ERROR_CODES.DUPLICATE_CHARGES
-        ].includes(error.code);
+        ];
+        return recoverableCodes.includes(error.code);
       },
       execute: async (context: PriceCalculationContext, error: PriceError) => {
         try {
@@ -394,17 +395,17 @@ export class PriceErrorHandler {
             currency: cart.currency_code || 'INR',
             breakdown: [
               {
-                type: 'item',
+                type: 'item' as const,
                 description: 'Subtotal (from backend)',
                 amount: cart.subtotal || 0
               },
               {
-                type: 'shipping',
+                type: 'shipping' as const,
                 description: 'Shipping (from backend)',
                 amount: cart.shipping_total || 0
               },
               {
-                type: 'tax',
+                type: 'tax' as const,
                 description: 'Tax (from backend)',
                 amount: cart.tax_total || 0
               }
@@ -429,10 +430,11 @@ export class PriceErrorHandler {
       name: 'Cache Recovery',
       description: 'Use cached calculation results',
       canRecover: (error: PriceError) => {
-        return [
+        const recoverableCodes: string[] = [
           this.ERROR_CODES.API_TIMEOUT,
           this.ERROR_CODES.NETWORK_ERROR
-        ].includes(error.code);
+        ];
+        return recoverableCodes.includes(error.code);
       },
       execute: async (context: PriceCalculationContext, error: PriceError) => {
         try {
@@ -495,10 +497,11 @@ export class PriceErrorHandler {
       name: 'Retry',
       description: 'Retry the failed operation',
       canRecover: (error: PriceError) => {
-        return [
+        const recoverableCodes: string[] = [
           this.ERROR_CODES.API_TIMEOUT,
           this.ERROR_CODES.NETWORK_ERROR
-        ].includes(error.code) && error.recoverable;
+        ];
+        return recoverableCodes.includes(error.code) && error.recoverable;
       },
       execute: async (context: PriceCalculationContext, error: PriceError) => {
         try {

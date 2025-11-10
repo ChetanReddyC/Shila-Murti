@@ -118,11 +118,6 @@ export default function ProductsPage() {
     // Make debug function available in browser console
     if (typeof window !== 'undefined') {
       (window as any).debugMedusaApi = debugMedusaApiResponse;
-      
-      // Also make shader test available
-      import('../../utils/testShaderCompilation').then(({ testShaderCompilation }) => {
-        (window as any).testShaderCompilation = testShaderCompilation;
-      });
     }
     
     return () => {

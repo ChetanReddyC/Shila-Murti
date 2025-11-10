@@ -5,13 +5,13 @@ import { useCallback } from 'react'
 type ArrayBufferLike = ArrayBuffer | Uint8Array | ArrayLike<number>
 
 function toBase64Url(input: ArrayBufferLike): string {
-  let buffer: ArrayBuffer
+  let buffer: ArrayBuffer | SharedArrayBuffer
   if (input instanceof ArrayBuffer) {
     buffer = input
   } else if (input instanceof Uint8Array) {
-    buffer = input.buffer
+    buffer = input.buffer as ArrayBuffer
   } else if (Array.isArray(input)) {
-    buffer = new Uint8Array(input).buffer
+    buffer = new Uint8Array(input).buffer as ArrayBuffer
   } else {
     // Fallback
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
