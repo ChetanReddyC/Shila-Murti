@@ -268,13 +268,13 @@ export class ProductDataMapper {
 
     // Determine overall stock status
     const inStock = availableVariants > 0;
-    const status = totalQuantity > 0
+    const status: 'in_stock' | 'out_of_stock' | 'backorder' = totalQuantity > 0
       ? 'in_stock'
       : (hasBackorderVariants || hasUnmanagedVariants)
         ? 'backorder'
         : 'out_of_stock';
 
-    const result = {
+    const result: import('../types/inventory').AggregatedInventoryInfo = {
       inStock,
       // quantity reflects effective purchasable units where possible
       quantity: totalEffectiveUnits > 0 ? totalEffectiveUnits : totalQuantity,

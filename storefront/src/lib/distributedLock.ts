@@ -7,7 +7,7 @@
  * Uses Redis SET NX (set if not exists) for atomic lock acquisition.
  */
 
-import { kvGet, kvDel } from './kv'
+import { kvGet, kvDel, kvSetNX } from './kv'
 import { kvSetNXAtomic } from './kvHybrid'
 import { randomUUID } from 'crypto'
 

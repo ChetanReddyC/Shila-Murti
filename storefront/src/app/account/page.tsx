@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import AccountPage from './accountPage';
 import SessionGuard from '@/components/SessionGuard';
  
@@ -5,7 +6,9 @@ import SessionGuard from '@/components/SessionGuard';
 export default function Page() {
   return (
     <SessionGuard>
-      <AccountPage />
+      <Suspense fallback={<div>Loading...</div>}>
+        <AccountPage />
+      </Suspense>
     </SessionGuard>
   );
 } 

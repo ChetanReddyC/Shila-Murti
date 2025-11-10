@@ -3,7 +3,7 @@ import styles from './ShaderCanvas.module.css';
 import { useShaderEffect } from '../../hooks/useShaderEffect';
 import { vertexShaderSource, fragmentShaderSource } from '../../utils/shaderSources';
 
-interface ShaderCanvasProps {
+export interface ShaderCanvasProps {
   isHovering: boolean;
 }
 

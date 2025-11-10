@@ -158,8 +158,20 @@ class PerformanceMonitor {
    * Get overall performance summary
    */
   getPerformanceSummary(): {
-    components: ReturnType<typeof this.getComponentStats>;
-    apis: ReturnType<typeof this.getApiStats>;
+    components: {
+      averageRenderTime: number;
+      slowRenders: number;
+      totalRenders: number;
+      metrics: ComponentPerformanceMetric[];
+    };
+    apis: {
+      averageResponseTime: number;
+      slowResponses: number;
+      totalRequests: number;
+      successRate: number;
+      cacheHitRate: number;
+      metrics: ApiPerformanceMetric[];
+    };
     recommendations: string[];
   } {
     const componentStats = this.getComponentStats();

@@ -340,9 +340,9 @@ export {
   setupCrossTabListener,
   
   // Types
-  SessionState,
-  AuthenticationEvent,
-  SessionTrackingState,
-  TimingConfig,
+  type SessionState,
+  type AuthenticationEvent,
+  type SessionTrackingState,
+  type TimingConfig,
   DEFAULT_TIMING
 }

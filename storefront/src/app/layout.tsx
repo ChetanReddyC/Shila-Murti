@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Public_Sans, Noto_Sans } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "../contexts";
@@ -37,13 +38,15 @@ export default function RootLayout({
       <body className={`${publicSans.variable} ${notoSans.variable} w-full`}>
         <AuthSessionProvider>
           <CartProvider>
-            <NavigationLoadingProvider>
-              {/* Global post-elevation passkey prompt */}
-              <PasskeyNudge />
-              {/* Global header - persists across all pages */}
-              <Header />
-              {children}
-            </NavigationLoadingProvider>
+            <Suspense fallback={null}>
+              <NavigationLoadingProvider>
+                {/* Global post-elevation passkey prompt */}
+                <PasskeyNudge />
+                {/* Global header - persists across all pages */}
+                <Header />
+                {children}
+              </NavigationLoadingProvider>
+            </Suspense>
           </CartProvider>
         </AuthSessionProvider>
       </body>

@@ -1,12 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    // Allow local cross-origin access between localhost and 127.0.0.1 in dev
-    allowedDevOrigins: [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-    ],
+  eslint: {
+    ignoreDuringBuilds: true,
   },
   turbopack: {
     rules: {

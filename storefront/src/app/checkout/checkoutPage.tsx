@@ -826,7 +826,7 @@ export default function CheckoutPage() {
 
               const { signIn } = await import('next-auth/react')
 
-              await signIn('session', { 
+              const signInResult = await signIn('session', { 
 
                 identifier: userIdentifier, 
 
@@ -838,11 +838,91 @@ export default function CheckoutPage() {
 
               })
 
-              console.log('✅ [Checkout ConditionalUI] Session created')
+              
+
+              if (!signInResult?.ok) {
+
+                console.error('❌ [Checkout ConditionalUI] SignIn failed:', signInResult?.error)
+
+                setIdentityError('⚠️ Session creation failed. Please refresh the page.')
+
+                setPurchaseReady(false)
+
+                return
+
+              }
+
+              
+
+              console.log('✅ [Checkout ConditionalUI] Session created successfully')
+
+              
+
+              // Wait for session cookie to be set and force session refresh
+
+              await new Promise(resolve => setTimeout(resolve, 800))
+
+              
+
+              // Force session validation by making a direct check
+
+              try {
+
+                const validationResponse = await fetch('/api/auth/session/validate', {
+
+                  method: 'GET',
+
+                  credentials: 'include',
+
+                  cache: 'no-store',
+
+                });
+
+                
+
+                const validationData = await validationResponse.json();
+
+                
+
+                if (validationData?.valid !== true) {
+
+                  console.error('[Checkout ConditionalUI] Session validation failed after creation:', validationData?.reason)
+
+                  setIdentityError('⚠️ Session validation failed. Please refresh the page.')
+
+                  setPurchaseReady(false)
+
+                  return
+
+                }
+
+                
+
+                console.log('✅ [Checkout ConditionalUI] Session validated successfully')
+
+              } catch (validationError) {
+
+                console.error('[Checkout ConditionalUI] Session validation error:', validationError)
+
+                setIdentityError('⚠️ Could not validate session. Please refresh the page.')
+
+                setPurchaseReady(false)
+
+                return
+
+              }
+
+              
 
             } catch (e) {
 
-              console.error('❌ [Checkout ConditionalUI] SignIn failed:', e)
+              console.error('❌ [Checkout ConditionalUI] SignIn error:', e)
+
+              setIdentityError('⚠️ Authentication failed. Please refresh the page.')
+
+              setPurchaseReady(false)
+
+              return
 
             }
 
@@ -1098,7 +1178,7 @@ export default function CheckoutPage() {
 
                 ? (emailParam || '').trim().toLowerCase()
 
-                : (phoneParam || '').trim();
+                : (phone || '').trim();
 
               if (identifierValue) {
 
@@ -1176,7 +1256,7 @@ export default function CheckoutPage() {
 
           cartId: cartIdParam,
 
-          customerId: json?.customerId, // Include customerId for cross-tab passkey detection
+          customerId: undefined, // customerId will be set by the verification process
 
           timestamp: Date.now(),
 
@@ -2183,7 +2263,7 @@ export default function CheckoutPage() {
 
                   ? (em || '').trim().toLowerCase()
 
-                  : (phoneParam || '').trim();
+                  : (phone || '').trim();
 
                 if (identifierValue) {
 
@@ -3010,11 +3090,11 @@ export default function CheckoutPage() {
 
         // Pass customer ID for sync
 
-        customerId: customerId,
+        customerId: customerId || undefined,
 
         // Pass the identity method used for authentication
 
-        identityMethod: identityMethod,
+        identityMethod: identityMethod === 'login' ? undefined : identityMethod,
 
         cartUpdate: {
 
@@ -3793,9 +3873,7 @@ export default function CheckoutPage() {
     <div
 
       className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
-      style={{ paddingTop: '100px' }}
-
-      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
+      style={{ paddingTop: '100px', fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
 
     >
 
@@ -4373,3 +4451,7 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+
+
+

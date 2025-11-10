@@ -39,7 +39,7 @@ export default function OrderConfirmationPage() {
     // Capture cart once at mount to keep UI stable regardless of later cart updates
     setFallbackCart(cart ?? null);
     
-    const urlOrderId = searchParams.get('order_id');
+    const urlOrderId = searchParams?.get('order_id') ?? null;
 
     // Try to read order result from session as set by checkout
     try {

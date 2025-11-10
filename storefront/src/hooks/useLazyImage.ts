@@ -19,7 +19,7 @@ export interface UseLazyImageResult {
   state: ImageLoadState;
   error: ImageError | null;
   retry: () => void;
-  ref: React.RefObject<HTMLElement>;
+  ref: React.RefObject<HTMLDivElement | null>;
 }
 
 export const useLazyImage = (options: UseLazyImageOptions): UseLazyImageResult => {
@@ -45,7 +45,7 @@ export const useLazyImage = (options: UseLazyImageOptions): UseLazyImageResult =
   const [error, setError] = useState<ImageError | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

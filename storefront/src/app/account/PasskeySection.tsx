@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import SetupPasskeyButton from '@/components/SetupPasskeyButton'
 import { getCustomerId } from '../../utils/hybridCustomerStorage'
 
 export default function PasskeySection() {
+  const router = useRouter()
   const [customerId, setCustomerId] = useState<string>('')
   const [userIdentifier, setUserIdentifier] = useState<string>('')
   const [creds, setCreds] = useState<Array<{ id: string; counter?: number; credentialDeviceType?: string }>>([])
@@ -18,8 +20,8 @@ export default function PasskeySection() {
       const res = await fetch(`/api/account/passkeys`)
       const json = await res.json()
       if (res.ok) setCreds(Array.isArray(json.credentials) ? json.credentials : [])
-      else if (checkSessionExpired(res, json)) {
-        handleSessionExpiry(router, 'PASSKEY')
+      else if (res.status === 401) {
+        router.push('/signin?expired=true&from=PASSKEY')
         return
       }
       else setError(json?.error || 'Unable to load credentials')
@@ -41,12 +43,10 @@ export default function PasskeySection() {
     }
     loadCustomerId()
     // Also try to infer from session identifier if present (best-effort)
-    if (!stored) {
-      try {
-        const sid = window.sessionStorage.getItem('identifier')
-        if (sid) setCustomerId(sid)
-      } catch {}
-    }
+    try {
+      const sid = window.sessionStorage.getItem('identifier')
+      if (sid) setUserIdentifier(sid)
+    } catch {}
     
     // Get user identifier (phone/email) for passkey display name
     try {

@@ -139,7 +139,7 @@ class MockSessionTrackingManager {
     }
   }
 
-  isSessionStableForDialog(identifier) {
+  isSessionStableForDialog() {
     if (!this.trackingState.lastAuthEvent) return true;
     
     const requiredDelay = this.getDelayForAuthEvent(this.trackingState.lastAuthEvent);
@@ -159,18 +159,15 @@ class MockSessionTrackingManager {
 // Validation tests
 function runIntegrationValidation() {
   
-  let passed = 0;
   let failed = 0;
   
   function test(description, testFn) {
     try {
       const result = testFn();
-      if (result) {
-        passed++;
-      } else {
+      if (!result) {
         failed++;
       }
-    } catch (error) {
+    } catch {
       failed++;
     }
   }
@@ -270,8 +267,7 @@ function runIntegrationValidation() {
   test('Should schedule dialog evaluation with correct delay', () => {
     const manager = new MockSessionTrackingManager();
     
-    let callbackExecuted = false;
-    const callback = () => { callbackExecuted = true; };
+    const callback = () => {};
     
     const mfaEvent = {
       type: 'mfa-complete',
@@ -302,7 +298,7 @@ function runIntegrationValidation() {
     const manager = new MockSessionTrackingManager();
     
     // No recent event should be stable
-    const stableResult = manager.isSessionStableForDialog('test@example.com');
+    const stableResult = manager.isSessionStableForDialog();
     
     // Recent event should not be stable initially
     manager.trackingState.lastAuthEvent = {
@@ -310,11 +306,11 @@ function runIntegrationValidation() {
       timestamp: Date.now() - 500, // 0.5 seconds ago
       identifier: 'test@example.com'
     };
-    const unstableResult = manager.isSessionStableForDialog('test@example.com');
+    const unstableResult = manager.isSessionStableForDialog();
     
     // Old event should be stable
     manager.trackingState.lastAuthEvent.timestamp = Date.now() - 3000; // 3 seconds ago
-    const oldEventStableResult = manager.isSessionStableForDialog('test@example.com');
+    const oldEventStableResult = manager.isSessionStableForDialog();
     
     return stableResult === true &&
            unstableResult === false &&

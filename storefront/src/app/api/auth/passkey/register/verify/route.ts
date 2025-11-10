@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     counter: info.counter,
     credentialDeviceType: info.credentialDeviceType,
     credentialBackedUp: info.credentialBackedUp,
-    transports: info.transports,
+    transports: credential.response?.transports || (info as any).transports || [],
   }
   
   // Store credential with userId as part of the key

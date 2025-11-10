@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createShader, createProgram } from '../utils/shaderUtils';
 
-export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement>, vertexShaderSource: string, fragmentShaderSource: string) => {
+export const useShaderEffect = (canvasRef: React.RefObject<HTMLCanvasElement | null>, vertexShaderSource: string, fragmentShaderSource: string) => {
   const glRef = useRef<WebGLRenderingContext | null>(null);
   const programRef = useRef<WebGLProgram | null>(null);
   const animationFrameId = useRef<number | null>(null);
