@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shilamurti-backend-service
+  namespace: shilamurti-backend
+spec:
+  selector:
+    app: shilamurti-backend-label
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80        
+      targetPort: 9000 
+  type: ClusterIP

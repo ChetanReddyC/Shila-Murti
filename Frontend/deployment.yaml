@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shilamurti-deploy
+  namespace: shilamurti-frontend
+  labels:
+    app: shilamurti-frontend-label
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shilamurti-frontend-label
+  template:
+    metadata:
+      labels:
+        app: shilamurti-frontend-label
+    spec:
+      containers:
+        - name: shilamurti-frontend-container
+          image: 
+          ports:
+            - containerPort: 80  # Only HTTP, since HTTPS is handled internally        
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "500Mi"
+            limits:
+              cpu: "500m"
+              memory: "750Mi"
+          

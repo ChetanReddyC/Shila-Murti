@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shilamurti-service
+  namespace: shilamurti-frontend
+spec:
+  selector:
+    app: shilamurti-frontend-label
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80        
+      targetPort: 3000 
+  type: ClusterIP

@@ -1,0 +1,8 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: shilemurti-multi-cert
+spec:
+  domains:
+    - shilamurti.com
+    - admin.shilamurti.com

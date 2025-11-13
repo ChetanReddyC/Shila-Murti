@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend-route
+  namespace: shilamurti-frontend
+spec:
+  parentRefs:
+    - name: ecommerce-gateway
+      namespace: default
+  hostnames:
+    - storefront.com
+  rules:
+    - backendRefs:
+        - name: shilamurti-service
+          port: 80

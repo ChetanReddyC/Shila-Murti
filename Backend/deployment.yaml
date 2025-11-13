@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shilamurti-deploy-backend
+  namespace: shilamurti-backend
+  labels:
+    app: shilamurti-backend-label
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shilamurti-backend-label
+  template:
+    metadata:
+      labels:
+        app: shilamurti-backend-label
+    spec:
+      containers:
+        - name: shilamurti-backend-container
+          image: 
+          ports:
+            - containerPort: 80  # Only HTTP, since HTTPS is handled by NGINX Ingress        
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "500Mi"
+            limits:
+              cpu: "500m"
+              memory: "750Mi"

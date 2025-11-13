@@ -1,0 +1,32 @@
+image:
+  registry: docker.io
+  repository: bitnami/postgresql
+  tag: latest
+  pullPolicy: IfNotPresent
+
+architecture: standalone   
+
+auth:
+  postgresPassword: "mypostgrespassword"
+  username: "chetan"
+  password: "chetan@7780104586"
+  database: "medusa-db-uvout"
+
+primary:
+  persistence:
+    enabled: true
+    existingClaim: my-postgres-pvc     
+    mountPath: /bitnami/postgresql     
+    subPath: ""                        # do not change
+
+service:
+  type: ClusterIP
+  port: 5432
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: 500m
