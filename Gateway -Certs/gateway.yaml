@@ -3,6 +3,8 @@ kind: Gateway
 metadata:
   name: ecommerce-gateway
   namespace: default
+  annotations:
+    networking.gke.io/certmap: shilamurti-map
 spec:
   gatewayClassName: gke-l7-global-external-managed
   listeners:
@@ -14,7 +16,3 @@ spec:
           - kind: HTTPRoute
         namespaces:
           from: All
-      tls:
-        mode: Terminate
-        options:
-          networking.gke.io/pre-shared-certs: shilemurti-multi-cert
