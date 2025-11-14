@@ -7,7 +7,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: shilamurti-deploy
-  minReplicas: 0
+  minReplicas: 1
   maxReplicas: 5
   metrics:
   - type: Resource
@@ -16,3 +16,4 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
+
