@@ -3,10 +3,8 @@ kind: Deployment
 metadata:
   name: shilamurti-deploy-backend
   namespace: shilamurti-backend
-  labels:
-    app: shilamurti-backend-label
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: shilamurti-backend-label
@@ -19,11 +17,11 @@ spec:
         - name: shilamurti-backend-container
           image: asia-southeast1-docker.pkg.dev/shilamurti/shilamurti/backend:12
           ports:
-            - containerPort: 80  # Only HTTP, since HTTPS is handled by NGINX Ingress        
+            - containerPort: 80 
           resources:
             requests:
               cpu: "750m"
               memory: "750Mi"
             limits:
-              cpu: "1"       
-              memory: "1Gi"
+              cpu: "1500m"
+              memory: "1500Mi"
