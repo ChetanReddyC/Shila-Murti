@@ -1,0 +1,25 @@
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: medusa-health-check-policy
+  namespace: shilamurti-backend
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: shilamurti-backend-service
+  default:
+    # Optional: Configure top-level common parameters
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    
+    # Protocol-specific configuration goes inside the 'config' block
+    config:
+      # You must explicitly define the type
+      type: HTTP
+      # The httpHealthCheck settings are nested inside 'config'
+      httpHealthCheck:
+        requestPath: /health
+        port: 9000
