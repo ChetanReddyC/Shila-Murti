@@ -1,7 +1,8 @@
 .productCard {
   position: relative;
   width: 250px;
-  height: 500px; /* Increased to accommodate all product details */
+  height: 500px;
+  /* Increased to accommodate all product details */
   transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   display: flex;
   flex-direction: column;
@@ -12,7 +13,8 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 350px; /* Fixed height for the card content */
+  height: 350px;
+  /* Fixed height for the card content */
   border: 1px solid #ccc;
   border-radius: 8px;
   overflow: hidden;
@@ -29,16 +31,19 @@
   object-fit: cover;
   object-position: center;
   z-index: 1;
- }
+}
 
 .foregroundWrapper {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 350px; /* Match the card content height */
-  z-index: 20; /* Increased from 10 to 20 to stay above all shader effects */
-  pointer-events: none; /* Allow clicks to pass through to the card */
+  height: 350px;
+  /* Match the card content height */
+  z-index: 20;
+  /* Increased from 10 to 20 to stay above all shader effects */
+  pointer-events: none;
+  /* Allow clicks to pass through to the card */
 }
 
 .foregroundImage {
@@ -51,18 +56,21 @@
   object-position: center;
   transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   transform-origin: center center;
-  z-index: 20; /* Increased from 10 to 20 to stay above all shader effects */
+  z-index: 20;
+  /* Increased from 10 to 20 to stay above all shader effects */
 }
 
 .foregroundImageHovered {
   transform: translateY(-35px) scale(1.15);
-  z-index: 100; /* Extremely high z-index to ensure it appears above all other elements */
+  z-index: 100;
+  /* Extremely high z-index to ensure it appears above all other elements */
 }
 
 /* Product details section */
 .productDetails {
   position: absolute;
-  top: 350px; /* Position below the card content */
+  top: 350px;
+  /* Position below the card content */
   left: 0;
   width: 100%;
   padding: 16px;
@@ -121,14 +129,17 @@
   display: flex;
 }
 
-.fullStar, .halfStar {
-  color: #FFD700; /* Gold color for stars */
+.fullStar,
+.halfStar {
+  color: #FFD700;
+  /* Gold color for stars */
   font-size: 1rem;
   line-height: 1;
 }
 
 .emptyStar {
-  color: #D3D3D3; /* Light gray for empty stars */
+  color: #D3D3D3;
+  /* Light gray for empty stars */
   font-size: 1rem;
   line-height: 1;
 }
@@ -175,7 +186,8 @@
 }
 
 .inStock {
-  color: #2E7D32; /* Green */
+  color: #2E7D32;
+  /* Green */
   font-weight: 600;
   font-size: 0.9rem;
   display: flex;
@@ -190,7 +202,8 @@
 }
 
 .outOfStock {
-  color: #C62828; /* Red */
+  color: #C62828;
+  /* Red */
   font-weight: 600;
   font-size: 0.9rem;
   display: flex;

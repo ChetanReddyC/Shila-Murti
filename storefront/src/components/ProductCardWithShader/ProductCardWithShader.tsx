@@ -170,115 +170,115 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
         onTouchEnd={() => setIsHovering(false)}
       >
         <div className={styles.cardWrapper}>
-        {/* Image section with 3D rotation effect */}
-        <div
-          ref={imageSectionRef}
-          className={styles.imageSection}
-          onMouseEnter={handleImageSectionMouseEnter}
-          onMouseLeave={handleImageSectionMouseLeave}
-          onMouseMove={handleImageSectionMouseMove}
-        >
-          <div className={styles.cardContentWrapper}>
-            <div className={styles.cardContent}>
-              <OptimizedImage
-                src={product.backgroundImage}
-                alt={`${product.title} background`}
-                fallbackSrc="/images/placeholder-background.svg"
-                className={styles.backgroundImage}
-                priority={false}
-                showRetryButton={false}
-              />
-            </div>
-
-            {/* Foreground image outside the card content to allow it to break free */}
-            <div className={styles.foregroundWrapper}>
-              <OptimizedImage
-                src={product.foregroundImage}
-                alt={product.title}
-                fallbackSrc="/images/placeholder-product.svg"
-                className={`${styles.foregroundImage} ${isHovering ? styles.foregroundImageHovered : ''}`}
-                containerClassName={styles.foregroundContainer}
-                priority={false}
-                showRetryButton={false}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Product details section - keep overlay active on hover to show shader */}
-        <div
-          className={styles.productDetails}
-          onMouseEnter={() => {
-            if (imageSectionRef.current) {
-              overlayRef?.current?.beginHover?.(imageSectionRef.current);
-            }
-          }}
-          onMouseMove={(e) => overlayRef?.current?.updatePointer?.(e.clientX, e.clientY)}
-        >
-          <h3 className={`${styles.productTitle} ${getTitleSizeClass()}`}>{product.title}</h3>
-          {product.subtitle && (
-            <p className={`${styles.productSubtitle} ${getSubtitleSizeClass()}`}>{product.subtitle}</p>
-          )}
-
-          {/* Price information */}
-          <div className={styles.priceContainer}>
-            {(product.price !== undefined && product.price !== null && product.price > 0) && (
-              <span className={styles.price}>
-                {formatPrice(product.price, product.currency)}
-              </span>
-            )}
-            {product.originalPrice && product.originalPrice > (product.price || 0) && (
-              <span className={styles.originalPrice}>
-                {formatPrice(product.originalPrice, product.currency)}
-              </span>
-            )}
-          </div>
-
-          {/* Rating and reviews */}
-          {product.rating && (
-            <div className={styles.ratingContainer}>
-              <div className={styles.stars}>
-                {Array.from({ length: Math.floor(product.rating) }).map((_, i) => (
-                  <span key={`star-${i}`} className={styles.fullStar}>★</span>
-                ))}
-                {product.rating % 1 >= 0.5 && (
-                  <span key="half-star" className={styles.halfStar}>★</span>
-                )}
-                {Array.from({ length: 5 - Math.floor(product.rating) - (product.rating % 1 >= 0.5 ? 1 : 0) }).map((_, i) => (
-                  <span key={`empty-${i}`} className={styles.emptyStar}>☆</span>
-                ))}
+          {/* Image section with 3D rotation effect */}
+          <div
+            ref={imageSectionRef}
+            className={styles.imageSection}
+            onMouseEnter={handleImageSectionMouseEnter}
+            onMouseLeave={handleImageSectionMouseLeave}
+            onMouseMove={handleImageSectionMouseMove}
+          >
+            <div className={styles.cardContentWrapper}>
+              <div className={styles.cardContent}>
+                <OptimizedImage
+                  src={product.backgroundImage}
+                  alt={`${product.title} background`}
+                  fallbackSrc="/images/placeholder-background.svg"
+                  className={styles.backgroundImage}
+                  priority={false}
+                  showRetryButton={false}
+                />
               </div>
-              {product.reviewCount && (
-                <span className={styles.reviewCount}>({product.reviewCount})</span>
+
+              {/* Foreground image outside the card content to allow it to break free */}
+              <div className={styles.foregroundWrapper}>
+                <OptimizedImage
+                  src={product.foregroundImage}
+                  alt={product.title}
+                  fallbackSrc="/images/placeholder-product.svg"
+                  className={`${styles.foregroundImage} ${isHovering ? styles.foregroundImageHovered : ''}`}
+                  containerClassName={styles.foregroundContainer}
+                  priority={false}
+                  showRetryButton={false}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Product details section - keep overlay active on hover to show shader */}
+          <div
+            className={styles.productDetails}
+            onMouseEnter={() => {
+              if (imageSectionRef.current) {
+                overlayRef?.current?.beginHover?.(imageSectionRef.current);
+              }
+            }}
+            onMouseMove={(e) => overlayRef?.current?.updatePointer?.(e.clientX, e.clientY)}
+          >
+            <h3 className={`${styles.productTitle} ${getTitleSizeClass()}`}>{product.title}</h3>
+            {product.subtitle && (
+              <p className={`${styles.productSubtitle} ${getSubtitleSizeClass()}`}>{product.subtitle}</p>
+            )}
+
+            {/* Price information */}
+            <div className={styles.priceContainer}>
+              {(product.price !== undefined && product.price !== null && product.price > 0) && (
+                <span className={styles.price}>
+                  {formatPrice(product.price, product.currency)}
+                </span>
+              )}
+              {product.originalPrice && product.originalPrice > (product.price || 0) && (
+                <span className={styles.originalPrice}>
+                  {formatPrice(product.originalPrice, product.currency)}
+                </span>
               )}
             </div>
-          )}
 
-          {/* Product specifications */}
-          <div className={styles.specifications}>
-            {product.material && (
-              <div className={styles.specItem}>
-                <span className={styles.specLabel}>Material:</span>
-                <span className={styles.specValue}>{product.material}</span>
+            {/* Rating and reviews */}
+            {product.rating && (
+              <div className={styles.ratingContainer}>
+                <div className={styles.stars}>
+                  {Array.from({ length: Math.floor(product.rating) }).map((_, i) => (
+                    <span key={`star-${i}`} className={styles.fullStar}>★</span>
+                  ))}
+                  {product.rating % 1 >= 0.5 && (
+                    <span key="half-star" className={styles.halfStar}>★</span>
+                  )}
+                  {Array.from({ length: 5 - Math.floor(product.rating) - (product.rating % 1 >= 0.5 ? 1 : 0) }).map((_, i) => (
+                    <span key={`empty-${i}`} className={styles.emptyStar}>☆</span>
+                  ))}
+                </div>
+                {product.reviewCount && (
+                  <span className={styles.reviewCount}>({product.reviewCount})</span>
+                )}
               </div>
             )}
-            {product.dimensions && (
-              <div className={styles.specItem}>
-                <span className={styles.specLabel}>Size:</span>
-                <span className={styles.specValue}>{product.dimensions}</span>
-              </div>
-            )}
-          </div>
 
-          {/* Availability */}
-          <div className={styles.availability}>
-            {product.inStock ? (
-              <span className={styles.inStock}>In Stock</span>
-            ) : (
-              <span className={styles.outOfStock}>Out of Stock</span>
-            )}
+            {/* Product specifications */}
+            <div className={styles.specifications}>
+              {product.material && (
+                <div className={styles.specItem}>
+                  <span className={styles.specLabel}>Material:</span>
+                  <span className={styles.specValue}>{product.material}</span>
+                </div>
+              )}
+              {product.dimensions && (
+                <div className={styles.specItem}>
+                  <span className={styles.specLabel}>Size:</span>
+                  <span className={styles.specValue}>{product.dimensions}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Availability */}
+            <div className={styles.availability}>
+              {product.inStock ? (
+                <span className={styles.inStock}>In Stock</span>
+              ) : (
+                <span className={styles.outOfStock}>Out of Stock</span>
+              )}
+            </div>
           </div>
-        </div>
         </div>
       </div>
     </Link>

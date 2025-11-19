@@ -25,23 +25,23 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
-    
+
     // Full stars
     for (let i = 0; i < fullStars; i++) {
       stars.push(<span key={`star-${i}`} className={styles.fullStar}>★</span>);
     }
-    
+
     // Half star if needed
     if (hasHalfStar) {
       stars.push(<span key="half-star" className={styles.halfStar}>★</span>);
     }
-    
+
     // Empty stars
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(<span key={`empty-${i}`} className={styles.emptyStar}>☆</span>);
     }
-    
+
     return stars;
   };
 
@@ -53,26 +53,26 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
   return (
     <div className={styles.productCard}>
       <div className={styles.cardContent}>
-        <img 
-          src={product.backgroundImage} 
-          alt={`${product.title} background`} 
+        <img
+          src={product.backgroundImage}
+          alt={`${product.title} background`}
           className={`${styles.backgroundImage} ${isHovering ? styles.backgroundImageHovered : ''}`}
         />
       </div>
-      
+
       {/* Foreground image outside the card content to allow it to break free */}
       <div className={styles.foregroundWrapper}>
-        <img 
-          src={product.foregroundImage} 
-          alt={product.title} 
+        <img
+          src={product.foregroundImage}
+          alt={product.title}
           className={`${styles.foregroundImage} ${isHovering ? styles.foregroundImageHovered : ''}`}
         />
       </div>
-      
+
       {/* Product details section */}
       <div className={styles.productDetails}>
         <h3 className={styles.productTitle}>{product.title}</h3>
-        
+
         {/* Price information */}
         <div className={styles.priceContainer}>
           {product.price && (
@@ -82,7 +82,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
             <span className={styles.originalPrice}>{formatPrice(product.originalPrice, product.currency)}</span>
           )}
         </div>
-        
+
         {/* Rating and reviews */}
         {product.rating && (
           <div className={styles.ratingContainer}>
@@ -94,7 +94,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
             )}
           </div>
         )}
-        
+
         {/* Product specifications */}
         <div className={styles.specifications}>
           {product.material && (
@@ -110,7 +110,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isHovering = false }
             </div>
           )}
         </div>
-        
+
         {/* Availability */}
         <div className={styles.availability}>
           {product.inStock ? (
