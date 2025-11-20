@@ -1,0 +1,223 @@
+/* Hero Section Container */
+.hero-container {
+    position: relative;
+    width: 90%;
+    max-width: 1400px;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    /* Vertically center text */
+    align-items: flex-start;
+    /* Align text to the left */
+    padding: 2rem;
+    background-color: transparent;
+    overflow: hidden;
+    border-radius: 2rem;
+
+    /* Testing Border as requested */
+    border: 2px solid red;
+}
+
+@media (min-width: 768px) {
+    .hero-container {
+        padding-left: 3rem;
+        /* Reduced from 6rem to move text slightly left */
+        padding-right: 6rem;
+    }
+}
+
+/* Content Wrapper (Text) */
+.hero-content-wrapper {
+    position: relative;
+    z-index: 20;
+    /* Above the canvas */
+    width: 100%;
+    max-width: 32rem;
+    /* Limit width so it stays on the left */
+    pointer-events: auto;
+}
+
+/* Canvas Wrapper (3D Model) */
+.hero-canvas-wrapper {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    /* Behind the text */
+    pointer-events: none;
+}
+
+/* We need pointer events on the canvas for OrbitControls */
+.hero-canvas-wrapper {
+    pointer-events: auto;
+}
+
+/* Subtitle */
+.hero-subtitle {
+    color: #ea580c;
+    /* text-orange-600 */
+    font-size: 0.75rem;
+    /* text-xs */
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    margin-bottom: 1rem;
+    /* mb-4 */
+    font-weight: 700;
+}
+
+@media (min-width: 768px) {
+    .hero-subtitle {
+        font-size: 0.875rem;
+        /* md:text-sm */
+    }
+}
+
+/* Main Title */
+.hero-title {
+    font-size: 3.5rem;
+    /* text-6xl */
+    font-family: serif;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    /* mb-6 */
+    color: #111827;
+    /* text-gray-900 */
+    line-height: 1.1;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    /* drop-shadow-sm */
+}
+
+@media (min-width: 768px) {
+    .hero-title {
+        font-size: 5rem;
+        /* md:text-8xl */
+    }
+}
+
+/* Divider Line */
+.hero-divider {
+    height: 0.25rem;
+    /* h-1 */
+    background: linear-gradient(to right, #f97316, #ca8a04);
+    /* from-orange-500 to-yellow-600 */
+    margin-bottom: 2rem;
+    /* mb-8 */
+    border-radius: 9999px;
+    /* rounded-full */
+}
+
+/* Description Paragraph */
+.hero-description {
+    color: #4b5563;
+    /* text-gray-600 */
+    font-size: 1rem;
+    /* text-base */
+    margin-bottom: 2.5rem;
+    /* mb-10 */
+    line-height: 1.625;
+    /* leading-relaxed */
+    font-weight: 300;
+    /* font-light */
+    max-width: 28rem;
+    /* max-w-md */
+}
+
+@media (min-width: 768px) {
+    .hero-description {
+        font-size: 1.125rem;
+        /* md:text-lg */
+    }
+}
+
+/* Buttons Container */
+.hero-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    /* gap-4 */
+}
+
+/* Primary Button */
+.btn-primary {
+    position: relative;
+    padding: 0.875rem 2.5rem;
+    /* px-10 py-3.5 */
+    background-color: black;
+    color: white;
+    font-weight: 500;
+    border-radius: 9999px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    /* hover:shadow-xl */
+    transform: translateY(-0.125rem);
+    /* hover:-translate-y-0.5 */
+}
+
+.btn-primary-text {
+    position: relative;
+    z-index: 10;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    /* tracking-wider */
+    font-size: 0.75rem;
+    /* text-xs */
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    .btn-primary-text {
+        font-size: 0.875rem;
+        /* md:text-sm */
+    }
+}
+
+.btn-primary-bg {
+    position: absolute;
+    inset: 0;
+    background-color: #1f2937;
+    /* bg-gray-800 */
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+}
+
+.btn-primary:hover .btn-primary-bg {
+    transform: scaleX(1);
+}
+
+/* Secondary Button */
+.btn-secondary {
+    padding: 0.875rem 2.5rem;
+    /* px-10 py-3.5 */
+    border: 1px solid #d1d5db;
+    /* border-gray-300 */
+    border-radius: 9999px;
+    color: #4b5563;
+    /* text-gray-600 */
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    /* tracking-wider */
+    font-size: 0.75rem;
+    /* text-xs */
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    .btn-secondary {
+        font-size: 0.875rem;
+        /* md:text-sm */
+    }
+}
+
+.btn-secondary:hover {
+    border-color: black;
+    background-color: black;
+    color: white;
+}
