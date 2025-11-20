@@ -108,28 +108,6 @@
     /* rounded-full */
 }
 
-/* Description Paragraph */
-.hero-description {
-    color: #4b5563;
-    /* text-gray-600 */
-    font-size: 1rem;
-    /* text-base */
-    margin-bottom: 2.5rem;
-    /* mb-10 */
-    line-height: 1.625;
-    /* leading-relaxed */
-    font-weight: 300;
-    /* font-light */
-    max-width: 28rem;
-    /* max-w-md */
-}
-
-@media (min-width: 768px) {
-    .hero-description {
-        font-size: 1.125rem;
-        /* md:text-lg */
-    }
-}
 
 /* Buttons Container */
 .hero-buttons {

@@ -2,9 +2,10 @@
 
 import React, { useRef, useState, useMemo, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Center, Environment, Float } from '@react-three/drei';
+import { useGLTF, OrbitControls, Center, Environment, Float, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion } from 'framer-motion';
+import ShivaLingaParticles from './ShivaLingaParticles';
 
 function ShivaLingaModel({ ...props }) {
   const { scene } = useGLTF('/shivalingamdepth-mesh.glb');
@@ -125,29 +126,20 @@ export default function NewHomePage() {
             className="hero-divider"
           ></motion.div>
 
-          <p className="hero-description">
-            Experience the timeless spiritual energy. Handcrafted with precision, representing the cosmic pillar of light. A masterpiece for your sacred space.
-          </p>
-
           <div className="hero-buttons">
             <button className="group btn-primary">
               <span className="btn-primary-text">Explore Collection</span>
               <div className="btn-primary-bg"></div>
-            </button>
-
-            <button className="btn-secondary">
-              Learn More
             </button>
           </div>
         </motion.div>
 
         {/* 3D Viewer Section (Inside Hero Section) */}
         <div className="hero-canvas-wrapper">
-          <Canvas shadows camera={{ position: [0, 0, 6.5], fov: 35 }} gl={{ localClippingEnabled: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}>
+          <Canvas shadows camera={{ position: [0, 0, 6.5], fov: 35 }} gl={{ localClippingEnabled: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2, alpha: true }}>
             <Suspense fallback={null}>
               {/* Environment & Lighting */}
-              <color attach="background" args={['#ffffff']} />
-
+              
               <ambientLight intensity={0.5} />
               <spotLight position={[10, 10, 5]} angle={0.3} penumbra={1} intensity={2} castShadow color="#ffaa00" />
               <spotLight position={[-10, 5, -5]} angle={0.3} penumbra={1} intensity={2} color="#4444ff" />
@@ -155,6 +147,19 @@ export default function NewHomePage() {
 
               <Center>
                 <ShivaLingaModel scale={0.3} />
+                <Html
+                  transform
+                  position={[0, -1.2, 0]} // Adjust position relative to model
+                  scale={0.3} // Scale down if needed to fit in the scene
+                  style={{
+                    width: '500px',
+                    height: '350px',
+                    pointerEvents: 'none',
+                  }}
+                  zIndexRange={[0, 0]}
+                >
+                   <ShivaLingaParticles />
+                </Html>
               </Center>
 
               <OrbitControls
