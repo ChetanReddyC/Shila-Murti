@@ -5,7 +5,7 @@ import Particles, { initParticlesEngine } from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import { loadPolygonMaskPlugin } from "@tsparticles/plugin-polygon-mask";
 
-export default function ShivaLingaParticles() {
+export default function ShivaLingaParticles({ scale = 0.35, pos = { x: 50, y: 55 } }) {
   const [init, setInit] = useState(false);
 
   useEffect(() => {
@@ -37,10 +37,10 @@ export default function ShivaLingaParticles() {
                     links: { color: "#000000" }
                 },
                 polygon: {
-                    scale: 0.35,
+                    scale: scale,
                     position: {
-                        x: 50,
-                        y: 55
+                        x: pos.x,
+                        y: pos.y
                     },
                     draw: {
                         stroke: { color: "#000000" }

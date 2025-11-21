@@ -139,7 +139,7 @@ export default function NewHomePage() {
           <Canvas shadows camera={{ position: [0, 0, 6.5], fov: 35 }} gl={{ localClippingEnabled: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2, alpha: true }}>
             <Suspense fallback={null}>
               {/* Environment & Lighting */}
-              
+
               <ambientLight intensity={0.5} />
               <spotLight position={[10, 10, 5]} angle={0.3} penumbra={1} intensity={2} castShadow color="#ffaa00" />
               <spotLight position={[-10, 5, -5]} angle={0.3} penumbra={1} intensity={2} color="#4444ff" />
@@ -149,16 +149,21 @@ export default function NewHomePage() {
                 <ShivaLingaModel scale={0.3} />
                 <Html
                   transform
-                  position={[0, -1.2, 0]} // Adjust position relative to model
-                  scale={0.3} // Scale down if needed to fit in the scene
+                  position={[-0.15, -1.55, 1.65]}
+                  scale={0.3}
                   style={{
-                    width: '500px',
-                    height: '350px',
+                    width: '1000px',
+                    height: '1000px',
                     pointerEvents: 'none',
                   }}
                   zIndexRange={[0, 0]}
                 >
-                   <ShivaLingaParticles />
+                  <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
+                    <ShivaLingaParticles
+                      scale={2}
+                      pos={{ x: 68, y: 55 }}
+                    />
+                  </div>
                 </Html>
               </Center>
 
