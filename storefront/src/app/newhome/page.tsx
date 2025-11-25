@@ -1,12 +1,43 @@
 'use client';
 
-import React, { useRef, useState, useMemo, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Center, Environment, Float, Html } from '@react-three/drei';
+import React, { useRef, useState, useMemo, Suspense, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useGLTF, Center, Environment, Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion } from 'framer-motion';
 import ShivaLingaParticles from './ShivaLingaParticles';
 import HimalayanShader from './HimalayanShader';
+
+// Mouse position context for 3D scene
+const mousePosition = { x: 0, y: 0 };
+
+// Component to handle mouse-based rotation
+function MouseRotationGroup({ children }: { children: React.ReactNode }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const { invalidate } = useThree();
+  
+  // Target and current rotation for smooth interpolation
+  const targetRotation = useRef({ x: 0, y: 0 });
+  const currentRotation = useRef({ x: 0, y: 0 });
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+
+    // Map mouse position to rotation angles - noticeable tilt, responsive movement
+    targetRotation.current.y = mousePosition.x * 0.5;
+    targetRotation.current.x = mousePosition.y * 0.3;
+
+    // Smooth interpolation (lerp) - faster response while staying seamless
+    currentRotation.current.x += (targetRotation.current.x - currentRotation.current.x) * 0.1;
+    currentRotation.current.y += (targetRotation.current.y - currentRotation.current.y) * 0.1;
+
+    // Apply rotation
+    groupRef.current.rotation.x = currentRotation.current.x;
+    groupRef.current.rotation.y = currentRotation.current.y;
+  });
+
+  return <group ref={groupRef}>{children}</group>;
+}
 
 function ShivaLingaModel({ ...props }) {
   const { scene } = useGLTF('/shivalingamdepth-mesh.glb');
@@ -92,62 +123,104 @@ function LoadingSpinner() {
 import './newhome.css';
 
 export default function NewHomePage() {
-  return (
-    <div className="relative w-full h-screen bg-white text-black overflow-hidden flex items-center justify-center">
-      
-      {/* Himalayan Shader Background - Full Viewport */}
-      <HimalayanShader />
+  const heroWrapperRef = useRef<HTMLDivElement>(null);
 
-      {/* Hero Section Container (Wraps Text and 3D Model) */}
-      <section
-        id="hero-section"
-        className="hero-container"
-      >
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!heroWrapperRef.current) return;
+      
+      const rect = heroWrapperRef.current.getBoundingClientRect();
+      // Normalize mouse position to -1 to 1 range
+      mousePosition.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mousePosition.y = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    };
+
+    const handleMouseLeave = () => {
+      // Reset to center when mouse leaves
+      mousePosition.x = 0;
+      mousePosition.y = 0;
+    };
+
+    const wrapper = heroWrapperRef.current;
+    if (wrapper) {
+      wrapper.addEventListener('mousemove', handleMouseMove);
+      wrapper.addEventListener('mouseleave', handleMouseLeave);
+    }
+
+    return () => {
+      if (wrapper) {
+        wrapper.removeEventListener('mousemove', handleMouseMove);
+        wrapper.removeEventListener('mouseleave', handleMouseLeave);
+      }
+    };
+  }, []);
+
+  return (
+    <div className="relative w-full min-h-screen bg-white text-black">
+      
+      {/* Hero Section Wrapper - Full Viewport */}
+      <div className="hero-section-wrapper" ref={heroWrapperRef}>
+        {/* Himalayan Shader Background */}
+        <HimalayanShader />
+
+        {/* Hero Section Container (Wraps Text and 3D Model) */}
+        <section
+          id="hero-section"
+          className="hero-container"
+        >
         {/* 3D Viewer Section (Inside Hero Section) */}
         <div className="hero-canvas-wrapper">
-          <Canvas shadows camera={{ position: [0, 0, 6.5], fov: 35 }} gl={{ localClippingEnabled: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2, alpha: true }}>
+          <Canvas camera={{ position: [0, 0, 6.5], fov: 35 }} dpr={1} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}>
             <Suspense fallback={null}>
-              {/* Environment & Lighting */}
+              {/* Optimized Lighting - reduced for performance */}
+              <ambientLight intensity={0.6} />
+              <directionalLight position={[5, 8, 5]} intensity={1.8} color="#ffaa00" />
+              <directionalLight position={[-5, 3, -3]} intensity={1.2} color="#4444ff" />
 
-              <ambientLight intensity={0.5} />
-              <spotLight position={[10, 10, 5]} angle={0.3} penumbra={1} intensity={2} castShadow color="#ffaa00" />
-              <spotLight position={[-10, 5, -5]} angle={0.3} penumbra={1} intensity={2} color="#4444ff" />
-              <pointLight position={[0, -2, 0]} intensity={1} color="#ff4400" distance={5} />
-
-              <Center position={[0, 0.5, 0]}>
-                <ShivaLingaModel scale={0.3} />
-                <Html
-                  transform
-                  position={[-0.08, -1.55, 1.65]}
-                  scale={0.3}
-                  style={{
-                    width: '375px',
-                    height: '185px',
-                    pointerEvents: 'none',
-                  }}
-                  zIndexRange={[0, 0]}
-                >
-                  <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
-                    <ShivaLingaParticles
-                      scale={2}
-                      pos={{ x: 50, y: 55 }}
-                    />
-                  </div>
-                </Html>
-              </Center>
+              <MouseRotationGroup>
+                <Center position={[0, 0.5, 0]}>
+                  <ShivaLingaModel scale={0.3} />
+                  <Html
+                    transform
+                    position={[-0.08, -1.55, 1.65]}
+                    scale={0.3}
+                    style={{
+                      width: '375px',
+                      height: '185px',
+                      pointerEvents: 'none',
+                    }}
+                    zIndexRange={[0, 0]}
+                  >
+                    <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
+                      <ShivaLingaParticles
+                        scale={2}
+                        pos={{ x: 50, y: 55 }}
+                      />
+                    </div>
+                  </Html>
+                </Center>
+              </MouseRotationGroup>
 
               <OrbitControls
                 enableZoom={false}
                 enablePan={false}
-                minPolarAngle={Math.PI / 3}
-                maxPolarAngle={Math.PI / 1.8}
+                enableDamping={true}
+                dampingFactor={0.08}
+                rotateSpeed={0.5}
+                minPolarAngle={Math.PI / 2.2}
+                maxPolarAngle={Math.PI / 1.95}
+                minAzimuthAngle={-Math.PI / 10}
+                maxAzimuthAngle={Math.PI / 10}
               />
-              <Environment preset="city" blur={0.8} />
+              <Environment preset="apartment" />
             </Suspense>
           </Canvas>
         </div>
-      </section>
+        </section>
+      </div>
 
+      {/* Additional content can be added below */}
+      
     </div>
   );
 }

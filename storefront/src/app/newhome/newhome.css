@@ -1,10 +1,20 @@
-/* Himalayan Shader Background - Full Viewport */
+/* Hero Section Wrapper - Full Viewport Height */
+.hero-section-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Himalayan Shader Background - Absolute within hero wrapper */
 .himalayan-shader-bg {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     z-index: 0;
 }
 
