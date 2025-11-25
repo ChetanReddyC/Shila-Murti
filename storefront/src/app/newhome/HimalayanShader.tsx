@@ -27,10 +27,10 @@ const fragmentShader = `
             (d - b) * u.x * u.y;
   }
 
-  #define OCTAVES 6
+  #define OCTAVES 3
   float fbm(in vec2 st) {
     float value = 0.0;
-    float amplitude = .5;
+    float amplitude = 0.65; // Increased from 0.5 for better visibility
     float frequency = 0.;
     
     mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.50));
@@ -38,7 +38,7 @@ const fragmentShader = `
     for (int i = 0; i < OCTAVES; i++) {
       value += amplitude * noise(st);
       st = rot * st * 2.0 + vec2(100.0, 0.0);
-      amplitude *= 0.5;
+      amplitude *= 0.55; // Increased from 0.5 to retain more detail
     }
     return value;
   }
@@ -112,22 +112,22 @@ const fragmentShader = `
     
     color = mix(color, colorIce, smoothstep(0.2, 0.8, length(q)));
 
-    float mistPattern = pow(r.x, 1.8); 
+    float mistPattern = pow(r.x, 1.4); // Reduced power for more mist visibility
     float cloudBreak = fbm(st * 0.8 + windDir * 0.5); 
-    float structuralHoles = smoothstep(0.4, 0.65, cloudBreak);
+    float structuralHoles = smoothstep(0.3, 0.55, cloudBreak); // Adjusted thresholds
 
     mistPattern *= structuralHoles;
 
-    float mistAlpha = smoothstep(0.35, 0.85, mistPattern);
+    float mistAlpha = smoothstep(0.2, 0.7, mistPattern); // Wider range for more visibility
 
     float heightFade = smoothstep(height1 - 0.4, height1 + 0.4, st.y);
     
-    float mistVisibilityFactor = clamp(heightFade + (structuralHoles * 0.6), 0.0, 1.0);
+    float mistVisibilityFactor = clamp(heightFade + (structuralHoles * 0.7), 0.0, 1.0); // Increased from 0.6
     
-    color = mix(color, colorMist, mistAlpha * mistVisibilityFactor);
+    color = mix(color, colorMist, mistAlpha * mistVisibilityFactor * 1.2); // Boosted by 1.2x
 
     float lightPattern = fbm(st * 3.0 + u_time * 0.1);
-    color += colorMist * pow(lightPattern, 4.0) * 0.15;
+    color += colorMist * pow(lightPattern, 3.0) * 0.2; // Reduced power, increased multiplier
 
     color = pow(color, vec3(1.1)); 
     color *= 1.0 - dist * 0.3;
@@ -149,7 +149,17 @@ const fragmentShader = `
     float organicDist = centerDist - noiseOffset;
     
     // Fade starts at 0.28 (transparent) and becomes fully opaque at 0.65
-    float alpha = smoothstep(0.28, 0.65, organicDist);
+    float centerAlpha = smoothstep(0.28, 0.65, organicDist);
+    
+    // Edge fade on top and bottom only (normalized st without aspect correction)
+    vec2 stNorm = gl_FragCoord.xy / u_resolution.xy;
+    float edgeFadeSize = 0.12; // Size of fade region on edges
+    float bottomFade = smoothstep(0.0, edgeFadeSize, stNorm.y);
+    float topFade = smoothstep(1.0, 1.0 - edgeFadeSize, stNorm.y);
+    float edgeAlpha = bottomFade * topFade;
+    
+    // Combine center and edge alpha
+    float alpha = centerAlpha * edgeAlpha;
 
     gl_FragColor = vec4(color, alpha);
   }
@@ -170,7 +180,7 @@ export default function HimalayanShader() {
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(1); // Capped to 1 for performance
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setClearColor(0x000000, 0); // Transparent background
     container.appendChild(renderer.domElement);

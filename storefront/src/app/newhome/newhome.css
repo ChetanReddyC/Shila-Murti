@@ -1,12 +1,11 @@
-/* Himalayan Shader Background */
+/* Himalayan Shader Background - Full Viewport */
 .himalayan-shader-bg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     z-index: 0;
-    border-radius: 2rem;
-    overflow: hidden;
 }
 
 .himalayan-shader-bg canvas {
@@ -28,11 +27,7 @@
     /* Align text to the left */
     padding: 2rem;
     background-color: transparent;
-    overflow: hidden;
-    border-radius: 2rem;
-
-    /* Testing Border as requested */
-    border: 2px solid red;
+    overflow: visible;
 }
 
 @media (min-width: 768px) {

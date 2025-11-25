@@ -94,15 +94,15 @@ import './newhome.css';
 export default function NewHomePage() {
   return (
     <div className="relative w-full h-screen bg-white text-black overflow-hidden flex items-center justify-center">
+      
+      {/* Himalayan Shader Background - Full Viewport */}
+      <HimalayanShader />
 
       {/* Hero Section Container (Wraps Text and 3D Model) */}
       <section
         id="hero-section"
         className="hero-container"
       >
-        {/* Himalayan Shader Background */}
-        <HimalayanShader />
-
         {/* 3D Viewer Section (Inside Hero Section) */}
         <div className="hero-canvas-wrapper">
           <Canvas shadows camera={{ position: [0, 0, 6.5], fov: 35 }} gl={{ localClippingEnabled: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2, alpha: true }}>
