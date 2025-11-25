@@ -6,6 +6,7 @@ import { useGLTF, OrbitControls, Center, Environment, Float, Html } from '@react
 import * as THREE from 'three';
 import { motion } from 'framer-motion';
 import ShivaLingaParticles from './ShivaLingaParticles';
+import HimalayanShader from './HimalayanShader';
 
 function ShivaLingaModel({ ...props }) {
   const { scene } = useGLTF('/shivalingamdepth-mesh.glb');
@@ -99,40 +100,8 @@ export default function NewHomePage() {
         id="hero-section"
         className="hero-container"
       >
-        {/* Text Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="hero-content-wrapper"
-        >
-          <motion.h2
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="hero-subtitle"
-          >
-            Sacred Artistry
-          </motion.h2>
-
-          <h1 className="hero-title">
-            Divine <br /> Aura
-          </h1>
-
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: 80 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-            className="hero-divider"
-          ></motion.div>
-
-          <div className="hero-buttons">
-            <button className="group btn-primary">
-              <span className="btn-primary-text">Explore Collection</span>
-              <div className="btn-primary-bg"></div>
-            </button>
-          </div>
-        </motion.div>
+        {/* Himalayan Shader Background */}
+        <HimalayanShader />
 
         {/* 3D Viewer Section (Inside Hero Section) */}
         <div className="hero-canvas-wrapper">
@@ -145,15 +114,15 @@ export default function NewHomePage() {
               <spotLight position={[-10, 5, -5]} angle={0.3} penumbra={1} intensity={2} color="#4444ff" />
               <pointLight position={[0, -2, 0]} intensity={1} color="#ff4400" distance={5} />
 
-              <Center>
+              <Center position={[0, 0.5, 0]}>
                 <ShivaLingaModel scale={0.3} />
                 <Html
                   transform
-                  position={[-0.15, -1.55, 1.65]}
+                  position={[-0.08, -1.55, 1.65]}
                   scale={0.3}
                   style={{
-                    width: '1000px',
-                    height: '1000px',
+                    width: '375px',
+                    height: '185px',
                     pointerEvents: 'none',
                   }}
                   zIndexRange={[0, 0]}
@@ -161,7 +130,7 @@ export default function NewHomePage() {
                   <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
                     <ShivaLingaParticles
                       scale={2}
-                      pos={{ x: 68, y: 55 }}
+                      pos={{ x: 50, y: 55 }}
                     />
                   </div>
                 </Html>

@@ -21,38 +21,38 @@ export default function ShivaLingaParticles({ scale = 0.35, pos = { x: 50, y: 55
 
   return (
     <div className="w-full h-full pointer-events-none">
-        <Particles
-            id="tsparticles"
-            url="/Shivalingambottompartconstellation.json"
-            className="w-full h-full"
-            options={{
-                background: {
-                    color: {
-                        value: "transparent"
-                    },
-                    opacity: 0
-                },
-                particles: {
-                    color: { value: "#000000" },
-                    links: { color: "#000000" }
-                },
-                polygon: {
-                    scale: scale,
-                    position: {
-                        x: pos.x,
-                        y: pos.y
-                    },
-                    draw: {
-                        stroke: { color: "#000000" }
-                    }
-                },
-                fullScreen: {
-                    enable: false,
-                    zIndex: 0
-                },
-                detectRetina: true
-            }}
-        />
+      <Particles
+        id="tsparticles"
+        url="/Shivalingambottompartconstellation.json"
+        className="w-full h-full"
+        options={{
+          background: {
+            color: {
+              value: "transparent"
+            },
+            opacity: 0
+          },
+          particles: {
+            color: { value: "#888888" },
+            links: { color: "#888888" }
+          },
+          polygon: {
+            scale: scale,
+            position: {
+              x: pos.x,
+              y: pos.y
+            },
+            draw: {
+              stroke: { color: "#888888" }
+            }
+          },
+          fullScreen: {
+            enable: false,
+            zIndex: 0
+          },
+          detectRetina: true
+        }}
+      />
     </div>
   );
 }

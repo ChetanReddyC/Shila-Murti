@@ -6,11 +6,11 @@
   "interactivity": {
     "events": {
       "onHover": {
-        "enable": true,
+        "enable": false,
         "mode": "bubble"
       },
       "onClick": {
-        "enable": true,
+        "enable": false,
         "mode": "push"
       }
     },
@@ -38,10 +38,10 @@
   },
   "particles": {
     "color": {
-      "value": "#ffffff"
+      "value": "#888888"
     },
     "links": {
-      "color": "#ffffff",
+      "color": "#888888",
       "distance": 30,
       "enable": true,
       "opacity": 0.4,
@@ -89,7 +89,7 @@
     "draw": {
       "enable": true,
       "stroke": {
-        "color": "#ffffff",
+        "color": "#888888",
         "width": 0.5,
         "opacity": 1
       }
