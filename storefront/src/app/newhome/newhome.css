@@ -193,14 +193,16 @@
     left: 50%;
     transform: translateX(-50%) translateY(25%);
     z-index: 20;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
-.center-bottom-text img {
+.center-bottom-text img,
+.center-bottom-text canvas {
     max-width: 450px;
     height: auto;
     opacity: 0.9;
     filter: drop-shadow(0 6px 16px rgba(60, 60, 60, 0.45));
+    cursor: pointer;
 }
 
 /* Responsive adjustments (Desktop) */
@@ -228,7 +230,8 @@
         /* Much larger on desktop (increased from 1.6rem) */
     }
     
-    .center-bottom-text img {
+    .center-bottom-text img,
+    .center-bottom-text canvas {
         max-width: 700px;
     }
 }

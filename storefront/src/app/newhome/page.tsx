@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { motion } from 'framer-motion';
 import ShivaLingaParticles from './ShivaLingaParticles';
 import HimalayanShader from './HimalayanShader';
+import IceShineText from './IceShineText';
 
 // Mouse position context for 3D scene
 const mousePosition = { x: 0, y: 0 };
@@ -180,9 +181,9 @@ export default function NewHomePage() {
           </button>
         </div>
         
-        {/* Center Bottom Text Image */}
+        {/* Center Bottom Text Image with Ice Shine Effect */}
         <div className="center-bottom-text">
-          <img src="/Mahadev_text.png" alt="Mahadev" />
+          <IceShineText src="/Mahadev_text.png" alt="Mahadev" />
         </div>
 
         {/* Hero Section Container (Wraps 3D Model) */}
