@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&display=swap');
+
 /* Hero Section Wrapper - Full Viewport Height */
 .hero-section-wrapper {
     position: relative;
@@ -6,6 +8,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: visible;
 }
 
 /* Himalayan Shader Background - Absolute within hero wrapper */
@@ -62,4 +65,170 @@
 /* We need pointer events on the canvas for OrbitControls */
 .hero-canvas-wrapper {
     pointer-events: auto;
+}
+
+/* Specific styling for the frosted text container to position it correctly */
+.frosted-text-container {
+    position: absolute;
+    top: 5rem;
+    /* Adjusted slightly downwards (was 4rem) */
+    left: 0.5rem;
+    /* Moved significantly closer to the left edge */
+    z-index: 20;
+}
+
+/* Right-side text container */
+.frosted-text-container-right {
+    position: absolute;
+    bottom: 5rem;
+    /* Positioned at bottom */
+    right: 0.5rem;
+    /* Aligned to the right edge */
+    z-index: 20;
+    text-align: right;
+    max-width: 300px;
+    /* Maintain width */
+}
+
+/* Frosted Glass Button */
+.frosted-glass-button {
+    /* Typography matching Syncopate style */
+    font-family: 'Syncopate', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+
+    /* Button Structure */
+    margin-top: 1rem;
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+
+    /* Text Gradient Effect */
+    color: transparent;
+    background-image: linear-gradient(180deg,
+            rgba(255, 255, 255, 1) 0%,
+            rgba(255, 255, 255, 0.7) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    /* Glow */
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.frosted-glass-button:hover {
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.15);
+    background-clip: padding-box;
+    -webkit-background-clip: padding-box;
+    border-color: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+/* Frosted Glass Text Effect & Typography */
+.frosted-glass-text {
+    /* Typography (replacing Tailwind classes) */
+    font-family: 'Syncopate', sans-serif;
+    /* Updated to Syncopate */
+    font-size: 2.5rem;
+    /* text-4xl */
+    line-height: 1.1;
+    /* leading-tight */
+    font-weight: 700;
+    /* Bolder weight as requested */
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
+
+    /* Base color transparent for gradient clip */
+    color: transparent;
+
+    /* Gradient Fill for Icy Look */
+    background: linear-gradient(180deg,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(255, 255, 255, 0.5) 50%,
+            rgba(255, 255, 255, 0.1) 100%);
+
+    /* Clip background to text */
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    /* Glassy Glow/Shadow */
+    filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.35));
+}
+
+/* Right-side smaller regular text styling */
+.frosted-glass-text-right {
+    /* Inherits Font from global but specific settings here */
+    font-family: 'Syncopate', sans-serif;
+    font-size: 1.5rem;
+    /* Increased from 1.2rem */
+    line-height: 1.4;
+    font-weight: 400;
+    /* Regular weight */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+
+    /* Same Frosted Effect */
+    color: transparent;
+    background: linear-gradient(180deg,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(255, 255, 255, 0.6) 50%,
+            rgba(255, 255, 255, 0.2) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
+}
+
+/* Center Bottom Text Image */
+.center-bottom-text {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(25%);
+    z-index: 20;
+    pointer-events: none;
+}
+
+.center-bottom-text img {
+    max-width: 450px;
+    height: auto;
+    opacity: 0.9;
+    filter: drop-shadow(0 6px 16px rgba(60, 60, 60, 0.45));
+}
+
+/* Responsive adjustments (Desktop) */
+@media (min-width: 768px) {
+    .frosted-text-container {
+        left: 1.5rem;
+        /* Moved even further left (was 3rem) */
+    }
+
+    .frosted-glass-text {
+        font-size: 4rem;
+        /* text-6xl */
+    }
+
+    .frosted-text-container-right {
+        right: 1.5rem;
+        bottom: 5rem;
+        /* Keep at bottom on desktop */
+        max-width: 600px;
+        /* Wider on desktop */
+    }
+
+    .frosted-glass-text-right {
+        font-size: 2.2rem;
+        /* Much larger on desktop (increased from 1.6rem) */
+    }
+    
+    .center-bottom-text img {
+        max-width: 700px;
+    }
 }
