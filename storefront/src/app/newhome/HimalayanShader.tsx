@@ -112,13 +112,13 @@ const fragmentShader = `
     
     color = mix(color, colorIce, smoothstep(0.2, 0.8, length(q)));
 
-    float mistPattern = pow(r.x, 1.4); // Reduced power for more mist visibility
+    float mistPattern = pow(r.x, 2.9); // Reduced power for more mist visibility
     float cloudBreak = fbm(st * 0.8 + windDir * 0.5); 
     float structuralHoles = smoothstep(0.3, 0.55, cloudBreak); // Adjusted thresholds
 
     mistPattern *= structuralHoles;
 
-    float mistAlpha = smoothstep(0.2, 0.7, mistPattern); // Wider range for more visibility
+    float mistAlpha = smoothstep(0.2, 1.9, mistPattern); // Wider range for more visibility
 
     float heightFade = smoothstep(height1 - 0.4, height1 + 0.4, st.y);
     
@@ -190,10 +190,12 @@ export default function HimalayanShader() {
     const material = new THREE.ShaderMaterial({
       uniforms: {
         u_time: { value: 0 },
-        u_resolution: { value: new THREE.Vector2(
-          container.clientWidth * renderer.getPixelRatio(),
-          container.clientHeight * renderer.getPixelRatio()
-        )}
+        u_resolution: {
+          value: new THREE.Vector2(
+            container.clientWidth * renderer.getPixelRatio(),
+            container.clientHeight * renderer.getPixelRatio()
+          )
+        }
       },
       fragmentShader: fragmentShader,
       transparent: true,

@@ -4,8 +4,6 @@ import React, { useRef, useState, useMemo, Suspense, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, Center, Environment, Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { motion } from 'framer-motion';
-import ShivaLingaParticles from './ShivaLingaParticles';
 import HimalayanShader from './HimalayanShader';
 import IceShineText from './IceShineText';
 
@@ -215,9 +213,17 @@ export default function NewHomePage() {
                       zIndexRange={[0, 0]}
                     >
                       <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
-                        <ShivaLingaParticles
-                          scale={2}
-                          pos={{ x: 50, y: 55 }}
+                        <img 
+                          src="/Shivalingbottom.svg" 
+                          alt="Shivalinga Base"
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'contain',
+                            opacity: 0.75,
+                            maskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)',
+                            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)'
+                          }}
                         />
                       </div>
                     </Html>
