@@ -108,9 +108,30 @@ const fragmentShader = `
 
     float f = fbm((st + r + windDir) * 3.0);
 
-    vec3 color = mix(bgBase, colorShadow, smoothstep(0.4, 1.0, (f*f)*1.5));
+    // === FLOWING SIDE REVEALS - Mountains tease through moving fog ===
+    // Normalize x position (0 = left edge, 1 = right edge)
+    float normX = st.x / aspect;
     
-    color = mix(color, colorIce, smoothstep(0.2, 0.8, length(q)));
+    // Left side flowing reveal - uses the SAME fog flow patterns
+    float leftRegion = smoothstep(0.4, 0.0, normX); // Bias toward left edge
+    float leftFlow = fbm(st * 2.5 + windDir * 1.2 + vec2(5.0, 10.0)); // Flows with wind
+    float leftReveal = leftRegion * smoothstep(0.3, 0.7, leftFlow); // Reveals when flow is high
+    
+    // Right side flowing reveal - mirrored, different seed
+    float rightRegion = smoothstep(0.6, 1.0, normX); // Bias toward right edge
+    float rightFlow = fbm(st * 2.5 + windDir * 1.2 + vec2(50.0, 30.0)); // Different seed, same wind
+    float rightReveal = rightRegion * smoothstep(0.3, 0.7, rightFlow); // Reveals when flow is high
+    
+    // Combine - fog naturally thins on sides as it flows
+    float sideReveal = leftReveal + rightReveal;
+    // === END FLOWING REVEALS ===
+
+    // Fog mixing - sideReveal creates flowing gaps on sides
+    float fogAmount = smoothstep(0.4, 1.0, (f*f)*1.5);
+    fogAmount *= (1.0 - sideReveal * 0.6); // Fog thins where flow reveals
+    vec3 color = mix(bgBase, colorShadow, fogAmount);
+    
+    color = mix(color, colorIce, smoothstep(0.2, 0.8, length(q)) * (1.0 - sideReveal * 0.4));
 
     float mistPattern = pow(r.x, 2.9); // Reduced power for more mist visibility
     float cloudBreak = fbm(st * 0.8 + windDir * 0.5); 
