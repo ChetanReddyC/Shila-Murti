@@ -1,0 +1,323 @@
+/* WorkshopGallery.css */
+
+/* Define local variables for the "Shila" theme colors */
+.workshop-gallery-section {
+    --shila-gold: #D4AF37;
+    --shila-gold-light: #F5E6BE;
+    --shila-stone: #1c1917;
+    --shila-mist: rgba(255, 255, 255, 0.5);
+
+    position: relative;
+    overflow: hidden;
+    background: #ffffff;
+    /* Solid background */
+    width: 100%;
+}
+
+/* Background Theme Arts */
+.theme-art-container {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    mix-blend-mode: multiply;
+    opacity: 0.12;
+}
+
+.theme-art-peacock {
+    top: 5%;
+    left: 0;
+    width: 600px;
+    height: 600px;
+}
+
+.theme-art-elephant {
+    top: 40%;
+    right: 0;
+    width: 700px;
+    height: 700px;
+    opacity: 0.10;
+}
+
+.theme-art-temple {
+    bottom: 0;
+    left: 5%;
+    width: 800px;
+    height: 800px;
+    opacity: 0.08;
+}
+
+.art-mask-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mask-fade-br {
+    mask-image: linear-gradient(to bottom right, black 0%, transparent 70%);
+    -webkit-mask-image: linear-gradient(to bottom right, black 0%, transparent 70%);
+}
+
+.mask-fade-l {
+    mask-image: linear-gradient(to left, black 0%, transparent 70%);
+    -webkit-mask-image: linear-gradient(to left, black 0%, transparent 70%);
+}
+
+.mask-fade-tr {
+    mask-image: linear-gradient(to top right, black 0%, transparent 70%);
+    -webkit-mask-image: linear-gradient(to top right, black 0%, transparent 70%);
+}
+
+.theme-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: invert(1) sepia(0.2) hue-rotate(10deg);
+}
+
+.theme-peacock-transform {
+    transform: translate(-25%, -25%);
+}
+
+.theme-elephant-transform {
+    transform: translate(25%, 0);
+}
+
+.theme-temple-transform {
+    transform: translate(0, 25%);
+}
+
+
+/* Main Container */
+.workshop-container {
+    position: relative;
+    z-index: 10;
+    padding: 0 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Gallery Row Layout */
+.gallery-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 80vh;
+    padding: 4rem 0;
+    gap: 4rem;
+}
+
+.gallery-item-row.reverse {
+    flex-direction: row-reverse;
+}
+
+/* Text Column */
+.gallery-text-col {
+    flex: 1;
+    padding: 2rem;
+    max-width: 600px;
+}
+
+.gallery-title {
+    font-family: var(--font-cinzel), serif;
+    font-size: 3rem;
+    /* 4xl approx */
+    color: var(--shila-stone);
+    font-weight: 400;
+    margin-bottom: 1.5rem;
+    line-height: 1.2;
+}
+
+.gallery-divider-container {
+    height: 0.75rem;
+    /* Reduced height for thinner line */
+    width: 8rem;
+    margin: 1rem 0;
+    position: relative;
+    overflow: visible;
+    /* Allow smoke to billow naturally */
+}
+
+.gallery-divider-shader {
+    width: 100%;
+    height: 100%;
+}
+
+.gallery-desc {
+    font-family: var(--font-inter), sans-serif;
+    font-size: 1.125rem;
+    /* lg */
+    color: #374151;
+    /* gray-700 */
+    line-height: 1.625;
+    /* relaxed */
+    font-weight: 300;
+    /* light */
+}
+
+/* Premium Button */
+.gallery-cta-btn {
+    position: relative;
+    margin-top: 2rem;
+    padding: 0.75rem 1.5rem;
+    /* px-6 py-3 */
+    overflow: visible;
+    /* Changed to visible for smoke puff */
+    border: none;
+    /* Removed static border */
+    border-radius: 9999px;
+    /* rounded-full */
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.gallery-btn-shader {
+    position: absolute;
+    inset: -20px;
+    /* Increased canvas space to prevent clipping */
+    width: auto;
+    height: auto;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: 9999px;
+    /* Helpful for some browsers/clipping if needed */
+}
+
+.gallery-cta-btn:hover {
+    background: rgba(212, 175, 55, 0.05);
+}
+
+.gallery-btn-text {
+    position: relative;
+    z-index: 10;
+    font-family: var(--font-cinzel), serif;
+    color: var(--shila-stone);
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.gallery-cta-btn:hover .gallery-btn-text {
+    letter-spacing: 0.1em;
+    /* tracking-widest */
+}
+
+
+/* Visual Column */
+.gallery-visual-col {
+    flex: 1;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.gallery-glow-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(212, 175, 55, 0.1);
+    filter: blur(40px);
+    /* Reduced from 80px */
+    border-radius: 9999px;
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Standard Clean Card */
+.gallery-media-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    /* 2xl */
+    /* border and shadow removed to fix glitchy artifacts */
+    border: none;
+    box-shadow: none;
+    transform: translateZ(0);
+    /* Hardware acceleration fix */
+    will-change: transform, opacity;
+    width: 100%;
+    aspect-ratio: 4/3;
+    /* or ensure height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gallery-media-card.light-glass {
+    background: #ffffff;
+}
+
+.gallery-media-card.stone-glass {
+    background: #f5f5f4;
+    /* stone-100 */
+}
+
+.gallery-placeholder-content {
+    padding: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.icon-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 5rem;
+    height: 5rem;
+    /* Fixed size for proper circle shader */
+    border-radius: 50%;
+    margin-bottom: 1rem;
+    margin-left: auto;
+    margin-right: auto;
+    /* Removed border and background as shader replaces border */
+    background: transparent;
+}
+
+.icon-border-shader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8rem;
+    /* 5rem + 1.5 + 1.5 spacing */
+    height: 8rem;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.icon-content {
+    position: relative;
+    z-index: 2;
+    color: var(--shila-gold);
+    display: flex;
+    /* Ensure SVG centers */
+}
+
+.icon-svg {
+    width: 2rem;
+    height: 2rem;
+}
+
+.placeholder-label-text {
+    font-family: var(--font-cinzel), serif;
+    font-size: 0.875rem;
+    /* sm */
+    letter-spacing: 0.1em;
+    /* tracking-widest */
+    color: #6b7280;
+    /* gray-500 */
+    text-transform: uppercase;
+}
+
+.gallery-real-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    /* Prevents bottom alignment gap */
+}

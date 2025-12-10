@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Public_Sans, Noto_Sans } from "next/font/google";
+import { Public_Sans, Noto_Sans, Cinzel, Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "../contexts";
 import AuthSessionProvider from "@/providers/SessionProvider";
@@ -20,6 +20,18 @@ const notoSans = Noto_Sans({
   variable: "--font-noto-sans",
 });
 
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-cinzel",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-inter",
+});
+
 export const metadata: Metadata = {
   title: "Shila Murthi",
   description: "Timeless beauty of handcrafted stone idols",
@@ -35,7 +47,7 @@ export default function RootLayout({
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
       </head>
-      <body className={`${publicSans.variable} ${notoSans.variable} w-full`}>
+      <body className={`${publicSans.variable} ${notoSans.variable} ${cinzel.variable} ${inter.variable} w-full`}>
         <AuthSessionProvider>
           <CartProvider>
             <Suspense fallback={null}>

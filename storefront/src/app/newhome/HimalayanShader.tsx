@@ -191,6 +191,7 @@ export default function HimalayanShader() {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const animationIdRef = useRef<number>(0);
+  const isVisibleRef = useRef<boolean>(true); // Track visibility
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -200,8 +201,8 @@ export default function HimalayanShader() {
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false });
-    renderer.setPixelRatio(1); // Capped to 1 for performance
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, premultipliedAlpha: false }); // Disable antialias for performance
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Cap pixel ratio
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setClearColor(0x000000, 0); // Transparent background
     container.appendChild(renderer.domElement);
@@ -230,6 +231,7 @@ export default function HimalayanShader() {
 
     // Resize handler
     const handleResize = () => {
+      if (!container) return;
       const width = container.clientWidth;
       const height = container.clientHeight;
       renderer.setSize(width, height);
@@ -241,10 +243,23 @@ export default function HimalayanShader() {
 
     window.addEventListener('resize', handleResize);
 
+    // Intersection Observer to Pause Rendering when off-screen
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+      },
+      { threshold: 0 } // Trigger as soon as 1 pixel is visible/invisible
+    );
+    observer.observe(container);
+
     // Animation loop
     const animate = () => {
-      material.uniforms.u_time.value += 0.015;
-      renderer.render(scene, camera);
+      // Only render if visible to save massive GPU resources
+      if (isVisibleRef.current) {
+        material.uniforms.u_time.value += 0.015;
+        renderer.render(scene, camera);
+      }
+
       animationIdRef.current = requestAnimationFrame(animate);
     };
     animate();
@@ -253,6 +268,7 @@ export default function HimalayanShader() {
     return () => {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationIdRef.current);
+      observer.disconnect();
       renderer.dispose();
       geometry.dispose();
       material.dispose();

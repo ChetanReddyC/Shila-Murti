@@ -69,7 +69,7 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
       const rect = containerRef.current.getBoundingClientRect();
       const elementHeight = rect.height;
       const viewportHeight = window.innerHeight;
-      
+
       // If element is larger than viewport, require at least 20% visibility
       if (elementHeight > viewportHeight) {
         return 0.2;
@@ -89,9 +89,9 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
           // Additional check: for large elements, ensure significant intersection
           const significantlyVisible = entry.intersectionRatio > 0.15;
           const shouldActivate = inView && (entry.intersectionRatio < 0.2 || significantlyVisible);
-          
+
           setIsInViewport(shouldActivate);
-          
+
           // Track if element has ever been visible (for lazy loading)
           if (shouldActivate && !hasBeenInViewport) {
             setHasBeenInViewport(true);
@@ -122,11 +122,11 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
       // Skip shader calculations if not in viewport
       if (!isInViewport) return;
       if (!containerRef.current || !lightRef.current) return;
-      
+
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      
+
       // For performance, we directly manipulate the DOM attributes of the light source
       // and a CSS custom property for the mask instead of triggering React re-renders.
       lightRef.current.setAttribute('x', String(x));
@@ -143,7 +143,7 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
       setIsHovering(true);
     }
   };
-  
+
   const handleMouseLeave = () => {
     setIsHovering(false);
   };
@@ -154,11 +154,11 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
       setIsHovering(false);
     }
   }, [isInViewport, isHovering]);
-  
+
   // We need to add our SVG filter to the child component.
   // React.cloneElement is used to achieve this without modifying the original child.
   const child = React.Children.only(children) as React.ReactElement<any>;
-  
+
   // Only create filtered version if element has been in viewport at least once
   const childWithFilter = hasBeenInViewport ? React.cloneElement(
     child,
@@ -204,9 +204,9 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
       {hasBeenInViewport && (
         <div
           className={styles.effectLayer}
-          style={{ 
-            opacity: isHovering && isInViewport ? 1 : 0, 
-            pointerEvents: isHovering && isInViewport ? 'auto' : 'none' 
+          style={{
+            opacity: isHovering && isInViewport ? 1 : 0,
+            pointerEvents: isHovering && isInViewport ? 'auto' : 'none'
           }}
           aria-hidden={!isHovering || !isInViewport}
         >
@@ -220,36 +220,36 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
           </div>
         </div>
       )}
-      
+
       {/* A hidden SVG element to define our complex filter effect. Only render if needed. */}
       {hasBeenInViewport && (
-        <svg 
-          aria-hidden="true" 
+        <svg
+          aria-hidden="true"
           className={styles.filterDefinition}
           style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}
         >
           <defs>
             <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
               <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur" />
-              <feSpecularLighting 
-                in="blur" 
-                surfaceScale="3" 
-                specularConstant={specularConstant} 
-                specularExponent={specularExponent} 
-                lightingColor={lightColor} 
+              <feSpecularLighting
+                in="blur"
+                surfaceScale="3"
+                specularConstant={specularConstant}
+                specularExponent={specularExponent}
+                lightingColor={lightColor}
                 result="specularOut"
               >
                 <fePointLight x="0" y="0" z="100" ref={lightRef} />
               </feSpecularLighting>
               <feComposite in="specularOut" in2="SourceAlpha" operator="in" result="specular-clipped" />
-              <feComposite 
-                in="SourceGraphic" 
-                in2="specular-clipped" 
-                operator="arithmetic" 
-                k1="0" 
-                k2="1" 
-                k3="0.5" 
-                k4="0" 
+              <feComposite
+                in="SourceGraphic"
+                in2="specular-clipped"
+                operator="arithmetic"
+                k1="0"
+                k2="1"
+                k3="0.5"
+                k4="0"
               />
             </filter>
           </defs>

@@ -229,9 +229,301 @@
         font-size: 2.2rem;
         /* Much larger on desktop (increased from 1.6rem) */
     }
-    
-    .center-bottom-text img,
+
     .center-bottom-text canvas {
         max-width: 700px;
     }
+}
+
+/* =========================================
+   Workshop Gallery Section Styling
+   ========================================= */
+
+.workshop-gallery-section {
+    position: relative;
+    width: 100%;
+    background-color: #f8f9fa;
+    padding-top: 8rem;
+    padding-bottom: 8rem;
+    overflow: hidden;
+}
+
+.workshop-gallery-mist {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10rem;
+    background: linear-gradient(to bottom, #ffffff, transparent);
+    pointer-events: none;
+    z-index: 10;
+}
+
+.workshop-container {
+    max-width: 80rem;
+    /* 7xl */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .workshop-container {
+        padding-left: 3rem;
+        padding-right: 3rem;
+    }
+}
+
+/* Gallery Item Row */
+.gallery-item-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3rem;
+    margin-bottom: 8rem;
+}
+
+@media (min-width: 768px) {
+    .gallery-item-row {
+        flex-direction: row;
+        gap: 6rem;
+    }
+
+    .gallery-item-row.reverse {
+        flex-direction: row-reverse;
+    }
+}
+
+/* Text Column */
+.gallery-text-col {
+    flex: 1;
+    z-index: 10;
+    text-align: center;
+}
+
+.gallery-text-col>*+* {
+    margin-top: 1.5rem;
+    /* space-y-6 equivalent */
+}
+
+@media (min-width: 768px) {
+    .gallery-text-col {
+        text-align: left;
+    }
+}
+
+.gallery-title {
+    font-family: serif;
+    /* Ensure you have a serif font loaded or fallback */
+    font-size: 2.25rem;
+    /* 4xl */
+    line-height: 1;
+    font-weight: 300;
+    /* font-light */
+    color: #1e293b;
+    /* slate-800 */
+    letter-spacing: -0.025em;
+    /* tracking-tight */
+}
+
+@media (min-width: 768px) {
+    .gallery-title {
+        font-size: 3rem;
+        /* 5xl */
+    }
+}
+
+.gallery-divider {
+    width: 4rem;
+    height: 0.25rem;
+    background-color: rgba(6, 182, 212, 0.3);
+    /* cyan-500/30 */
+    border-radius: 9999px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (min-width: 768px) {
+    .gallery-divider {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+
+.gallery-desc {
+    font-size: 1.125rem;
+    /* lg */
+    color: #475569;
+    /* slate-600 */
+    line-height: 1.625;
+    /* leading-relaxed */
+    font-weight: 300;
+    /* font-light */
+    max-width: 32rem;
+    /* max-w-lg */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (min-width: 768px) {
+    .gallery-desc {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+
+/* Button */
+.gallery-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.75rem 2rem;
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    /* slate-200 */
+    border-radius: 9999px;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: all 300ms;
+    cursor: pointer;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (min-width: 768px) {
+    .gallery-btn {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+
+.gallery-btn:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.gallery-btn-text {
+    font-weight: 500;
+    background: linear-gradient(to right, #1e293b, #475569);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.gallery-btn-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: #22d3ee;
+    /* cyan-400 */
+    transition: transform 300ms;
+}
+
+.gallery-btn:hover .gallery-btn-dot {
+    transform: scale(1.25);
+}
+
+/* Visual Column */
+.gallery-visual-col {
+    flex: 1;
+    width: 100%;
+    position: relative;
+    /* group functionality handled in CSS via nesting or parent selector if needed, 
+       but standard CSS :hover on parent works */
+}
+
+.gallery-glow {
+    position: absolute;
+    inset: -1rem;
+    background: linear-gradient(to top right, rgba(207, 250, 254, 0.5), rgba(239, 246, 255, 0.5));
+    border-radius: 2rem;
+    filter: blur(40px);
+    opacity: 0;
+    transition: opacity 700ms;
+    pointer-events: none;
+}
+
+.gallery-visual-col:hover .gallery-glow {
+    opacity: 1;
+}
+
+.gallery-media-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    border-radius: 2rem;
+    overflow: hidden;
+    background-color: white;
+    /* Fallback */
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    transition: box-shadow 500ms;
+    box-shadow: 0 20px 50px -12px rgba(200, 210, 230, 0.6);
+}
+
+@media (min-width: 768px) {
+    .gallery-media-container {
+        aspect-ratio: 1 / 1;
+    }
+}
+
+.gallery-visual-col:hover .gallery-media-container {
+    box-shadow: 0 20px 50px -12px rgba(164, 213, 255, 0.4);
+}
+
+/* Placeholders */
+.gallery-placeholder-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.placeholder-icon-box {
+    display: inline-block;
+    padding: 1rem;
+    border-radius: 9999px;
+    background-color: rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+
+.placeholder-icon {
+    width: 2rem;
+    height: 2rem;
+    color: rgba(100, 116, 139, 0.7);
+    /* slate-500/70 */
+}
+
+.placeholder-label {
+    margin-top: 1rem;
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: #94a3b8;
+    /* slate-400 */
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.gallery-real-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 700ms;
+}
+
+.gallery-visual-col:hover .gallery-real-img {
+    transform: scale(1.05);
+}
+
+/* Dynamic BG Colors for placeholders */
+.bg-stone-200 {
+    background-color: #e7e5e4;
+}
+
+.bg-stone-300 {
+    background-color: #d6d3d1;
 }

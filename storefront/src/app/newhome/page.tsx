@@ -4,8 +4,10 @@ import React, { useRef, useState, useMemo, Suspense, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, Center, Environment, Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { motion, useScroll, useTransform, useMotionValueEvent, AnimatePresence } from 'framer-motion';
 import HimalayanShader from './HimalayanShader';
 import IceShineText from './IceShineText';
+import WorkshopGallery from './WorkshopGallery';
 
 // Mouse position context for 3D scene
 const mousePosition = { x: 0, y: 0 };
@@ -123,6 +125,29 @@ import './newhome.css';
 
 export default function NewHomePage() {
   const heroWrapperRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // -- AGGRESSIVE SCROLL-TO-UNLOAD LOGIC --
+  const [isHeroMounted, setIsHeroMounted] = useState(true);
+  const { scrollY } = useScroll({ container: scrollContainerRef });
+
+  // Opacity: Starts fading at 5% (approx 40px), completely gone by 30% (approx 250px)
+  // We use standard pixels assuming typical 800px height, so 40px to 250px
+  const heroOpacity = useTransform(scrollY, [40, 300], [1, 0]);
+  const heroScale = useTransform(scrollY, [40, 300], [1, 0.95]);
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    // Unmount check
+    if (typeof window !== 'undefined') {
+      const threshold = window.innerHeight * 0.4; // 40% of screen height
+
+      // ONE-WAY TICKET: Once we pass the threshold, we unmount forever (until refresh)
+      if (latest > threshold && isHeroMounted) {
+        setIsHeroMounted(false);
+      }
+      // Removed the 'else if' block to prevent remounting/resource reloading
+    }
+  });
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -152,103 +177,122 @@ export default function NewHomePage() {
         wrapper.removeEventListener('mouseleave', handleMouseLeave);
       }
     };
-  }, []);
+  }, [isHeroMounted]); // Re-attach listeners if hero remounts
 
   return (
-    <div className="relative w-full min-h-screen bg-white text-black">
+    <div
+      ref={scrollContainerRef}
+      className="h-screen w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-white text-black"
+    >
 
-      {/* Hero Section Wrapper - Full Viewport */}
-      <div className="hero-section-wrapper" ref={heroWrapperRef}>
-        {/* Himalayan Shader Background */}
-        <HimalayanShader />
-        
-        {/* Top Heading Text - Moved to wrapper for viewport-relative positioning */}
-        <div className="frosted-text-container">
-          <h1 className="frosted-glass-text">
-            Explore all<br />deities
-          </h1>
-        </div>
-        
-        {/* Right-Side Subtext & Button */}
-        <div className="frosted-text-container-right">
-          <p className="frosted-glass-text-right">
-            Hand carved dities with the divine blessings
-          </p>
-          <button className="frosted-glass-button">
-            Explore Arts
-          </button>
-        </div>
-        
-        {/* Center Bottom Text Image with Ice Shine Effect */}
-        <div className="center-bottom-text">
-          <IceShineText src="/Mahadev_text.png" alt="Mahadev" />
-        </div>
+      {/* SNAP SECTION 1: HERO SPACER & FIXED CONTENT */}
+      {/* This section takes up the full viewport and acts as the 'Home' snap point */}
+      <section className="h-screen w-full snap-start relative">
+        <AnimatePresence>
+          {isHeroMounted && (
+            <motion.div
+              className="hero-section-wrapper fixed inset-0 z-0 h-screen overflow-hidden"
+              ref={heroWrapperRef}
+              style={{ opacity: heroOpacity, scale: heroScale }}
+              exit={{ opacity: 0 }}
+            >
+              {/* Himalayan Shader Background */}
+              <HimalayanShader />
 
-        {/* Hero Section Container (Wraps 3D Model) */}
-        <section
-          id="hero-section"
-          className="hero-container"
-        >
-          {/* 3D Viewer Section (Inside Hero Section) */}
-          <div className="hero-canvas-wrapper">
-            <Canvas camera={{ position: [0, 0, 6.5], fov: 35 }} dpr={1} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}>
-              <Suspense fallback={null}>
-                {/* Optimized Lighting - reduced for performance */}
-                <ambientLight intensity={0.6} />
-                <directionalLight position={[5, 8, 5]} intensity={1.8} color="#ffaa00" />
-                <directionalLight position={[-5, 3, -3]} intensity={1.2} color="#4444ff" />
+              {/* Top Heading Text */}
+              <div className="frosted-text-container">
+                <h1 className="frosted-glass-text">
+                  Explore all<br />deities
+                </h1>
+              </div>
 
-                <MouseRotationGroup>
-                  <Center position={[0, 0.5, 0]}>
-                    <ShivaLingaModel scale={0.3} />
-                    <Html
-                      transform
-                      position={[-0.08, -1.55, 1.65]}
-                      scale={0.3}
-                      style={{
-                        width: '375px',
-                        height: '185px',
-                        pointerEvents: 'none',
-                      }}
-                      zIndexRange={[0, 0]}
-                    >
-                      <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
-                        <img 
-                          src="/Shivalingbottom.svg" 
-                          alt="Shivalinga Base"
-                          style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'contain',
-                            opacity: 0.75,
-                            maskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)',
-                            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)'
-                          }}
-                        />
-                      </div>
-                    </Html>
-                  </Center>
-                </MouseRotationGroup>
+              {/* Right-Side Subtext & Button */}
+              <div className="frosted-text-container-right">
+                <p className="frosted-glass-text-right">
+                  Hand carved dities with the divine blessings
+                </p>
+                <button className="frosted-glass-button">
+                  Explore Arts
+                </button>
+              </div>
 
-                <OrbitControls
-                  enableZoom={false}
-                  enablePan={false}
-                  enableDamping={true}
-                  dampingFactor={0.08}
-                  rotateSpeed={0.5}
-                  minPolarAngle={Math.PI / 2.2}
-                  maxPolarAngle={Math.PI / 1.95}
-                  minAzimuthAngle={-Math.PI / 10}
-                  maxAzimuthAngle={Math.PI / 10}
-                />
-                <Environment preset="apartment" />
-              </Suspense>
-            </Canvas>
-          </div>
-        </section>
-      </div>
+              {/* Center Bottom Text Image with Ice Shine Effect */}
+              <div className="center-bottom-text">
+                <IceShineText src="/Mahadev_text_comp.png" alt="Mahadev" />
+              </div>
 
-      {/* Additional content can be added below */}
+              {/* Hero Section Container (Wraps 3D Model) */}
+              <section
+                id="hero-section"
+                className="hero-container"
+              >
+                {/* 3D Viewer Section (Inside Hero Section) */}
+                <div className="hero-canvas-wrapper">
+                  <Canvas camera={{ position: [0, 0, 6.5], fov: 35 }} dpr={1} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}>
+                    <Suspense fallback={null}>
+                      {/* Optimized Lighting */}
+                      <ambientLight intensity={0.6} />
+                      <directionalLight position={[5, 8, 5]} intensity={1.8} color="#ffaa00" />
+                      <directionalLight position={[-5, 3, -3]} intensity={1.2} color="#4444ff" />
+
+                      <MouseRotationGroup>
+                        <Center position={[0, 0.5, 0]}>
+                          <ShivaLingaModel scale={0.3} />
+                          <Html
+                            transform
+                            position={[-0.08, -1.55, 1.65]}
+                            scale={0.3}
+                            style={{
+                              width: '375px',
+                              height: '185px',
+                              pointerEvents: 'none',
+                            }}
+                            zIndexRange={[0, 0]}
+                          >
+                            <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
+                              <img
+                                src="/Shivalingbottom.svg"
+                                alt="Shivalinga Base"
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'contain',
+                                  opacity: 0.75,
+                                  maskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)',
+                                  WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)'
+                                }}
+                              />
+                            </div>
+                          </Html>
+                        </Center>
+                      </MouseRotationGroup>
+
+                      <OrbitControls
+                        enableZoom={false}
+                        enablePan={false}
+                        enableDamping={true}
+                        dampingFactor={0.08}
+                        rotateSpeed={0.5}
+                        minPolarAngle={Math.PI / 2.2}
+                        maxPolarAngle={Math.PI / 1.95}
+                        minAzimuthAngle={-Math.PI / 10}
+                        maxAzimuthAngle={Math.PI / 10}
+                      />
+                      <Environment preset="apartment" />
+                    </Suspense>
+                  </Canvas>
+                </div>
+              </section>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      {/* SNAP SECTION 2: GALLERY */}
+      {/* This section is the destination snap point. Once here, the hero above unmounts. */}
+      <section className="min-h-screen w-full snap-start bg-white relative z-10">
+        <WorkshopGallery />
+      </section>
 
     </div>
   );
