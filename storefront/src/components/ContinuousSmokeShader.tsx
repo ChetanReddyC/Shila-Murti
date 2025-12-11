@@ -129,8 +129,8 @@ const fsSource = `
         // Define Pill Dimensions relative to canvas
         // Canvas is expanded by 20px (CSS). 
         // We want the line roughly 10-15px from the edge.
-        // Subtracting 16.0 ensures it floats nicely around the button
-        vec2 boxSize = (u_res * 0.5) - vec2(16.0); 
+        // Subtracting non-uniform vector to tighten height more than width
+        vec2 boxSize = (u_res * 0.5) - vec2(10.0, 40.0); 
         float radius = boxSize.y; // Fully rounded ends (pill)
         
         // SDF for Box part (width - height)
@@ -172,6 +172,7 @@ const fsSource = `
 `;
 
 const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = 'line', className, style }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGLRenderingContext | null>(null);
   const programRef = useRef<WebGLProgram | null>(null);
@@ -179,26 +180,60 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
   const rafRef = useRef<number | null>(null);
   const uniformsRef = useRef<any>({});
 
+  // Visibility state to manage WebGL context count
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Intersection Observer to manage lifecycle
   useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      // Add a small buffer (rootMargin already defaults to 0, but we can add some)
+      // If it's intersecting, we mount the canvas.
+      setIsVisible(entry.isIntersecting);
+    }, {
+      rootMargin: '200px 0px', // Pre-load slightly before coming into view
+      threshold: 0
+    });
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    // If not visible, do nothing (Canvas isn't rendered)
+    if (!isVisible) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', {
-      alpha: true,
-      premultipliedAlpha: false // Critical for correct transparency ensuring NO background color artifacts
-    });
+    // Try/Catch context creation to prevent total crash if limit still hit
+    let gl: WebGLRenderingContext | null = null;
+    try {
+      gl = canvas.getContext('webgl', {
+        alpha: true,
+        premultipliedAlpha: false
+      });
+    } catch (e) {
+      console.warn("WebGL Context creation failed", e);
+    }
+
     if (!gl) return;
     glRef.current = gl;
 
     // Compile Shaders
     const createShader = (type: number, source: string) => {
-      const s = gl.createShader(type);
+      const s = gl!.createShader(type);
       if (!s) return null;
-      gl.shaderSource(s, source);
-      gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(s));
-        gl.deleteShader(s);
+      gl!.shaderSource(s, source);
+      gl!.compileShader(s);
+      if (!gl!.getShaderParameter(s, gl!.COMPILE_STATUS)) {
+        console.error(gl!.getShaderInfoLog(s));
+        gl!.deleteShader(s);
         return null;
       }
       return s;
@@ -234,21 +269,20 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
       u_shape: gl.getUniformLocation(program, 'u_shape'),
     };
 
-    // Cleanup
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    const gl = glRef.current;
-    const canvas = canvasRef.current;
-    if (!gl || !canvas || !programRef.current) return;
-
+    // Render Loop
     const render = () => {
-      // Resize handling (basic)
+      if (!glRef.current || !programRef.current || !canvasRef.current) return;
+      const gl = glRef.current;
+      const canvas = canvasRef.current;
+
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
+      // Guard against 0 dimensions (which can happen during layout shifts)
+      if (rect.width === 0 || rect.height === 0) {
+        rafRef.current = requestAnimationFrame(render);
+        return;
+      }
+
       const targetW = Math.floor(rect.width * dpr);
       const targetH = Math.floor(rect.height * dpr);
 
@@ -268,7 +302,6 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
       if (u.u_time) gl.uniform1f(u.u_time, time);
       if (u.u_res) gl.uniform2f(u.u_res, targetW, targetH);
 
-      // SHAPE MAPPING: 0.0=line, 1.0=circle, 2.0=button
       let shapeVal = 0.0;
       if (shape === 'circle') shapeVal = 1.0;
       if (shape === 'button') shapeVal = 2.0;
@@ -281,9 +314,27 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
     };
 
     render();
-  }, [shape]);
 
-  return <canvas ref={canvasRef} className={className} style={{ width: '100%', height: '100%', ...style }} />;
+    // Cleanup: Cancel loop and loose context if possible (implicitly by unmounting)
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      // We don't manually lose context here, but React unmounting the canvas element 
+      // is the strongest signal to the browser to clean up.
+    };
+  }, [shape, isVisible]);
+
+  // If not visible, render a placeholder div to maintain layout
+  // Ref is on the wrapper to track visibility
+  return (
+    <div ref={containerRef} className={className} style={{ width: '100%', height: '100%', position: 'absolute', ...style }}>
+      {isVisible && (
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+      )}
+    </div>
+  );
 };
 
 export default ContinuousSmokeShader;

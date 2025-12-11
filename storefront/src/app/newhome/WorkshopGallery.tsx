@@ -12,25 +12,22 @@ const GALLERY_ITEMS = [
         id: 1,
         title: 'The Divine Craft',
         description: 'Witness the meticulous process of carving raw stone into spiritual energy. Every chisel strike is a mantra, every curve a prayer.',
-        type: 'video',
-        mediaSrc: '',
-        theme: 'light',
+        videoSrc: '/videos/Candidate_Slowmo_1.mp4',
+        config: { x: 60, y: 43, scale: 0.80 }
     },
     {
         id: 2,
         title: 'Master Craftsman',
         description: 'Decades of experience concentrated in a single moment of focus. The workshop hums with the rhythm of creation.',
-        type: 'image',
-        mediaSrc: '',
-        theme: 'dark',
+        videoSrc: '/videos/Candidate_Slowmo_2.mp4',
+        config: { x: 48, y: 23, scale: 1.04 }
     },
     {
         id: 3,
         title: 'Legacy of Stone',
         description: 'Generations of knowledge passed down through hands covered in dust. We don\'t just build statues; we preserve history.',
-        type: 'video',
-        mediaSrc: '',
-        theme: 'light',
+        videoSrc: '/videos/Candidate_Slowmo_3.mp4',
+        config: { x: 37, y: 30, scale: 0.77 }
     },
 ];
 
@@ -66,20 +63,52 @@ const textItemVariants = {
 
 const imageRevealVariants = {
     hidden: {
-        clipPath: "inset(0% 100% 0% 0%)",
         opacity: 0,
         x: 50
     },
     visible: {
-        clipPath: "inset(0% 0% 0% 0%)",
         opacity: 1,
         x: 0,
         transition: {
             duration: 1.2,
-            ease: [0.22, 1, 0.36, 1], /* Custom Quint ease */
+            ease: [0.22, 1, 0.36, 1] as const,
             delay: 0.1
         }
     }
+};
+
+const VideoDisplay = ({ src, align, config }: { src: string, align: 'left' | 'right', config?: { x: number, y: number, scale: number } }) => {
+    const [isLoading, setIsLoading] = React.useState(true);
+    // Use config if provided, else default
+    const position = config ? { x: config.x, y: config.y } : { x: 50, y: 50 };
+    const scale = config?.scale || 1;
+
+    return (
+        <div
+            className={`gallery-video-wrapper ${align === 'right' ? 'video-align-right' : 'video-align-left'}`}
+        >
+            {isLoading && (
+                <div className="video-loading-spinner">
+                    <div className="spinner-ring"></div>
+                </div>
+            )}
+
+            <video
+                className={`gallery-video ${isLoading ? 'hidden' : 'visible'}`}
+                src={src}
+                autoPlay
+                muted
+                loop
+                playsInline
+                onCanPlay={() => setIsLoading(false)}
+                style={{
+                    objectPosition: `${position.x}% ${position.y}%`,
+                    transform: `scale(${scale})`
+                }}
+            />
+            <div className="video-overlay-gradient" />
+        </div>
+    );
 };
 
 export default function WorkshopGallery() {
@@ -201,53 +230,24 @@ export default function WorkshopGallery() {
                                         <span className="gallery-btn-text">
                                             View Details
                                         </span>
-                                        <ContinuousSmokeShader shape="button" className="gallery-btn-shader" />
+                                        <ContinuousSmokeShader
+                                            shape="button"
+                                            className="gallery-btn-shader"
+                                            style={{ width: 'auto', height: 'auto' }}
+                                        />
                                     </motion.button>
                                 </motion.div>
 
-                                {/* Visual Column */}
+                                {/* Visual Column / Video Wrapper */}
                                 <motion.div
                                     className="gallery-visual-col"
                                     variants={imageRevealVariants}
                                 >
-                                    {/* "Ice Glow" Backing */}
-                                    <div className="gallery-glow-backdrop" />
-
-                                    {/* Media Container - Glassmorphism */}
-                                    <div className={`gallery-media-card ${item.theme === 'light' ? 'light-glass' : 'stone-glass'}`}>
-                                        {/* Placeholder Content */}
-                                        <div className="gallery-placeholder-content">
-                                            <div style={{ textAlign: 'center' }}>
-                                                <div className="icon-circle">
-                                                    <ContinuousSmokeShader shape="circle" className="icon-border-shader" />
-                                                    <div className="icon-content">
-                                                        {item.type === 'video' ? (
-                                                            <svg className="icon-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        ) : (
-                                                            <svg className="icon-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <p className="placeholder-label-text">
-                                                    {item.type} Placeholder
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Real Media Image (Hidden when empty) */}
-                                        {item.mediaSrc && (
-                                            <img
-                                                src={item.mediaSrc}
-                                                alt={item.title}
-                                                className="gallery-real-img"
-                                            />
-                                        )}
-                                    </div>
+                                    <VideoDisplay
+                                        src={item.videoSrc}
+                                        align={isEven ? 'right' : 'left'}
+                                        config={item.config}
+                                    />
                                 </motion.div>
                             </motion.div>
                         );
