@@ -8,6 +8,8 @@
     height: 400vh;
     position: relative;
     background: #ffffff;
+    overflow-x: hidden;
+    /* Prevent horizontal scroll */
 }
 
 .idol-sticky-wrapper {
@@ -295,8 +297,11 @@
     .idol-slide {
         width: 100%;
         height: auto;
-        min-height: 100vh;
+        min-height: 100svh;
+        /* Use small viewport height for mobile */
         padding: 4rem 1rem;
+        scroll-snap-align: start;
+        /* Optional: snap behavior for vertical list */
     }
 
     .idol-content-grid {

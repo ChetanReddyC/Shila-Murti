@@ -155,7 +155,16 @@ const fragmentShader = `
     color += random(st + u_time) * 0.02;
 
     // Center fade to transparent for GLB model area (shifted down for ShivaLingam)
-    vec2 screenCenter = vec2(0.5 * aspect, 0.42); // Shifted down from 0.5
+    // Center fade to transparent for GLB model area (shifted down for ShivaLingam)
+    // Detect mobile (portrait) based on aspect ratio
+    float isMobile = 1.0 - step(1.0, aspect); // 1.0 if aspect < 1.0, 0.0 otherwise
+    
+    // Adaptive parameters
+    float holeY = mix(0.42, 0.45, isMobile); // Raised hole to 0.45
+    float holeInner = mix(0.28, 0.12, isMobile); // Tighter inner clear zone
+    float holeOuter = mix(0.65, 0.32, isMobile); // Tighter fade to show more blue at bottom
+
+    vec2 screenCenter = vec2(0.5 * aspect, holeY);
     float centerDist = distance(st, screenCenter);
     
     // Add organic non-uniformity ONLY to the bottom half
@@ -169,12 +178,12 @@ const fragmentShader = `
     
     float organicDist = centerDist - noiseOffset;
     
-    // Fade starts at 0.28 (transparent) and becomes fully opaque at 0.65
-    float centerAlpha = smoothstep(0.28, 0.65, organicDist);
+    // Fade starts at inner radius (transparent) and becomes fully opaque at outer radius
+    float centerAlpha = smoothstep(holeInner, holeOuter, organicDist);
     
     // Edge fade on top and bottom only (normalized st without aspect correction)
     vec2 stNorm = gl_FragCoord.xy / u_resolution.xy;
-    float edgeFadeSize = 0.12; // Size of fade region on edges
+    float edgeFadeSize = mix(0.12, 0.02, isMobile); // Minimal fade on mobile bottom
     float bottomFade = smoothstep(0.0, edgeFadeSize, stNorm.y);
     float topFade = smoothstep(1.0, 1.0 - edgeFadeSize, stNorm.y);
     float edgeAlpha = bottomFade * topFade;

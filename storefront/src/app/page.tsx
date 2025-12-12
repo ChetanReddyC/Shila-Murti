@@ -124,6 +124,51 @@ function LoadingSpinner() {
 
 import './newhome.css';
 
+function ResponsiveScene() {
+  const { width } = useThree((state) => state.size);
+  const isMobile = width < 768;
+
+  // Responsive values
+  const modelScale = isMobile ? 0.15 : 0.3; // Decreased further
+  const htmlScale = isMobile ? 0.19 : 0.3; // Increased to fix shrinkage
+  const htmlPosition: [number, number, number] = isMobile ? [0.02, -0.82, 1] : [-0.08, -1.55, 1.65]; // Adjusted Y for larger scale docking
+
+  // Center Position Adjustment
+  const centerPosition: [number, number, number] = isMobile ? [0, 0.0, 0] : [0, 0.5, 0]; // Raised to 0.0 per user request
+
+  return (
+    <Center position={centerPosition}>
+      <ShivaLingaModel scale={modelScale} />
+      <Html
+        transform
+        position={htmlPosition}
+        scale={htmlScale}
+        style={{
+          width: isMobile ? '280px' : '375px', // Smaller width on mobile
+          height: isMobile ? '140px' : '185px',
+          pointerEvents: 'none',
+        }}
+        zIndexRange={[0, 0]}
+      >
+        <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
+          <img
+            src="/Shivalingbottom.svg"
+            alt="Shivalinga Base"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              opacity: 0.75,
+              maskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)'
+            }}
+          />
+        </div>
+      </Html>
+    </Center>
+  );
+}
+
 export default function NewHomePage() {
   const heroWrapperRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -222,6 +267,13 @@ export default function NewHomePage() {
                 <IceShineText src="/Mahadev_text_comp.png" alt="Mahadev" />
               </div>
 
+              {/* Scroll Indicator */}
+              <div className="scroll-indicator">
+                <p>Scroll to Bottom</p>
+              </div>
+
+
+
               {/* Hero Section Container (Wraps 3D Model) */}
               <section
                 id="hero-section"
@@ -237,35 +289,7 @@ export default function NewHomePage() {
                       <directionalLight position={[-5, 3, -3]} intensity={1.2} color="#4444ff" />
 
                       <MouseRotationGroup>
-                        <Center position={[0, 0.5, 0]}>
-                          <ShivaLingaModel scale={0.3} />
-                          <Html
-                            transform
-                            position={[-0.08, -1.55, 1.65]}
-                            scale={0.3}
-                            style={{
-                              width: '375px',
-                              height: '185px',
-                              pointerEvents: 'none',
-                            }}
-                            zIndexRange={[0, 0]}
-                          >
-                            <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
-                              <img
-                                src="/Shivalingbottom.svg"
-                                alt="Shivalinga Base"
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'contain',
-                                  opacity: 0.75,
-                                  maskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)',
-                                  WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)'
-                                }}
-                              />
-                            </div>
-                          </Html>
-                        </Center>
+                        <ResponsiveScene />
                       </MouseRotationGroup>
 
                       <OrbitControls
