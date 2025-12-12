@@ -8,8 +8,8 @@
     height: 400vh;
     position: relative;
     background: #ffffff;
-    overflow-x: hidden;
-    /* Prevent horizontal scroll */
+    overflow: visible;
+    /* CRITICAL: Must be visible for sticky to work on window scroll */
 }
 
 .idol-sticky-wrapper {
@@ -276,71 +276,175 @@
 
 /* --- Mobile Responsiveness --- */
 @media (max-width: 1024px) {
+
+    /* RESTORE STICKY SCROLL MECHANICS (User Requirement: Pin page until idols done) */
     .idol-scroll-section {
-        height: auto;
+        height: 300vh !important;
+        /* Length of the scroll track */
+        min-height: auto;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        overflow: visible !important;
+        /* CRITICAL: enable sticky behavior */
     }
 
     .idol-sticky-wrapper {
-        position: relative;
-        height: auto;
-        flex-direction: column;
+        position: sticky !important;
         top: 0;
+        height: 100vh;
+        width: 100%;
+        overflow: hidden !important;
+        /* Hide overflow, let JS transform move track */
+        display: flex;
+        flex-direction: row;
+        align-items: center;
     }
 
     .idol-horizontal-track {
-        flex-direction: column;
-        width: 100%;
-        transform: none !important;
-        /* Disable horiz scroll on mobile usually */
+        display: flex;
+        flex-direction: row;
+        width: 300vw;
+        /* 3 slides x 100vw */
+        height: 100%;
+        /* JS handles transform (x) */
     }
 
     .idol-slide {
-        width: 100%;
-        height: auto;
-        min-height: 100svh;
-        /* Use small viewport height for mobile */
-        padding: 4rem 1rem;
-        scroll-snap-align: start;
-        /* Optional: snap behavior for vertical list */
+        width: 100vw;
+        height: 100vh;
+        flex-shrink: 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
+    /* CARD CONTENT - Side-by-side on mobile (Mini Desktop) */
     .idol-content-grid {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto;
-        gap: 2rem;
-        text-align: center;
+        grid-template-columns: 1fr 1fr;
+        /* Equal split */
+        grid-template-rows: 1fr;
+        /* Single row */
+        gap: 0;
+        /* Zero gap for strict separation */
+        text-align: left;
+        height: 100%;
+        width: 100%;
+        align-items: center;
     }
 
     .idol-visual-side {
         order: 1;
-        /* Image first */
-        height: 50vh;
+        /* Left */
+        height: 100%;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        /* Stick to LEFT edge */
+        padding-left: 0.5rem;
+        /* Tiny buffer */
+    }
+
+    .idol-image-wrapper {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        /* Align image left */
+    }
+
+    .idol-image {
+        max-height: 25vh;
+        /* Even more reduced height */
+        max-width: 90%;
+        object-fit: contain;
     }
 
     .idol-text-side {
         order: 2;
-        align-items: center;
+        /* Right */
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        /* Left align text content */
+        padding-right: 0.5rem;
+        /* Stick to RIGHT edge (minimal padding) */
+        padding-left: 0.5rem;
     }
 
     .idol-info-box {
-        align-items: center;
+        align-items: flex-start;
+        /* Left align items */
+        gap: 0.5rem;
+        /* Tight gap */
+        width: 100%;
     }
 
     .idol-cta-btn {
-        align-items: center;
+        align-items: flex-start;
+        margin-top: 0.5rem;
     }
 
     .idol-halo-container {
-        left: 50%;
-        width: 40vh;
-        height: 40vh;
+        left: 17%;
+        /* Position behind the left-aligned image */
+        top: 45%;
+        transform: translate(-50%, -50%);
+        width: 18vh;
+        /* Scaled down to match 25vh image */
+        height: 18vh;
     }
 
     .idol-progress-bar {
         display: none;
     }
 
+    /* Font Adjustments for Mobile - Ultra Tiny */
     .idol-title {
-        font-size: 2.5rem;
+        font-size: 0.9rem;
+        /* Tiny title */
+        line-height: 1.1;
+    }
+
+    .idol-subtitle {
+        font-size: 0.4rem;
+        letter-spacing: 0.1em;
+    }
+
+    .idol-name-tag {
+        font-size: 0.6rem;
+        margin-top: -0.1rem;
+    }
+
+    .idol-description {
+        font-size: 0.45rem;
+        /* Micro body text */
+        line-height: 1.4;
+        max-height: none;
+        max-width: 100%;
+    }
+
+    .btn-text {
+        font-size: 0.5rem;
+    }
+
+    .idol-shadow {
+        bottom: -5px;
+        width: 80%;
+        height: 15px;
+        left: 0;
+    }
+
+    /* Resize Background Mist for Mobile */
+    .idol-atmosphere {
+        width: 250px;
+        height: 250px;
+        bottom: -5%;
+        right: -10%;
+        opacity: 0.3;
     }
 }

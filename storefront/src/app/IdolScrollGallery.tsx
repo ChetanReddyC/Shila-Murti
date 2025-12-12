@@ -44,34 +44,46 @@ const IdolCard = ({ item, onInquire }: { item: typeof IDOLS[0], onInquire: () =>
         <div className="idol-card">
             {/* Background Arch/Halo */}
             <div className="idol-halo-container">
-                {/* Drawn Circle Animation */}
-                <motion.svg
-                    className="idol-halo-svg"
-                    viewBox="0 0 100 100"
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: false, amount: 0.5 }}
+                <motion.div
+                    style={{ width: '100%', height: '100%', position: 'relative' }}
+                    animate={{
+                        y: [0, -14, 0]
+                    }}
+                    transition={{
+                        duration: 5,
+                        ease: "easeInOut",
+                        repeat: Infinity
+                    }}
                 >
-                    <motion.circle
-                        cx="50"
-                        cy="50"
-                        r="49"
-                        stroke={item.color}
-                        strokeWidth="0.5"
-                        strokeOpacity="0.4"
-                        fill="transparent"
-                        variants={{
-                            hidden: { pathLength: 0, opacity: 0 },
-                            visible: {
-                                pathLength: 1,
-                                opacity: 1,
-                                transition: { duration: 2, ease: "easeInOut" }
-                            }
-                        }}
-                    />
-                </motion.svg>
+                    {/* Drawn Circle Animation */}
+                    <motion.svg
+                        className="idol-halo-svg"
+                        viewBox="0 0 100 100"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: false, amount: 0.5 }}
+                    >
+                        <motion.circle
+                            cx="50"
+                            cy="50"
+                            r="49"
+                            stroke={item.color}
+                            strokeWidth="0.5"
+                            strokeOpacity="0.4"
+                            fill="transparent"
+                            variants={{
+                                hidden: { pathLength: 0, opacity: 0 },
+                                visible: {
+                                    pathLength: 1,
+                                    opacity: 1,
+                                    transition: { duration: 2, ease: "easeInOut" }
+                                }
+                            }}
+                        />
+                    </motion.svg>
 
-                <div className="idol-halo-inner" style={{ background: item.color + '20' }} />
+                    <div className="idol-halo-inner" style={{ background: item.color + '20' }} />
+                </motion.div>
             </div>
 
             {/* Content Container */}

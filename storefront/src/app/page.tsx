@@ -315,12 +315,13 @@ export default function NewHomePage() {
 
       {/* SNAP SECTION 2: GALLERY */}
       {/* This section is the destination snap point. Once here, the hero above unmounts. */}
-      <section className="min-h-screen w-full snap-start bg-white relative z-10">
+      {/* Remove min-h-screen on mobile to avoid forced height gaps */}
+      <section className="min-h-0 lg:min-h-screen w-full snap-start bg-white relative z-10">
         <WorkshopGallery />
       </section>
 
       {/* SNAP SECTION 3: IDOL SCROLL GALLERY (Horizontal) */}
-      <section className="min-h-screen w-full snap-start bg-white relative z-10">
+      <section className="min-h-0 lg:min-h-screen w-full snap-start bg-white relative z-10">
         <IdolScrollGallery containerRef={scrollContainerRef as React.RefObject<HTMLElement>} />
       </section>
 
