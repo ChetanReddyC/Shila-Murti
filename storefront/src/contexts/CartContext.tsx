@@ -208,14 +208,14 @@ export function CartProvider({ children }: CartProviderProps) {
     try {
       const response = await fetch(CART_SESSION_API, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'x-publishable-api-key': process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
         },
         credentials: 'include', // Important: include cookies
-        body: JSON.stringify({ 
-          cartId, 
-          userId: sessionUserId 
+        body: JSON.stringify({
+          cartId,
+          userId: sessionUserId
         })
       });
 
@@ -226,7 +226,11 @@ export function CartProvider({ children }: CartProviderProps) {
       const data = await response.json();
       console.log('[CART] Session saved securely', { cartId: cartId.substring(0, 8) + '...' });
     } catch (error) {
-      console.error('[CART] Failed to save session:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        console.warn('[CART] Session save skipped: Backend unreachable');
+      } else {
+        console.error('[CART] Failed to save session:', error);
+      }
       // Don't throw - gracefully degrade but log the error
     }
   }, [sessionUserId]);
@@ -249,21 +253,25 @@ export function CartProvider({ children }: CartProviderProps) {
       }
 
       const data = await response.json();
-      
+
       // Security Enhancement: Detect if session needs rotation
       // Note: Actual rotation is handled separately to avoid circular dependencies
       if (data.requiresRotation && data.session?.cartId) {
         console.log('[CART] Session rotation recommended - will rotate in background');
         // Rotation will be triggered by the rotation check effect
       }
-      
+
       if (data.session && data.session.cartId) {
         return data.session.cartId;
       }
-      
+
       return null;
     } catch (error) {
-      console.error('[CART] Failed to get session:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        console.warn('[CART] Session retrieval skipped: Backend unreachable');
+      } else {
+        console.error('[CART] Failed to get session:', error);
+      }
       return null;
     }
   }, []);
@@ -284,7 +292,11 @@ export function CartProvider({ children }: CartProviderProps) {
         console.log('[CART] Session cleared successfully');
       }
     } catch (error) {
-      console.error('[CART] Failed to clear session:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        console.warn('[CART] Session clear skipped: Backend unreachable');
+      } else {
+        console.error('[CART] Failed to clear session:', error);
+      }
     }
   }, []);
 
@@ -315,9 +327,13 @@ export function CartProvider({ children }: CartProviderProps) {
       console.log('[CART] Session rotated successfully', {
         rotationCount: data.rotationCount
       });
-      
+
       return true;
     } catch (error) {
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        console.warn('[CART] Session rotation skipped: Backend unreachable');
+        return false;
+      }
       console.error('[CART] Failed to rotate session:', error);
       return false;
     }
@@ -345,7 +361,7 @@ export function CartProvider({ children }: CartProviderProps) {
     }
 
     try {
-      
+
       // Calculate totals using centralized service
       const calculatedTotals = PriceCalculationService.calculateCartTotals(
         state.cart,
@@ -370,11 +386,13 @@ export function CartProvider({ children }: CartProviderProps) {
 
     } catch (error) {
       dispatch({ type: 'SET_CALCULATED_TOTALS', payload: null });
-      dispatch({ type: 'SET_PRICE_VALIDATION', payload: {
-        isValid: false,
-        errors: [`Price calculation failed: ${error}`],
-        warnings: []
-      }});
+      dispatch({
+        type: 'SET_PRICE_VALIDATION', payload: {
+          isValid: false,
+          errors: [`Price calculation failed: ${error}`],
+          warnings: []
+        }
+      });
     }
   }, [state.cart]);
 
@@ -401,7 +419,7 @@ export function CartProvider({ children }: CartProviderProps) {
     if (!state.calculatedTotals) {
       return 'Free';
     }
-    return state.calculatedTotals.shipping > 0 
+    return state.calculatedTotals.shipping > 0
       ? formatCurrency(state.calculatedTotals.shipping, state.calculatedTotals.currency)
       : 'Free';
   }, [state.calculatedTotals, formatCurrency]);
@@ -556,7 +574,7 @@ export function CartProvider({ children }: CartProviderProps) {
   // Add item to cart with enhanced session management
   const addToCart = React.useCallback(async (variantId: string, quantity: number, estimatedUnitPrice?: number): Promise<void> => {
     console.log('[CartContext] addToCart called with:', { variantId, quantity, estimatedUnitPrice });
-    
+
     // Lock removed - backend guard handles duplicate prevention
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
@@ -1063,28 +1081,28 @@ export function CartProvider({ children }: CartProviderProps) {
     validatePrices,
     recalculatePrices,
   }), [
-    state.cart, 
-    state.loading, 
-    state.error, 
+    state.cart,
+    state.loading,
+    state.error,
     state.calculatedTotals,
     state.priceValidation,
-    errorState.error, 
-    addToCart, 
-    removeFromCart, 
-    updateQuantity, 
-    clearCart, 
-    clearCartSilently, 
-    getTotalItems, 
-    refreshCart, 
-    loadSpecificCart, 
-    createCart, 
-    clearError, 
-    retryLastOperation, 
-    errorState.isRetryable, 
-    lastOperation, 
-    isRetryableError, 
-    errorState.originalError, 
-    isOrderConfirmationActive, 
+    errorState.error,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    clearCartSilently,
+    getTotalItems,
+    refreshCart,
+    loadSpecificCart,
+    createCart,
+    clearError,
+    retryLastOperation,
+    errorState.isRetryable,
+    lastOperation,
+    isRetryableError,
+    errorState.originalError,
+    isOrderConfirmationActive,
     setOrderConfirmationProtection,
     formatCurrency,
     getFormattedTotal,

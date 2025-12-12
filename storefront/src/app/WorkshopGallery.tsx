@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import ContinuousSmokeShader from '../../components/ContinuousSmokeShader';
+import { useRouter } from 'next/navigation';
+import ContinuousSmokeShader from '../components/ContinuousSmokeShader';
 import './WorkshopGallery.css';
 
 
@@ -57,7 +58,7 @@ const textItemVariants = {
     visible: {
         y: 0,
         opacity: 1,
-        transition: { type: "spring", stiffness: 50, damping: 20 }
+        transition: { type: "spring" as const, stiffness: 50, damping: 20 }
     }
 };
 
@@ -79,12 +80,64 @@ const imageRevealVariants = {
 
 const VideoDisplay = ({ src, align, config }: { src: string, align: 'left' | 'right', config?: { x: number, y: number, scale: number } }) => {
     const [isLoading, setIsLoading] = React.useState(true);
+    const [videoSrc, setVideoSrc] = React.useState<string | undefined>(undefined);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // 1. Just-in-Time Loading (Streaming-like efficiency)
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const loadObserver = new IntersectionObserver((entries) => {
+            const entry = entries[0];
+            if (entry.isIntersecting) {
+                setVideoSrc(src);
+                loadObserver.disconnect();
+            }
+        }, {
+            rootMargin: '200px',
+            threshold: 0
+        });
+
+        loadObserver.observe(containerRef.current);
+        return () => loadObserver.disconnect();
+    }, [src]);
+
+    // 2. Smart Playback Control
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || !videoSrc) return;
+
+        const playbackObserver = new IntersectionObserver((entries) => {
+            const entry = entries[0];
+            if (entry.isIntersecting) {
+                video.play().catch(e => {
+                    console.warn("Video play failed", e);
+                });
+            } else {
+                video.pause();
+            }
+        }, {
+            threshold: 0.1,
+            rootMargin: "50px"
+        });
+
+        if (containerRef.current) {
+            playbackObserver.observe(containerRef.current);
+        }
+
+        return () => {
+            playbackObserver.disconnect();
+        };
+    }, [videoSrc]);
+
     // Use config if provided, else default
     const position = config ? { x: config.x, y: config.y } : { x: 50, y: 50 };
     const scale = config?.scale || 1;
 
     return (
         <div
+            ref={containerRef}
             className={`gallery-video-wrapper ${align === 'right' ? 'video-align-right' : 'video-align-left'}`}
         >
             {isLoading && (
@@ -94,9 +147,9 @@ const VideoDisplay = ({ src, align, config }: { src: string, align: 'left' | 'ri
             )}
 
             <video
+                ref={videoRef}
                 className={`gallery-video ${isLoading ? 'hidden' : 'visible'}`}
-                src={src}
-                autoPlay
+                src={videoSrc}
                 muted
                 loop
                 playsInline
@@ -113,6 +166,7 @@ const VideoDisplay = ({ src, align, config }: { src: string, align: 'left' | 'ri
 
 export default function WorkshopGallery() {
     const containerRef = useRef<HTMLElement>(null);
+    const router = useRouter();
     const { scrollYProgress } = useScroll({
         target: containerRef,
         offset: ["start end", "end start"]
@@ -131,7 +185,6 @@ export default function WorkshopGallery() {
 
                 {/* -- BACKGROUND THEME ARTS -- */}
                 {/* Peacock - Top Left */}
-                {/* Peacock - Top Left */}
                 <motion.div
                     style={{ y: yPeacock }}
                     className="theme-art-container theme-art-peacock"
@@ -148,7 +201,6 @@ export default function WorkshopGallery() {
                 </motion.div>
 
                 {/* Elephant - Center Right */}
-                {/* Elephant - Center Right */}
                 <motion.div
                     style={{ y: yElephant }}
                     className="theme-art-container theme-art-elephant"
@@ -164,7 +216,6 @@ export default function WorkshopGallery() {
                     </div>
                 </motion.div>
 
-                {/* Temple - Bottom Left */}
                 {/* Temple - Bottom Left */}
                 <motion.div
                     style={{ y: yTemple }}
@@ -190,7 +241,7 @@ export default function WorkshopGallery() {
                                 key={item.id}
                                 initial="hidden"
                                 whileInView="visible"
-                                viewport={{ once: false, margin: "-20%" }}
+                                viewport={{ once: true, margin: "-20%" }}
                                 variants={rowVariants}
                                 className={`gallery-item-row ${isEven ? '' : 'reverse'}`}
                             >
@@ -226,9 +277,10 @@ export default function WorkshopGallery() {
                                         variants={textItemVariants}
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
+                                        onClick={() => router.push('/products')}
                                     >
                                         <span className="gallery-btn-text">
-                                            View Details
+                                            View Arts
                                         </span>
                                         <ContinuousSmokeShader
                                             shape="button"

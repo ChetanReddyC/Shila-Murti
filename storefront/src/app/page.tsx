@@ -1,255 +1,305 @@
 'use client';
 
-import styles from './page.module.css';
-import GLSLCanvas from '../components/GLSLCanvas';
-import DynamicSvgEffect from '../components/DynamicSvgEffect';
-import { useState, useEffect, useRef } from 'react';
+import React, { useRef, useState, useMemo, Suspense, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useGLTF, Center, Environment, Html, OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
+import { motion, useScroll, useTransform, useMotionValueEvent, AnimatePresence } from 'framer-motion';
+import HimalayanShader from './HimalayanShader';
+import IceShineText from './IceShineText';
+import WorkshopGallery from './WorkshopGallery';
+import IdolScrollGallery from './IdolScrollGallery';
 
-export default function Home() {
-  const heroes = [
-    {
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuDhueADB8ZtBUYTHeeqKcelefoBApqLPbZ-2m9ggoHGf4MriDJ00W3nc-Nd9apu1pe50qXwMnjKcybXilTnWVAZuUxuC7Uqgr6QUq031Z6SwW9ffES0sHmt0Fj4IlikSx0km5mqjAmVM6zmU90rHwi-5NqPpWdBphgfYjz1OJSuzjGUa10Q3BRPMxhAW8CDyJcY5OktxWcPiyZ-24dQTfH03NsapHGav3fyli1FuX6WEssUIEw6f0yFTGnbE8s0FzQfP7w3kIAttzWr",
-      title: "Discover the Timeless Beauty of Stone Idols",
-      subtitle: "Explore our curated collection of handcrafted stone idols, each a unique work of art.",
-    },
-    {
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuBza2aC2ynjO_Cjf626h87aSOt6g514Cu9YBGndKOWhwbAekyy-xbM6E8VJD2ty8pE71ZLBb20yel8lueRTviCFy-mB8xfQ49iarJ5aQHf83SgOvx7_kKvu8rajfW8YA3ce7YRXJ3a75oRWg1A5yBKCOR1dpc0pq8pJQKPAPJAdAHUnvrDQu2SCsjYM5EowTheFW4ObmvSzO9cU8YRjUEQi1yXSm-b2N7gM36zuui0yAemwzteOBZ2tMHb6JlVtQfU50hz6R7MUAKYP",
-      title: "Divine Deities Collection",
-      subtitle: "Sacred stone idols of gods and goddesses.",
-    },
-    {
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuBGuVXBEdwxEBhOsezPu5hI80kb916JNPwnjmENG3ZjFKtctuY-5HEY01Zmt-w8L3D_aoJ6BA6YOi8VXOf9s2EhMFdlQAdwVv14JeIPgFZiM89QsJ8khyiGn0WFIk03lHcTlwQPnYVspBNPgEo4OVZAg9d6evt0qZ6OKrf5GizWSAS1JjDgQyqlD2JN1UiUSZIPJl-9wjAPI7EI6PD85Yur1CRrbzLIbTXEwdiChNzrjOSnoKZi8xU6vk9QYM442UOTL56KymUBbwhc",
-      title: "Majestic Animal Sculptures",
-      subtitle: "Stone carvings inspired by nature's creatures.",
-    },
-    {
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuCGjv1a_PR8Jhg3tiabrTUC9d0RRLIci59mEHHL7Bv4Aub5Tag0vgvmZ2x39fTQOUJX--rUdB-kVUf5A51MBre0kf88rpIRv8UAGqsiKkJbBDEAZIfjk4FTVBGCz0andy95SIRQY2Kj_lmptrIRw43lzpmzhCbY-8tMiowiztlEc6RuQMmEnIbtbIL9w1QhjTu5FCTNQMDM8O3d9dvGgYuWW9gS1GoJKWDTAbvi-PSKg0cHeZXsAi_-M96zvCezziY1YaXLnaPAE8go",
-      title: "Abstract Stone Art",
-      subtitle: "Modern and contemporary stone designs.",
-    },
-    {
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuDhueADB8ZtBUYTHeeqKcelefoBApqLPbZ-2m9ggoHGf4MriDJ00W3nc-Nd9apu1pe50qXwMnjKcybXilTnWVAZuUxuC7Uqgr6QUq031Z6SwW9ffES0sHmt0Fj4IlikSx0km5mqjAmVM6zmU90rHwi-5NqPpWdBphgfYjz1OJSuzjGUa10Q3BRPMxhAW8CDyJcY5OktxWcPiyZ-24dQTfH03NsapHGav3fyli1FuX6WEssUIEw6f0yFTGnbE8s0FzQfP7w3kIAttzWr",
-      title: "Timeless Masterpieces",
-      subtitle: "Handcrafted stone idols for your space.",
-    },
-  ];
+// Mouse position context for 3D scene
+const mousePosition = { x: 0, y: 0 };
 
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [direction, setDirection] = useState(1);
-  // Shader is always active now; removed debug toggle logic that caused flicker
-  const shaderActive = true;
+// Component to handle mouse-based rotation
+function MouseRotationGroup({ children }: { children: React.ReactNode }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const { invalidate } = useThree();
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => {
-        let next = prev + direction;
-        if (next >= heroes.length) {
-          setDirection(-1);
-          next = heroes.length - 2;
-        } else if (next < 0) {
-          setDirection(1);
-          next = 1;
+  // Target and current rotation for smooth interpolation
+  const targetRotation = useRef({ x: 0, y: 0 });
+  const currentRotation = useRef({ x: 0, y: 0 });
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+
+    // Map mouse position to rotation angles - noticeable tilt, responsive movement
+    targetRotation.current.y = mousePosition.x * 0.5;
+    targetRotation.current.x = mousePosition.y * 0.3;
+
+    // Smooth interpolation (lerp) - faster response while staying seamless
+    currentRotation.current.x += (targetRotation.current.x - currentRotation.current.x) * 0.1;
+    currentRotation.current.y += (targetRotation.current.y - currentRotation.current.y) * 0.1;
+
+    // Apply rotation
+    groupRef.current.rotation.x = currentRotation.current.x;
+    groupRef.current.rotation.y = currentRotation.current.y;
+  });
+
+  return <group ref={groupRef}>{children}</group>;
+}
+
+function ShivaLingaModel({ ...props }) {
+  const { scene } = useGLTF('/shivalingamdepth-mesh.glb');
+
+  // Clone the scene so we can modify materials without affecting the global cache
+  const clonedScene = useMemo(() => scene.clone(), [scene]);
+
+  useMemo(() => {
+    clonedScene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+
+        // Clone material to avoid side effects and enable custom shader
+        if (mesh.material) {
+          mesh.material = (mesh.material as THREE.Material).clone();
+          const material = mesh.material as THREE.MeshStandardMaterial;
+
+          material.transparent = true;
+          // material.depthWrite = false; // Optional: might help if sorting issues arise, but usually true is better for the main object
+
+          material.onBeforeCompile = (shader) => {
+            // Add custom varying to pass UV from vertex to fragment shader
+            shader.vertexShader = shader.vertexShader.replace(
+              'void main() {',
+              `
+              varying vec2 vCustomUv;
+              void main() {
+                vCustomUv = uv;
+              `
+            );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+              'void main() {',
+              `
+              varying vec2 vCustomUv;
+              void main() {
+              `
+            );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+              '#include <dithering_fragment>',
+              `
+              #include <dithering_fragment>
+              
+              // --- Arch Top Edge (Circular/Parabolic Mask) ---
+              float edgeWidth = 0.15; 
+              
+              // Calculate the top boundary as a curve to create an arch
+              // Curves down from 1.0 at the center.
+              // Asymmetric Arch: Left side is flatter (0.5) to reveal even more of the top-left
+              float curveMult = mix(0.5, 2.0, step(0.5, vCustomUv.x));
+              float topCurve = 1.0 - curveMult * pow(vCustomUv.x - 0.5, 2.0);
+
+              float alphaMask = smoothstep(0.0, edgeWidth, vCustomUv.x) * 
+                                smoothstep(1.0, 1.0 - edgeWidth, vCustomUv.x) * 
+                                smoothstep(0.0, edgeWidth, vCustomUv.y) * 
+                                smoothstep(topCurve, topCurve - edgeWidth, vCustomUv.y);
+              
+              gl_FragColor.a *= alphaMask;
+              `
+            );
+          };
         }
-        return next;
-      });
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [direction]);
-
-  const slideRef = useRef(null);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (touchStart - touchEnd > 75) {
-      // Swipe left
-      setCurrentSlide((prev) => Math.min(prev + 1, heroes.length - 1));
-    }
-    if (touchStart - touchEnd < -75) {
-      // Swipe right
-      setCurrentSlide((prev) => Math.max(prev - 1, 0));
-    }
-    setDirection(0); // Pause auto-slide on manual interaction
-  };
+      }
+    });
+  }, [clonedScene]);
 
   return (
-    <>
-      <div className="relative w-full overflow-hidden" style={{ paddingTop: '100px' }}>
-        <div
-          className="relative min-h-screen w-full bg-white"
-          style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
-        >
-          {/* Removed debug indicator */}
+    <group {...props}>
+      <primitive object={clonedScene} />
+    </group>
+  );
+}
 
-        <div className="w-full flex justify-center bg-white pt-12">
-          <div className="flex h-full grow flex-col w-full max-w-[1280px] px-4 sm:px-6 mx-auto">
-            {/* First decorative SVG - with standard viewport detection */}
-            <div className={styles.shaderWrapper} style={{ zIndex: 5 }}>
-              <DynamicSvgEffect
-                spotlightSize={400}
-                lightColor="#FFFFFF"
-                specularConstant={0.75}
-                specularExponent={25}
-                enableViewportCulling={true}
-                viewportMargin="50px"  // Standard margin for first SVG
-              >
-                <img 
-                  src="/svg-art1.svg" 
-                  alt="Decorative art" 
-                  style={{
-                    height: '100%',
-                    width: 'auto',
-                    objectFit: 'contain',
-                  }}
-                />
-              </DynamicSvgEffect>
-            </div>
-            
-            {/* Main content */}
-            <div className="flex flex-1 w-full">
-              <div className="flex flex-col w-full">
-                {/* Hero section */}
-                <div className="w-full mt-6">
-                  <div className={styles.heroCarousel}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    ref={slideRef}
-                  >
-                    
-                    <div className={styles.heroSlides} style={{ transform: `translateX(-${currentSlide * 100}%)`, transition: 'transform 0.5s ease' }}>
-                      {heroes.map((hero, index) => (
-                        <div key={index} className={styles.hero}>
-                          <img 
-                            src={hero.img} 
-                            alt={hero.title} 
-                            className={styles.heroImage}
-                            loading={index === 0 ? "eager" : "lazy"}
-                          />
-                          <div className={styles.heroContent}>
-                            <h1 className={styles.heroTitle}>
-                              {hero.title}
-                            </h1>
-                            <p className={styles.heroSubtitle}>
-                              {hero.subtitle}
-                            </p>
-                            <button className={styles.shopButton}>
-                              Shop Now
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className={styles.heroDots}>
-                      {heroes.map((_, index) => (
-                        <span
-                          key={index}
-                          className={`${styles.heroDot} ${currentSlide === index ? styles.active : ''}`}
-                          onClick={() => setCurrentSlide(index)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <GLSLCanvas />
-                {/* Featured collections - responsive grid handled by CSS */}
-                <div className="mt-16 sm:mt-20">
-                  <h2 className={styles.sectionTitle}>
-                    Featured Collections
-                  </h2>
-                  <div className={styles.collectionGrid}>
-                  {[
-                    {
-                      label: "Deities",
-                      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuBza2aC2ynjO_Cjf626h87aSOt6g514Cu9YBGndKOWhwbAekyy-xbM6E8VJD2ty8pE71ZLBb20yel8lueRTviCFy-mB8xfQ49iarJ5aQHf83SgOvx7_kKvu8rajfW8YA3ce7YRXJ3a75oRWg1A5yBKCOR1dpc0pq8pJQKPAPJAdAHUnvrDQu2SCsjYM5EowTheFW4ObmvSzO9cU8YRjUEQi1yXSm-b2N7gM36zuui0yAemwzteOBZ2tMHb6JlVtQfU50hz6R7MUAKYP",
-                    },
-                    {
-                      label: "Animals",
-                      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuBGuVXBEdwxEBhOsezPu5hI80kb916JNPwnjmENG3ZjFKtctuY-5HEY01Zmt-w8L3D_aoJ6BA6YOi8VXOf9s2EhMFdlQAdwVv14JeIPgFZiM89QsJ8khyiGn0WFIk03lHcTlwQPnYVspBNPgEo4OVZAg9d6evt0qZ6OKrf5GizWSAS1JjDgQyqlD2JN1UiUSZIPJl-9wjAPI7EI6PD85Yur1CRrbzLIbTXEwdiChNzrjOSnoKZi8xU6vk9QYM442UOTL56KymUBbwhc",
-                    },
-                    {
-                      label: "Abstract",
-                      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuCGjv1a_PR8Jhg3tiabrTUC9d0RRLIci59mEHHL7Bv4Aub5Tag0vgvmZ2x39fTQOUJX--rUdB-kVUf5A51MBre0kf88rpIRv8UAGqsiKkJbBDEAZIfjk4FTVBGCz0andy95SIRQY2Kj_lmptrIRw43lzpmzhCbY-8tMiowiztlEc6RuQMmEnIbtbIL9w1QhjTu5FCTNQMDM8O3d9dvGgYuWW9gS1GoJKWDTAbvi-PSKg0cHeZXsAi_-M96zvCezziY1YaXLnaPAE8go",
-                    },
-                  ].map((collection) => (
-                      <div key={collection.label} className="flex flex-col cursor-pointer w-80 ">
-                        <div className="overflow-hidden rounded-lg">
-                          <img 
-                            src={collection.img} 
-                            alt={collection.label} 
-                            className={styles.collectionImage}
-                            loading="lazy"
-                          />
-                        </div>
-                        <p className={styles.collectionTitle}>
-                          {collection.label}
-                        </p>
-                      </div>
-                  ))}
-                  </div>
-                </div>
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center h-full w-full text-white">
+      <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-orange-500"></div>
+    </div>
+  );
+}
 
-                {/* Second decorative SVG - Restored with shader effects */}
-                <div className={styles.shaderWrapperSecond} style={{ zIndex: 0 }}>
-                  <DynamicSvgEffect
-                    spotlightSize={400}
-                    lightColor="#FFFFFF"
-                    specularConstant={0.75}
-                    specularExponent={25}
-                    enableViewportCulling={true}
-                    viewportMargin="50px"
-                    containerStyle={{
-                      maskImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0) 100%)',
-                      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0) 100%)',
-                    }}
-                  >
-                    <img 
-                      src="/violene11.png" 
-                      alt="Decorative art" 
-                      style={{
-                        height: '100%',
-                        width: 'auto',
-                        objectFit: 'fill',
-                      }}
-                    />
-                  </DynamicSvgEffect>
-                </div>
+import './newhome.css';
 
-                {/* Footer - responsive styles handled by CSS */}
-                <footer className={styles.footer}>
-                  <div className={styles.footerLinks}>
-                    {[
-                      { label: "About Us", href: "#" },
-                      { label: "Contact", href: "#" },
-                      { label: "Terms of Service", href: "#" },
-                    ].map((link) => (
-                      <a
-                        key={link.label}
-                        className={styles.footerLink}
-                        href={link.href}
-                      >
-                        {link.label}
-                      </a>
-                    ))}
-                  </div>
-                  <p className={styles.footerCopyright}>
-                    © 2024 Shila Murthi. All rights reserved.
-                  </p>
-                </footer>
+export default function NewHomePage() {
+  const heroWrapperRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // -- AGGRESSIVE SCROLL-TO-UNLOAD LOGIC --
+  const [isHeroMounted, setIsHeroMounted] = useState(true);
+  const { scrollY } = useScroll({ container: scrollContainerRef });
+
+  // Opacity: Starts fading at 5% (approx 40px), completely gone by 30% (approx 250px)
+  // We use standard pixels assuming typical 800px height, so 40px to 250px
+  const heroOpacity = useTransform(scrollY, [40, 300], [1, 0]);
+  const heroScale = useTransform(scrollY, [40, 300], [1, 0.95]);
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    // Unmount check
+    if (typeof window !== 'undefined') {
+      const threshold = window.innerHeight * 0.4; // 40% of screen height
+
+      // ONE-WAY TICKET: Once we pass the threshold, we unmount forever (until refresh)
+      if (latest > threshold && isHeroMounted) {
+        setIsHeroMounted(false);
+      }
+      // Removed the 'else if' block to prevent remounting/resource reloading
+    }
+  });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!heroWrapperRef.current) return;
+
+      const rect = heroWrapperRef.current.getBoundingClientRect();
+      // Normalize mouse position to -1 to 1 range
+      mousePosition.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mousePosition.y = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    };
+
+    const handleMouseLeave = () => {
+      // Reset to center when mouse leaves
+      mousePosition.x = 0;
+      mousePosition.y = 0;
+    };
+
+    const wrapper = heroWrapperRef.current;
+    if (wrapper) {
+      wrapper.addEventListener('mousemove', handleMouseMove);
+      wrapper.addEventListener('mouseleave', handleMouseLeave);
+    }
+
+    return () => {
+      if (wrapper) {
+        wrapper.removeEventListener('mousemove', handleMouseMove);
+        wrapper.removeEventListener('mouseleave', handleMouseLeave);
+      }
+    };
+  }, [isHeroMounted]); // Re-attach listeners if hero remounts
+
+  return (
+    <div
+      ref={scrollContainerRef}
+      className="h-screen w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-white text-black"
+    >
+
+      {/* SNAP SECTION 1: HERO SPACER & FIXED CONTENT */}
+      {/* This section takes up the full viewport and acts as the 'Home' snap point */}
+      <section className="h-screen w-full snap-start relative">
+        <AnimatePresence>
+          {isHeroMounted && (
+            <motion.div
+              className="hero-section-wrapper fixed inset-0 z-0 h-screen overflow-hidden"
+              ref={heroWrapperRef}
+              style={{ opacity: heroOpacity, scale: heroScale }}
+              exit={{ opacity: 0 }}
+            >
+              {/* Himalayan Shader Background */}
+              <HimalayanShader />
+
+              {/* Top Heading Text */}
+              <div className="frosted-text-container">
+                <h1 className="frosted-glass-text">
+                  Explore all<br />deities
+                </h1>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>
-    </>
+
+              {/* Right-Side Subtext & Button */}
+              <div className="frosted-text-container-right">
+                <p className="frosted-glass-text-right">
+                  Hand carved dities with the divine blessings
+                </p>
+                <button className="frosted-glass-button">
+                  Explore Arts
+                </button>
+              </div>
+
+              {/* Center Bottom Text Image with Ice Shine Effect */}
+              <div className="center-bottom-text">
+                <IceShineText src="/Mahadev_text_comp.png" alt="Mahadev" />
+              </div>
+
+              {/* Hero Section Container (Wraps 3D Model) */}
+              <section
+                id="hero-section"
+                className="hero-container"
+              >
+                {/* 3D Viewer Section (Inside Hero Section) */}
+                <div className="hero-canvas-wrapper">
+                  <Canvas camera={{ position: [0, 0, 6.5], fov: 35 }} dpr={1} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}>
+                    <Suspense fallback={null}>
+                      {/* Optimized Lighting */}
+                      <ambientLight intensity={0.6} />
+                      <directionalLight position={[5, 8, 5]} intensity={1.8} color="#ffaa00" />
+                      <directionalLight position={[-5, 3, -3]} intensity={1.2} color="#4444ff" />
+
+                      <MouseRotationGroup>
+                        <Center position={[0, 0.5, 0]}>
+                          <ShivaLingaModel scale={0.3} />
+                          <Html
+                            transform
+                            position={[-0.08, -1.55, 1.65]}
+                            scale={0.3}
+                            style={{
+                              width: '375px',
+                              height: '185px',
+                              pointerEvents: 'none',
+                            }}
+                            zIndexRange={[0, 0]}
+                          >
+                            <div style={{ width: '100%', height: '100%', transform: 'scaleX(1.1)', transformOrigin: 'center' }}>
+                              <img
+                                src="/Shivalingbottom.svg"
+                                alt="Shivalinga Base"
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'contain',
+                                  opacity: 0.75,
+                                  maskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)',
+                                  WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 85%)'
+                                }}
+                              />
+                            </div>
+                          </Html>
+                        </Center>
+                      </MouseRotationGroup>
+
+                      <OrbitControls
+                        enableZoom={false}
+                        enablePan={false}
+                        enableDamping={true}
+                        dampingFactor={0.08}
+                        rotateSpeed={0.5}
+                        minPolarAngle={Math.PI / 2.2}
+                        maxPolarAngle={Math.PI / 1.95}
+                        minAzimuthAngle={-Math.PI / 10}
+                        maxAzimuthAngle={Math.PI / 10}
+                      />
+                      <Environment preset="apartment" />
+                    </Suspense>
+                  </Canvas>
+                </div>
+              </section>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      {/* SNAP SECTION 2: GALLERY */}
+      {/* This section is the destination snap point. Once here, the hero above unmounts. */}
+      <section className="min-h-screen w-full snap-start bg-white relative z-10">
+        <WorkshopGallery />
+      </section>
+
+      {/* SNAP SECTION 3: IDOL SCROLL GALLERY (Horizontal) */}
+      <section className="min-h-screen w-full snap-start bg-white relative z-10">
+        <IdolScrollGallery containerRef={scrollContainerRef as React.RefObject<HTMLElement>} />
+      </section>
+
+    </div>
   );
 }

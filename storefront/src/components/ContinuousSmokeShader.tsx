@@ -179,8 +179,9 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
   const startTimeRef = useRef<number>(Date.now());
   const rafRef = useRef<number | null>(null);
   const uniformsRef = useRef<any>({});
+  const isMountedRef = useRef(false);
 
-  // Visibility state to manage WebGL context count
+  // Visibility state to manage Animation Loop (not context creation)
   const [isVisible, setIsVisible] = useState(false);
 
   // Intersection Observer to manage lifecycle
@@ -189,8 +190,6 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
 
     const observer = new IntersectionObserver((entries) => {
       const entry = entries[0];
-      // Add a small buffer (rootMargin already defaults to 0, but we can add some)
-      // If it's intersecting, we mount the canvas.
       setIsVisible(entry.isIntersecting);
     }, {
       rootMargin: '200px 0px', // Pre-load slightly before coming into view
@@ -204,19 +203,23 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
     };
   }, []);
 
+  // One-time WebGL Setup
   useEffect(() => {
-    // If not visible, do nothing (Canvas isn't rendered)
-    if (!isVisible) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Try/Catch context creation to prevent total crash if limit still hit
+    // Prevent re-initialization
+    if (glRef.current) return;
+
+    // Try/Catch context creation
     let gl: WebGLRenderingContext | null = null;
     try {
       gl = canvas.getContext('webgl', {
         alpha: true,
-        premultipliedAlpha: false
+        premultipliedAlpha: false,
+        antialias: false, // Performance boost
+        depth: false, // Performance boost
+        preserveDrawingBuffer: false
       });
     } catch (e) {
       console.warn("WebGL Context creation failed", e);
@@ -269,22 +272,41 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
       u_shape: gl.getUniformLocation(program, 'u_shape'),
     };
 
-    // Render Loop
+    isMountedRef.current = true;
+
+    // Cleanup on unmount (only when component is truly removed)
+    return () => {
+      isMountedRef.current = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      // We rely on browser GC for context, but we could try extension based losing if needed.
+      // Usually fine to just let it go.
+      glRef.current = null;
+    };
+  }, []); // Run once
+
+  // Animation Loop - Toggled by isVisible
+  useEffect(() => {
+    if (!isVisible || !glRef.current || !programRef.current) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+
     const render = () => {
       if (!glRef.current || !programRef.current || !canvasRef.current) return;
       const gl = glRef.current;
       const canvas = canvasRef.current;
 
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      // Guard against 0 dimensions (which can happen during layout shifts)
-      if (rect.width === 0 || rect.height === 0) {
+      // Layout check - skip if hidden or zero size
+      // This is cheaper than context switching
+      if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
         rafRef.current = requestAnimationFrame(render);
         return;
       }
 
-      const targetW = Math.floor(rect.width * dpr);
-      const targetH = Math.floor(rect.height * dpr);
+      const dpr = window.devicePixelRatio || 1;
+      // Optimize: Only resize if changed
+      const targetW = Math.floor(canvas.clientWidth * dpr);
+      const targetH = Math.floor(canvas.clientHeight * dpr);
 
       if (canvas.width !== targetW || canvas.height !== targetH) {
         canvas.width = targetW;
@@ -315,24 +337,17 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
 
     render();
 
-    // Cleanup: Cancel loop and loose context if possible (implicitly by unmounting)
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      // We don't manually lose context here, but React unmounting the canvas element 
-      // is the strongest signal to the browser to clean up.
     };
-  }, [shape, isVisible]);
+  }, [isVisible, shape]);
 
-  // If not visible, render a placeholder div to maintain layout
-  // Ref is on the wrapper to track visibility
   return (
     <div ref={containerRef} className={className} style={{ width: '100%', height: '100%', position: 'absolute', ...style }}>
-      {isVisible && (
-        <canvas
-          ref={canvasRef}
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
-      )}
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      />
     </div>
   );
 };

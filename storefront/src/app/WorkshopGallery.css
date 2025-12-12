@@ -21,6 +21,7 @@
     z-index: 0;
     mix-blend-mode: multiply;
     opacity: 0.12;
+    will-change: transform;
 }
 
 .theme-art-peacock {
@@ -254,6 +255,8 @@
     z-index: 0;
     /* Should be behind text (z:10) but above body bg */
     pointer-events: auto;
+    will-change: transform, opacity;
+    transform: translateZ(0);
 }
 
 /* Spinner */
@@ -352,15 +355,16 @@
     /* Combine masks: 
        1. Fade Left Edge (Gradient to right)
        2. Fade Top/Bottom (Gradient to vertical center)
+       Updated for Scale ~0.8 videos: Pushed fade zones in to 12% to cover video edges (10%)
     */
     mask-image:
-        linear-gradient(to right, transparent 0%, black 20%, black 100%),
-        linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+        linear-gradient(to right, transparent 12%, black 30%, black 100%),
+        linear-gradient(to bottom, transparent 12%, black 30%, black 70%, transparent 88%);
     mask-composite: intersect;
     /* Only show where BOTH are opaque (standard) or use specific webkit */
     -webkit-mask-image:
-        linear-gradient(to right, transparent 0%, black 20%, black 100%),
-        linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+        linear-gradient(to right, transparent 12%, black 30%, black 100%),
+        linear-gradient(to bottom, transparent 12%, black 30%, black 70%, transparent 88%);
     -webkit-mask-composite: source-in;
     /* standard intersection */
 }

@@ -1,0 +1,341 @@
+/* IdolScrollGallery.css */
+
+/* IdolScrollGallery.css */
+
+.idol-scroll-section {
+    /* Height defines the length of the scroll needed (3 slides -> ~300-400vh) */
+    /* IMPORTANT: Increase height to ensure enough scroll distance */
+    height: 400vh;
+    position: relative;
+    background: #ffffff;
+}
+
+.idol-sticky-wrapper {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    /* Hide the overflow x */
+    display: flex;
+    align-items: center;
+}
+
+.idol-horizontal-track {
+    display: flex;
+    width: 300vw;
+    /* 3 slides x 100vw */
+    height: 100%;
+    will-change: transform;
+}
+
+.idol-slide {
+    width: 100vw;
+    height: 100vh;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 2rem;
+}
+
+/* --- Card / Layout --- */
+.idol-card {
+    width: 100%;
+    height: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.idol-content-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    /* Image wider */
+    gap: 4rem;
+    width: 100%;
+    height: 90%;
+    /* Increased space */
+    /* confine to avoid edge clipping */
+    align-items: center;
+    position: relative;
+    z-index: 10;
+}
+
+/* --- Visual Side --- */
+.idol-visual-side {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.idol-image-wrapper {
+    position: relative;
+    height: 100%;
+    /* Use full available height */
+    width: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Ensure centered */
+    filter: drop-shadow(0px 20px 40px rgba(0, 0, 0, 0.15));
+}
+
+.idol-image {
+    max-height: 85vh;
+    /* Maximize impact */
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    z-index: 2;
+}
+
+.idol-shadow {
+    position: absolute;
+    bottom: -20px;
+    width: 60%;
+    height: 40px;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.4) 0%, transparent 70%);
+    z-index: 1;
+    transform: scaleY(0.5);
+}
+
+/* --- Background Halo/Arch --- */
+/* --- Background Halo/Arch --- */
+.idol-halo-container {
+    position: absolute;
+    top: 50%;
+    left: 25%;
+    /* Behind image mostly */
+    transform: translate(-50%, -50%);
+    width: 65vh;
+    height: 65vh;
+    border-radius: 50%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.idol-halo-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    animation: rotateSlow 60s linear infinite;
+    transform-origin: center;
+}
+
+.idol-halo-inner {
+    position: absolute;
+    inset: 20px;
+    border-radius: 50%;
+    filter: blur(40px);
+}
+
+@keyframes rotateSlow {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* --- Text Side --- */
+.idol-text-side {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+}
+
+.idol-info-box {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.idol-subtitle {
+    font-family: var(--font-inter), sans-serif;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-weight: 600;
+}
+
+.idol-title {
+    font-family: var(--font-cinzel), serif;
+    font-size: 5rem;
+    /* Big impact */
+    line-height: 1.1;
+    color: #1c1917;
+    margin: 0;
+}
+
+.idol-name-tag {
+    font-family: var(--font-cinzel), serif;
+    font-size: 1.75rem;
+    font-style: italic;
+    color: #57534e;
+    font-weight: 400;
+    margin-top: -0.5rem;
+    /* Closer to title */
+}
+
+.idol-description {
+    font-family: var(--font-inter), sans-serif;
+    font-size: 1.25rem;
+    color: #4b5563;
+    line-height: 1.7;
+    font-weight: 300;
+    max-width: 90%;
+}
+
+.idol-cta-btn {
+    margin-top: 2rem;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.btn-text {
+    font-family: var(--font-cinzel), serif;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #1c1917;
+}
+
+/* Button Divider (Using Shader) */
+.idol-btn-divider-container {
+    width: 60px;
+    height: 0.75rem;
+    /* Match workshop gallery divider height */
+    position: relative;
+    overflow: visible;
+    transition: width 0.3s ease;
+    margin-top: 0.25rem;
+}
+
+.idol-btn-divider-shader {
+    width: 100%;
+    height: 100%;
+    opacity: 0.8;
+}
+
+.idol-cta-btn:hover .idol-btn-divider-container {
+    width: 120px;
+    /* Expand on hover */
+}
+
+/* --- Atmosphere --- */
+.idol-atmosphere {
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    mix-blend-mode: multiply;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* --- Progress Bar --- */
+.idol-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.05);
+    z-index: 50;
+}
+
+.progress-fill {
+    width: 100%;
+    height: 100%;
+    background: #D4AF37;
+    /* Gold */
+    transform-origin: left;
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 1024px) {
+    .idol-scroll-section {
+        height: auto;
+    }
+
+    .idol-sticky-wrapper {
+        position: relative;
+        height: auto;
+        flex-direction: column;
+        top: 0;
+    }
+
+    .idol-horizontal-track {
+        flex-direction: column;
+        width: 100%;
+        transform: none !important;
+        /* Disable horiz scroll on mobile usually */
+    }
+
+    .idol-slide {
+        width: 100%;
+        height: auto;
+        min-height: 100vh;
+        padding: 4rem 1rem;
+    }
+
+    .idol-content-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+        gap: 2rem;
+        text-align: center;
+    }
+
+    .idol-visual-side {
+        order: 1;
+        /* Image first */
+        height: 50vh;
+    }
+
+    .idol-text-side {
+        order: 2;
+        align-items: center;
+    }
+
+    .idol-info-box {
+        align-items: center;
+    }
+
+    .idol-cta-btn {
+        align-items: center;
+    }
+
+    .idol-halo-container {
+        left: 50%;
+        width: 40vh;
+        height: 40vh;
+    }
+
+    .idol-progress-bar {
+        display: none;
+    }
+
+    .idol-title {
+        font-size: 2.5rem;
+    }
+}
