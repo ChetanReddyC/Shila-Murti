@@ -88,33 +88,33 @@ interface IceShineTextProps {
 function createShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
   const shader = gl.createShader(type);
   if (!shader) return null;
-  
+
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-  
+
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
     console.error('Shader compile error:', gl.getShaderInfoLog(shader));
     gl.deleteShader(shader);
     return null;
   }
-  
+
   return shader;
 }
 
 function createProgram(gl: WebGLRenderingContext, vertexShader: WebGLShader, fragmentShader: WebGLShader): WebGLProgram | null {
   const program = gl.createProgram();
   if (!program) return null;
-  
+
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
-  
+
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error('Program link error:', gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
     return null;
   }
-  
+
   return program;
 }
 
@@ -132,28 +132,28 @@ export default function IceShineText({ src, alt = '', className = '', style = {}
   const render = useCallback(() => {
     const gl = glRef.current;
     const program = programRef.current;
-    
+
     if (!gl || !program) return;
-    
+
     // Smooth mouse interpolation
     mouseRef.current.x += (targetMouseRef.current.x - mouseRef.current.x) * 0.08;
     mouseRef.current.y += (targetMouseRef.current.y - mouseRef.current.y) * 0.08;
-    
+
     // Smooth hover interpolation
     hoverRef.current += (targetHoverRef.current - hoverRef.current) * 0.1;
-    
+
     // Update uniforms
     const mouseLocation = gl.getUniformLocation(program, 'u_mouse');
     const timeLocation = gl.getUniformLocation(program, 'u_time');
     const hoverLocation = gl.getUniformLocation(program, 'u_hover');
-    
+
     gl.uniform2f(mouseLocation, mouseRef.current.x, -mouseRef.current.y);
     gl.uniform1f(timeLocation, (Date.now() - startTimeRef.current) / 1000);
     gl.uniform1f(hoverLocation, hoverRef.current);
-    
+
     // Draw
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-    
+
     animationRef.current = requestAnimationFrame(render);
   }, []);
 
@@ -161,28 +161,28 @@ export default function IceShineText({ src, alt = '', className = '', style = {}
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', { 
-      alpha: true, 
+    const gl = canvas.getContext('webgl', {
+      alpha: true,
       premultipliedAlpha: false,
-      preserveDrawingBuffer: true 
+      preserveDrawingBuffer: true
     });
     if (!gl) {
       console.error('WebGL not supported');
       return;
     }
-    
+
     glRef.current = gl;
 
     // Create shaders
     const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-    
+
     if (!vertexShader || !fragmentShader) return;
 
     // Create program
     const program = createProgram(gl, vertexShader, fragmentShader);
     if (!program) return;
-    
+
     programRef.current = program;
     gl.useProgram(program);
 
@@ -247,7 +247,7 @@ export default function IceShineText({ src, alt = '', className = '', style = {}
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const rect = canvas.getBoundingClientRect();
     // Normalize to -1 to 1 range
     targetMouseRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -264,9 +264,8 @@ export default function IceShineText({ src, alt = '', className = '', style = {}
     <canvas
       ref={canvasRef}
       className={className}
-      style={{ 
+      style={{
         ...style,
-        maxWidth: '100%',
         height: 'auto',
       }}
       onMouseMove={handleMouseMove}

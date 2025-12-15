@@ -13,7 +13,7 @@ const IDOLS = [
         title: "Strength & Devotion",
         material: "Black Granite Stone",
         description: "An embodiment of infinite strength and selfless service. Notice the intricate muscle detailing and the expression of sublime devotion.",
-        image: "/images/gallaryscrolimgs/hanumaimage-removebg.png",
+        image: "/images/idols/hanuman.png",
         color: "#5D4037", // Earthy Brown
         bgGradient: "linear-gradient(135deg, #e0dcd9 0%, #bdc3c7 100%)"
     },
@@ -23,7 +23,7 @@ const IDOLS = [
         title: "The Divine Flute",
         material: "Pure White Marble",
         description: "Capturing the playful yet cosmic nature of the divine cowherd. The flow of the dhoti and the stance creates a rhythm in stone.",
-        image: "/images/gallaryscrolimgs/krishnaimage-removebg.png",
+        image: "/images/idols/krishna.png",
         color: "#5D4037", // Unified Earthy Brown
         bgGradient: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)"
     },
@@ -33,7 +33,7 @@ const IDOLS = [
         title: "Timeless Grace",
         material: "Sandstone Masterpiece",
         description: "A testament to the chisol's precision. Standing tall through ages, preserving the sanctity of the ancient scriptures.",
-        image: "/images/gallaryscrolimgs/statueidol-removebg.png",
+        image: "/images/idols/statue.png",
         color: "#5D4037", // Unified Earthy Brown
         bgGradient: "linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)"
     }

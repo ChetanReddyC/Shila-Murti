@@ -1,3 +1,5 @@
+@reference "../../app/globals.css";
+
 .container {
   @apply fixed top-4 right-4 z-50 max-w-sm rounded-xl border shadow-lg transition-all duration-300;
   animation: slideInRight 0.3s ease-out;
@@ -52,6 +54,7 @@
     opacity: 0;
     transform: translateX(100%);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -63,15 +66,15 @@
   .container {
     @apply top-2 right-2 left-2 max-w-none;
   }
-  
+
   .content {
     @apply p-3;
   }
-  
+
   .message {
     @apply text-xs;
   }
-  
+
   .dismissButton {
     @apply p-1;
   }

@@ -3,7 +3,7 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import ContinuousSmokeShader from '../components/ContinuousSmokeShader';
+import SharedSmokeOverlay, { SharedSmokeTarget } from '../components/SharedSmokeOverlay/SharedSmokeOverlay';
 import './WorkshopGallery.css';
 
 
@@ -180,131 +180,139 @@ export default function WorkshopGallery() {
     return (
         <>
             <section ref={containerRef} className="workshop-gallery-section">
-                {/* Decorative Mist */}
-                <div className="workshop-gallery-mist" />
+                <SharedSmokeOverlay className="shared-smoke-overlay-wrapper">
+                    {/* Decorative Mist */}
+                    <div className="workshop-gallery-mist" />
 
-                {/* -- BACKGROUND THEME ARTS -- */}
-                {/* Peacock - Top Left */}
-                <motion.div
-                    style={{ y: yPeacock }}
-                    className="theme-art-container theme-art-peacock"
-                >
-                    <div
-                        className="art-mask-wrapper mask-fade-br"
+                    {/* -- BACKGROUND THEME ARTS -- */}
+                    {/* Peacock - Top Left */}
+                    <motion.div
+                        style={{ y: yPeacock }}
+                        className="theme-art-container theme-art-peacock"
                     >
-                        <img
-                            src="/theme_images/peacock%20art%20white.png"
-                            alt=""
-                            className="theme-image theme-peacock-transform"
-                        />
-                    </div>
-                </motion.div>
+                        <div
+                            className="art-mask-wrapper mask-fade-br"
+                        >
+                            <img
+                                src="/theme_images/peacock-art-white.png"
+                                alt=""
+                                className="theme-image theme-peacock-transform"
+                            />
+                        </div>
+                    </motion.div>
 
-                {/* Elephant - Center Right */}
-                <motion.div
-                    style={{ y: yElephant }}
-                    className="theme-art-container theme-art-elephant"
-                >
-                    <div
-                        className="art-mask-wrapper mask-fade-l"
+                    {/* Elephant - Center Right */}
+                    <motion.div
+                        style={{ y: yElephant }}
+                        className="theme-art-container theme-art-elephant"
                     >
-                        <img
-                            src="/theme_images/Iravathlineart%20white.png"
-                            alt=""
-                            className="theme-image theme-elephant-transform"
-                        />
-                    </div>
-                </motion.div>
+                        <div
+                            className="art-mask-wrapper mask-fade-l"
+                        >
+                            <img
+                                src="/theme_images/elephant-art-white.png"
+                                alt=""
+                                className="theme-image theme-elephant-transform"
+                            />
+                        </div>
+                    </motion.div>
 
-                {/* Temple - Bottom Left */}
-                <motion.div
-                    style={{ y: yTemple }}
-                    className="theme-art-container theme-art-temple"
-                >
-                    <div
-                        className="art-mask-wrapper mask-fade-tr"
+                    {/* Temple - Bottom Left */}
+                    <motion.div
+                        style={{ y: yTemple }}
+                        className="theme-art-container theme-art-temple"
                     >
-                        <img
-                            src="/theme_images/templefront-white.png"
-                            alt=""
-                            className="theme-image theme-temple-transform"
-                        />
-                    </div>
-                </motion.div>
+                        <div
+                            className="art-mask-wrapper mask-fade-tr"
+                        >
+                            <img
+                                src="/theme_images/templefront-white.png"
+                                alt=""
+                                className="theme-image theme-temple-transform"
+                            />
+                        </div>
+                    </motion.div>
 
-                <div className="workshop-container">
-                    {GALLERY_ITEMS.map((item, index) => {
-                        const isEven = index % 2 === 0;
+                    <div className="workshop-container">
+                        {GALLERY_ITEMS.map((item, index) => {
+                            const isEven = index % 2 === 0;
 
-                        return (
-                            <motion.div
-                                key={item.id}
-                                initial="hidden"
-                                whileInView="visible"
-                                viewport={{ once: true, margin: "-20%" }}
-                                variants={rowVariants}
-                                className={`gallery-item-row ${isEven ? '' : 'reverse'}`}
-                            >
-                                {/* Text Column */}
+                            return (
                                 <motion.div
-                                    className="gallery-text-col"
-                                    variants={textStaggerVariants}
+                                    key={item.id}
+                                    initial="hidden"
+                                    whileInView="visible"
+                                    viewport={{ once: true, margin: "-20%" }}
+                                    variants={rowVariants}
+                                    className={`gallery-item-row ${isEven ? '' : 'reverse'}`}
                                 >
-                                    <motion.h2
-                                        className="gallery-title"
-                                        variants={textItemVariants}
-                                    >
-                                        {item.title}
-                                    </motion.h2>
+                                    {/* Text Column */}
                                     <motion.div
-                                        className="gallery-divider-container"
-                                        variants={{
-                                            hidden: { width: 0, opacity: 0 },
-                                            visible: { width: '8rem', opacity: 1, transition: { duration: 0.8, delay: 0.4 } }
-                                        }}
+                                        className="gallery-text-col"
+                                        variants={textStaggerVariants}
                                     >
-                                        <ContinuousSmokeShader shape="line" className="gallery-divider-shader" />
+                                        <motion.h2
+                                            className="gallery-title"
+                                            variants={textItemVariants}
+                                        >
+                                            {item.title}
+                                        </motion.h2>
+                                        <motion.div
+                                            className="gallery-divider-container"
+                                            style={{ transformOrigin: 'left' }}
+                                            variants={{
+                                                hidden: { scaleX: 0, opacity: 0 },
+                                                visible: { scaleX: 1, opacity: 1, transition: { duration: 0.8, delay: 0.4 } }
+                                            }}
+                                        >
+                                            <SharedSmokeTarget
+                                                id={`divider-${item.id}`}
+                                                shape="line"
+                                                className="gallery-divider-shader"
+                                            />
+                                        </motion.div>
+                                        <motion.p
+                                            className="gallery-desc"
+                                            variants={textItemVariants}
+                                        >
+                                            {item.description}
+                                        </motion.p>
+
+                                        <motion.button
+                                            className="gallery-cta-btn"
+                                            variants={textItemVariants}
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => router.push('/products')}
+                                        >
+                                            <span className="gallery-btn-text">
+                                                View Arts
+                                            </span>
+                                            <SharedSmokeTarget
+                                                id={`btn-${item.id}`}
+                                                shape="button"
+                                                className="gallery-btn-shader"
+                                                style={{ width: 'auto', height: 'auto' }}
+                                            />
+                                        </motion.button>
                                     </motion.div>
-                                    <motion.p
-                                        className="gallery-desc"
-                                        variants={textItemVariants}
-                                    >
-                                        {item.description}
-                                    </motion.p>
 
-                                    <motion.button
-                                        className="gallery-cta-btn"
-                                        variants={textItemVariants}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => router.push('/products')}
+                                    {/* Visual Column / Video Wrapper */}
+                                    <motion.div
+                                        className="gallery-visual-col"
+                                        variants={imageRevealVariants}
                                     >
-                                        <span className="gallery-btn-text">
-                                            View Arts
-                                        </span>
-                                        <ContinuousSmokeShader
-                                            shape="button"
-                                            className="gallery-btn-shader"
-                                            style={{ width: 'auto', height: 'auto' }}
+                                        <VideoDisplay
+                                            src={item.videoSrc}
+                                            align={isEven ? 'right' : 'left'}
+                                            config={item.config}
                                         />
-                                    </motion.button>
+                                    </motion.div>
                                 </motion.div>
-
-                                {/* Visual Column / Video Wrapper */}
-                                <motion.div
-                                    className="gallery-visual-col"
-                                    variants={imageRevealVariants}
-                                >
-                                    <VideoDisplay
-                                        src={item.videoSrc}
-                                        align={isEven ? 'right' : 'left'}
-                                        config={item.config}
-                                    />
-                                </motion.div>
-                            </motion.div>
-                        );
-                    })}
-                </div>
+                            );
+                        })}
+                    </div>
+                </SharedSmokeOverlay>
             </section>
         </>
     );

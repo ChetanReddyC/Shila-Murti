@@ -1,3 +1,5 @@
+@reference "../../app/globals.css";
+
 .container {
   @apply flex items-start gap-3 p-4 rounded-xl border transition-all duration-200;
   animation: slideIn 0.3s ease-out;
@@ -84,6 +86,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -95,15 +98,15 @@
   .container {
     @apply p-3;
   }
-  
+
   .message {
     @apply text-xs;
   }
-  
+
   .retryButton {
     @apply px-2 py-1 text-xs;
   }
-  
+
   .dismissButton {
     @apply p-1;
   }

@@ -313,90 +313,90 @@
         width: 100vw;
         height: 100vh;
         flex-shrink: 0;
+        padding: 4rem 0;
+        /* Slight padding top/bottom */
+        /* Pull content up to start */
+        display: flex;
+        align-items: flex-start;
+        /* Align top instead of center */
+        justify-content: center;
+    }
+
+    /* CARD CONTENT - Stacked Center alignment (Mobile) */
+    .idol-content-grid {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 1.5rem;
+        /* Balanced spacing */
+        text-align: center;
+        height: 100%;
+        width: 100%;
+        padding: 0 1rem;
+    }
+
+    .idol-visual-side {
+        order: 1;
+        height: auto;
+        /* Natural height */
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Center image */
         padding: 0;
+    }
+
+    .idol-image-wrapper {
+        width: 100%;
+        height: auto;
         display: flex;
         align-items: center;
         justify-content: center;
     }
 
-    /* CARD CONTENT - Side-by-side on mobile (Mini Desktop) */
-    .idol-content-grid {
-        grid-template-columns: 1fr 1fr;
-        /* Equal split */
-        grid-template-rows: 1fr;
-        /* Single row */
-        gap: 0;
-        /* Zero gap for strict separation */
-        text-align: left;
-        height: 100%;
-        width: 100%;
-        align-items: center;
-    }
-
-    .idol-visual-side {
-        order: 1;
-        /* Left */
-        height: 100%;
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-        /* Stick to LEFT edge */
-        padding-left: 0.5rem;
-        /* Tiny buffer */
-    }
-
-    .idol-image-wrapper {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-        /* Align image left */
-    }
-
     .idol-image {
-        max-height: 25vh;
-        /* Even more reduced height */
-        max-width: 90%;
+        max-height: 40vh;
+        /* Good visibility */
+        max-width: 80%;
         object-fit: contain;
     }
 
     .idol-text-side {
         order: 2;
-        /* Right */
-        height: 100%;
+        height: auto;
+        /* Natural height */
+        width: 100%;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        align-items: flex-start;
-        /* Left align text content */
-        padding-right: 0.5rem;
-        /* Stick to RIGHT edge (minimal padding) */
-        padding-left: 0.5rem;
+        justify-content: flex-start;
+        align-items: center;
+        /* Center align text content */
+        padding: 0;
     }
 
     .idol-info-box {
-        align-items: flex-start;
-        /* Left align items */
-        gap: 0.5rem;
-        /* Tight gap */
+        align-items: center;
+        /* Center align items */
+        gap: 0.8rem;
         width: 100%;
     }
 
     .idol-cta-btn {
-        align-items: flex-start;
-        margin-top: 0.5rem;
+        align-items: center;
+        /* Center button content */
+        margin-top: 1rem;
     }
 
     .idol-halo-container {
-        left: 17%;
-        /* Position behind the left-aligned image */
-        top: 45%;
+        left: 50%;
+        /* Center horizontally */
+        top: 25%;
+        /* Align with top image roughly */
         transform: translate(-50%, -50%);
-        width: 18vh;
-        /* Scaled down to match 25vh image */
-        height: 18vh;
+        width: 35vh;
+        height: 35vh;
     }
 
     .idol-progress-bar {
@@ -405,38 +405,41 @@
 
     /* Font Adjustments for Mobile - Ultra Tiny */
     .idol-title {
-        font-size: 0.9rem;
-        /* Tiny title */
+        font-size: 2rem;
+        /* Readable Title */
         line-height: 1.1;
     }
 
     .idol-subtitle {
-        font-size: 0.4rem;
-        letter-spacing: 0.1em;
+        font-size: 0.75rem;
+        letter-spacing: 0.15em;
     }
 
     .idol-name-tag {
-        font-size: 0.6rem;
-        margin-top: -0.1rem;
+        font-size: 1rem;
+        margin-top: -0.25rem;
     }
 
     .idol-description {
-        font-size: 0.45rem;
-        /* Micro body text */
-        line-height: 1.4;
-        max-height: none;
-        max-width: 100%;
+        font-size: 0.9rem;
+        /* Readable small text */
+        line-height: 1.5;
+        max-width: 90%;
+        /* Prevent full edge-to-edge text */
     }
 
     .btn-text {
-        font-size: 0.5rem;
+        font-size: 0.8rem;
     }
 
     .idol-shadow {
-        bottom: -5px;
-        width: 80%;
-        height: 15px;
-        left: 0;
+        bottom: -15px;
+        width: 60%;
+        height: 25px;
+        left: 20%;
+        /* Center shadow mostly */
+        transform: translateX(0);
+        /* Reset any transforms if needed */
     }
 
     /* Resize Background Mist for Mobile */

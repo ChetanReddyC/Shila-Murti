@@ -1,6 +1,8 @@
+/// <reference path="../types/r3f.d.ts" />
 'use client';
 
 import React, { useRef, useState, useMemo, Suspense, useEffect } from 'react';
+// @ts-ignore
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, Center, Environment, Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -38,7 +40,7 @@ function MouseRotationGroup({ children }: { children: React.ReactNode }) {
     groupRef.current.rotation.y = currentRotation.current.y;
   });
 
-  return <group ref={groupRef}>{children}</group>;
+  return React.createElement('group' as any, { ref: groupRef }, children);
 }
 
 function ShivaLingaModel({ ...props }) {
@@ -48,7 +50,7 @@ function ShivaLingaModel({ ...props }) {
   const clonedScene = useMemo(() => scene.clone(), [scene]);
 
   useMemo(() => {
-    clonedScene.traverse((child) => {
+    clonedScene.traverse((child: THREE.Object3D) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
 
@@ -107,10 +109,10 @@ function ShivaLingaModel({ ...props }) {
     });
   }, [clonedScene]);
 
-  return (
-    <group {...props}>
-      <primitive object={clonedScene} />
-    </group>
+  return React.createElement(
+    'group' as any,
+    props,
+    React.createElement('primitive' as any, { object: clonedScene })
   );
 }
 
@@ -125,7 +127,7 @@ function LoadingSpinner() {
 import './newhome.css';
 
 function ResponsiveScene() {
-  const { width } = useThree((state) => state.size);
+  const { width } = useThree((state: any) => state.size);
   const isMobile = width < 768;
 
   // Responsive values
@@ -284,9 +286,9 @@ export default function NewHomePage() {
                   <Canvas camera={{ position: [0, 0, 6.5], fov: 35 }} dpr={1} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}>
                     <Suspense fallback={null}>
                       {/* Optimized Lighting */}
-                      <ambientLight intensity={0.6} />
-                      <directionalLight position={[5, 8, 5]} intensity={1.8} color="#ffaa00" />
-                      <directionalLight position={[-5, 3, -3]} intensity={1.2} color="#4444ff" />
+                      {React.createElement('ambientLight' as any, { intensity: 0.6 })}
+                      {React.createElement('directionalLight' as any, { position: [5, 8, 5], intensity: 1.8, color: '#ffaa00' })}
+                      {React.createElement('directionalLight' as any, { position: [-5, 3, -3], intensity: 1.2, color: '#4444ff' })}
 
                       <MouseRotationGroup>
                         <ResponsiveScene />

@@ -18,7 +18,7 @@ const vsSource = `
 `;
 
 const fsSource = `
-  precision highp float;
+  precision mediump float;
   varying vec2 v_uv;
   uniform float u_time;
   uniform vec2 u_res;
@@ -203,39 +203,49 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
     };
   }, []);
 
-  // One-time WebGL Setup
+  // Dynamic WebGL Lifecycle Management
+  // Merged effect to ensure safe startup/teardown without conditional hook violations or race conditions.
   useEffect(() => {
+    // If not visible or no container, we don't start the GL context
+    // BUT we must adhere to hook rules. This effect will run when isVisible changes.
+    if (!isVisible) {
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Prevent re-initialization
-    if (glRef.current) return;
-
-    // Try/Catch context creation
+    // --- WebGL Initialization ---
+    // Initialize context
     let gl: WebGLRenderingContext | null = null;
     try {
       gl = canvas.getContext('webgl', {
         alpha: true,
         premultipliedAlpha: false,
-        antialias: false, // Performance boost
-        depth: false, // Performance boost
-        preserveDrawingBuffer: false
+        antialias: false,
+        depth: false,
+        preserveDrawingBuffer: true,
+        failIfMajorPerformanceCaveat: false
       });
     } catch (e) {
       console.warn("WebGL Context creation failed", e);
     }
 
-    if (!gl) return;
+    if (!gl) return; // If GL failing is persistent, we just exit this effect run.
+
     glRef.current = gl;
 
     // Compile Shaders
+    // (Helper inner function)
     const createShader = (type: number, source: string) => {
-      const s = gl!.createShader(type);
+      const s = gl!.createShader(type); // gl is guaranteed non-null here in closure
       if (!s) return null;
       gl!.shaderSource(s, source);
       gl!.compileShader(s);
       if (!gl!.getShaderParameter(s, gl!.COMPILE_STATUS)) {
-        console.error(gl!.getShaderInfoLog(s));
+        // Safe logging
+        const log = gl!.getShaderInfoLog(s);
+        console.warn('Shader compile error:', log);
         gl!.deleteShader(s);
         return null;
       }
@@ -244,19 +254,28 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
 
     const vs = createShader(gl.VERTEX_SHADER, vsSource);
     const fs = createShader(gl.FRAGMENT_SHADER, fsSource);
-    if (!vs || !fs) return;
+
+    // Fallback if shaders fail
+    if (!vs || !fs) {
+      // Cleanup partially created stuff if needed
+      return;
+    }
 
     const program = gl.createProgram();
     if (!program) return;
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.warn('Program link error:', gl.getProgramInfoLog(program));
+      return;
+    }
 
     gl.useProgram(program);
     programRef.current = program;
 
-    // Buffer
+    // Buffer Setup
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
@@ -265,46 +284,33 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-    // Uniforms
+    // Cache Uniform Locations
     uniformsRef.current = {
       u_time: gl.getUniformLocation(program, 'u_time'),
       u_res: gl.getUniformLocation(program, 'u_res'),
       u_shape: gl.getUniformLocation(program, 'u_shape'),
     };
 
+    // Mark as ready
     isMountedRef.current = true;
 
-    // Cleanup on unmount (only when component is truly removed)
-    return () => {
-      isMountedRef.current = false;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      // We rely on browser GC for context, but we could try extension based losing if needed.
-      // Usually fine to just let it go.
-      glRef.current = null;
-    };
-  }, []); // Run once
-
-  // Animation Loop - Toggled by isVisible
-  useEffect(() => {
-    if (!isVisible || !glRef.current || !programRef.current) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      return;
-    }
-
+    // --- Render Loop ---
     const render = () => {
-      if (!glRef.current || !programRef.current || !canvasRef.current) return;
+      // Safety checks inside the loop
+      if (!isMountedRef.current || !canvasRef.current) return;
+
       const gl = glRef.current;
+      if (!gl) return; // Context lost or cleaned up
+
       const canvas = canvasRef.current;
 
-      // Layout check - skip if hidden or zero size
-      // This is cheaper than context switching
       if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+        // Element might be hidden but not intersecting 0? wait.
         rafRef.current = requestAnimationFrame(render);
         return;
       }
 
-      const dpr = window.devicePixelRatio || 1;
-      // Optimize: Only resize if changed
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const targetW = Math.floor(canvas.clientWidth * dpr);
       const targetH = Math.floor(canvas.clientHeight * dpr);
 
@@ -335,12 +341,24 @@ const ContinuousSmokeShader: React.FC<ContinuousSmokeShaderProps> = ({ shape = '
       rafRef.current = requestAnimationFrame(render);
     };
 
+    // Start loop
     render();
 
+    // CLEANUP FUNCTION
     return () => {
+      isMountedRef.current = false;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+      const gl = glRef.current;
+      if (gl) {
+        // Try to lose context to free memory
+        const ext = gl.getExtension('WEBGL_lose_context');
+        if (ext) ext.loseContext();
+      }
+      glRef.current = null;
+      programRef.current = null;
     };
-  }, [isVisible, shape]);
+  }, [isVisible, shape]); // Re-run if visibility or shape changes
 
   return (
     <div ref={containerRef} className={className} style={{ width: '100%', height: '100%', position: 'absolute', ...style }}>
