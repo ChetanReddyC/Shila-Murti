@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY package.json package-lock.json* ./
 
-# RUN --mount=type=cache,target=/root/.npm \
-#     npm ci --prefer-offline
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline
 
 
 # ------------------------------------------------------
