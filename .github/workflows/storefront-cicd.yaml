@@ -1,0 +1,183 @@
+name: MEDUSA BACKEND CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/storefront-cicd.yaml'
+      
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  # Set environment variables based on the branch
+  GCP_REGION: asia-southeast1
+  NAMESPACE: shilamurti-backend
+  GCP_PROJECT_ID: ${{ github.ref == 'refs/heads/dev' && secrets.GCP_PROJECT_ID_DEV }}
+  GCP_SA_KEY: ${{ github.ref == 'refs/heads/dev' && secrets.GCP_SA_KEY_DEV }}
+  AR_REPO_NAME: ${{ github.ref == 'refs/heads/dev' && secrets.AR_REPOSITORY_DEV }}
+  GKE_CLUSTER_NAME: ${{ github.ref == 'refs/heads/dev' && secrets.GKE_CLUSTER_DEV }}
+  GKE_CLUSTER_REGION: ${{ github.ref == 'refs/heads/dev' && secrets.GKE_REGION_DEV }}
+  ENV: ${{ github.ref == 'refs/heads/dev' && secrets.BACKEND_ENV_DEV }}
+  PAT_GITHUB: ${{ secrets.PAT_GITHUB }}
+  
+
+jobs:
+  validate-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate environment variables
+        run: |
+          MISSING_VARS=()
+          for var in GCP_PROJECT_ID GCP_SA_KEY AR_REPO_NAME GKE_CLUSTER_NAME GKE_CLUSTER_REGION ENV PAT_GITHUB; do
+            if [ -z "${!var}" ]; then
+              MISSING_VARS+=("$var")
+            fi
+          done
+          if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+            echo "Error: Missing environment variables: ${MISSING_VARS[*]}"
+            exit 1
+          fi
+      - name: Validation of env successfully completed
+        run: echo "success"
+
+  build-image:
+    runs-on: ubuntu-latest
+    needs: validate-env
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          IMAGE_NAME="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO_NAME }}/backend:${{ github.run_number }}"
+
+          docker buildx build \
+            --build-arg BACKEND_ENV_FILE_CONTENTS="$(cat << 'EOF'
+          ${{ env.ENV }}
+          EOF
+          )" \
+                -t "$IMAGE_NAME" \
+                --cache-from type=gha \
+                --cache-to type=gha,mode=max \
+                -f ./backend/Dockerfile \
+                backend
+
+      - name: List Docker images after build
+        run: docker images
+      - name: Save Docker image
+        run: |
+          IMAGE_NAME="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO_NAME }}/backend:${{ github.run_number }}"
+          docker save $IMAGE_NAME -o image.tar
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar
+          retention-days: 1
+
+  push-image:
+    runs-on: ubuntu-latest
+    needs: build-image
+    steps:
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ env.GCP_SA_KEY }}
+      - name: Configure Docker to use gcloud as a credential helper
+        run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev"
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - name: Load Docker image
+        run: |
+          docker load -i image.tar
+          echo "Docker images after loading the artifact:"
+          docker images
+      - name: Push Docker image
+        run: |
+          IMAGE_NAME="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_NAME}/backend:${{ github.run_number }}"
+          docker push $IMAGE_NAME
+
+  update-image-tag:
+    runs-on: ubuntu-latest
+    needs: push-image
+    steps:
+      - name: Checkout manifest repository
+        uses: actions/checkout@v4
+        with:
+          repository: ChetanReddyC/Shila-Murti
+          token: ${{ secrets.PAT_GITHUB }}
+          persist-credentials: false
+          ref: shilamurti-k8s-manifests-${{ github.ref_name }}
+      - name: Update image tag in irys-be-utilis
+        run: |
+          sed -i "s|image:.*|image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_NAME}/backend:${{ github.run_number }}|" Backend/deployment.yaml
+      - name: Commit and push updated manifest
+        run: |
+          git config --global user.email ""
+          git config --global user.name "GitHub Actions"
+          git add Backend/deployment.yaml
+          git commit -m "Updated image tag to deployment.yaml for run number ${{ github.run_number }}"
+          git push https://x-access-token:${{ secrets.PAT_GITHUB }}@github.com/ChetanReddyC/Shila-Murti.git HEAD:shilamurti-k8s-manifests-${{ github.ref_name }}
+
+  deploy-to-gke:
+    runs-on: ubuntu-latest
+    needs: update-image-tag
+    steps:
+      - name: Checkout manifest repository
+        uses: actions/checkout@v4
+        with:
+          repository: ChetanReddyC/Shila-Murti
+          token: ${{ secrets.PAT_GITHUB }}
+          persist-credentials: false
+          ref: shilamurti-k8s-manifests-${{ github.ref_name }}
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ env.GCP_SA_KEY }}
+      - name: Set up GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER_NAME }}
+          location: ${{ env.GKE_CLUSTER_REGION }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - name: set deployment name by branch
+        run: |
+          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+            echo "DEPLOYMENT=shilamurti-deploy-backend" >> $GITHUB_ENV
+          else
+            echo "Unknown branch ${{ github.ref_name }}"
+            exit 1
+          fi
+      - name: Deploy to GKE
+        run: |
+          kubectl apply -f Backend/deployment.yaml -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment "${DEPLOYMENT}" -n ${{ env.NAMESPACE }}
+      - name: Wait for Deployment Rollout
+        run: |
+          kubectl rollout status "deployment/${DEPLOYMENT}" -n ${{ env.NAMESPACE }}  --timeout=300s
+      - name: Manifests Deploy to GKE
+        run: |
+          kubectl apply -f Backend/svc.yaml -n ${{ env.NAMESPACE }}
+          kubectl apply -f Backend/hpa.yaml -n ${{ env.NAMESPACE }}
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: deploy-to-gke
+    if: always()
+    steps:
+      - name: Clean up Docker images
+        run: docker rmi $(docker images -q --filter "dangling=true") || true
+      - name: Remove unused images
+        run: |
+          docker image prune -a --force || true
+
+
+
+          
