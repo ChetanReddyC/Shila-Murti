@@ -4,17 +4,7 @@
 FROM node:22-slim AS deps
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    libcairo2-dev \
-    libpango1.0-dev \
-    libjpeg-dev \
-    libgif-dev \
-    vim \
-    nano \
-&& rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y nano vim curl iputils-ping postgresql-client python3
 
 COPY package.json package-lock.json* ./
 
