@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     libpango1.0-dev \
     libjpeg-dev \
     libgif-dev \
+    vim \
+    nano \
 && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
