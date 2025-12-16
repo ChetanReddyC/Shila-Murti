@@ -17,12 +17,12 @@ env:
   # Set environment variables based on the branch
   GCP_REGION: asia-southeast1
   NAMESPACE: shilamurti-backend
-  GCP_PROJECT_ID: ${{ github.ref == 'refs/heads/dev' && secrets.GCP_PROJECT_ID_DEV }}
-  GCP_SA_KEY: ${{ github.ref == 'refs/heads/dev' && secrets.GCP_SA_KEY_DEV }}
-  AR_REPO_NAME: ${{ github.ref == 'refs/heads/dev' && secrets.AR_REPOSITORY_DEV }}
-  GKE_CLUSTER_NAME: ${{ github.ref == 'refs/heads/dev' && secrets.GKE_CLUSTER_DEV }}
-  GKE_CLUSTER_REGION: ${{ github.ref == 'refs/heads/dev' && secrets.GKE_REGION_DEV }}
-  ENV: ${{ github.ref == 'refs/heads/dev' && secrets.BACKEND_ENV_DEV }}
+  GCP_PROJECT_ID: ${{ github.ref == 'refs/heads/main' && secrets.GCP_PROJECT_ID_DEV }}
+  GCP_SA_KEY: ${{ github.ref == 'refs/heads/main' && secrets.GCP_SA_KEY_DEV }}
+  AR_REPO_NAME: ${{ github.ref == 'refs/heads/main' && secrets.AR_REPOSITORY_DEV }}
+  GKE_CLUSTER_NAME: ${{ github.ref == 'refs/heads/main' && secrets.GKE_CLUSTER_DEV }}
+  GKE_CLUSTER_REGION: ${{ github.ref == 'refs/heads/main' && secrets.GKE_REGION_DEV }}
+  ENV: ${{ github.ref == 'refs/heads/main' && secrets.BACKEND_ENV_DEV }}
   PAT_GITHUB: ${{ secrets.PAT_GITHUB }}
   
 
@@ -149,7 +149,7 @@ jobs:
           project_id: ${{ env.GCP_PROJECT_ID }}
       - name: set deployment name by branch
         run: |
-          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
             echo "DEPLOYMENT=shilamurti-deploy-backend" >> $GITHUB_ENV
           else
             echo "Unknown branch ${{ github.ref_name }}"
