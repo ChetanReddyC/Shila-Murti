@@ -58,7 +58,7 @@ jobs:
           IMAGE_NAME="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO_NAME }}/storefront:${{ github.run_number }}"
           docker buildx build \
                 --build-arg ENV_FILE_CONTENTS="$(cat <<EOF
-          ${{ env.ENV_GCP_SA_KEY }}
+          ${{ env.ENV }}
           EOF
           )" \
                 -t "$IMAGE_NAME" \
