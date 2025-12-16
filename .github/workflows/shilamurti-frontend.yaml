@@ -1,4 +1,4 @@
-name: STOREFRONT CI/CD Pipeline
+name: STOREFRONT SHILAMURTI CI/CD Pipeline
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'storefront/**'
-      - '.github/workflows/storefront-cicd.yaml'
+      - '.github/workflows/shilamurti-frontend.yaml'
 
 permissions:
   contents: write
