@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: shilamurti-frontend-container
-          image: asia-southeast1-docker.pkg.dev/shilamurti/shilamurti/storefront:18
+          image: asia-southeast1-docker.pkg.dev/shilamurti/shilamurti/storefront:19
           ports:
             - containerPort: 80  # Only HTTP, since HTTPS is handled internally        
           resources:
