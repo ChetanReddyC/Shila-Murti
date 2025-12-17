@@ -1,6 +1,6 @@
 /// <reference path="../types/r3f.d.ts" />
 'use client';
-
+// This is home page
 import React, { useRef, useState, useMemo, Suspense, useEffect } from 'react';
 // @ts-ignore
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
