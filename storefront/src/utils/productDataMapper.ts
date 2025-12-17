@@ -16,7 +16,7 @@ export interface ProductCardData {
   reviewCount?: number;
   material?: string;
   dimensions?: string;
-  
+
   // New comprehensive fields
   description?: string | null;
   subtitle?: string | null;
@@ -58,7 +58,7 @@ export class ProductDataMapper {
    */
   static mapToProductCard(medusaProduct: Product): ProductCardData {
     const inventoryInfo = this.extractInventoryInfo(medusaProduct);
-    
+
     return {
       id: medusaProduct.id,
       title: medusaProduct.title,
@@ -101,7 +101,7 @@ export class ProductDataMapper {
   static extractWeight(product: Product): { weight: number | null; weightUnit: string } {
     const weight = product.weight || product.variants?.[0]?.weight || null;
     // Assuming the weight from Medusa is in grams.
-    const weightUnit = weight !== null ? 'g' : ''; 
+    const weightUnit = weight !== null ? 'g' : '';
     return { weight, weightUnit };
   }
 
@@ -318,13 +318,24 @@ export class ProductDataMapper {
 
   /**
    * Processes image URL to ensure it's properly formatted
+   * Transforms localhost URLs to production backend URL
    */
   private static processImageUrl(url: string): string {
     if (!url) {
       return this.FALLBACK_IMAGE;
     }
 
-    // If URL is already absolute, return as is
+    const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'https://admin.shilamurti.com';
+
+    // Transform localhost URLs to production backend URL
+    if (url.includes('localhost:9000') || url.includes('127.0.0.1:9000')) {
+      // Replace localhost with production backend URL
+      return url
+        .replace('http://localhost:9000', backendUrl)
+        .replace('http://127.0.0.1:9000', backendUrl);
+    }
+
+    // If URL is already absolute and not localhost, return as is
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
@@ -333,14 +344,12 @@ export class ProductDataMapper {
     if (url.startsWith('/')) {
       // Check if it's a static file that should be served from backend
       if (url.startsWith('/static/') || url.includes('static')) {
-        const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000';
         return `${backendUrl}${url}`;
       }
       return url;
     }
 
     // Otherwise, assume it needs to be prefixed with backend URL for static files
-    const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000';
     return `${backendUrl}/${url}`;
   }
 
@@ -354,8 +363,8 @@ export class ProductDataMapper {
     }
 
     const priceData = this.extractPricesFromVariants(variants);
-    
-    
+
+
     if (priceData.length === 0) {
       return { price: 0, currency: 'INR' };
     }
@@ -367,25 +376,25 @@ export class ProductDataMapper {
 
     // Use the price as-is (your Medusa setup stores prices as whole currency units, not cents)
     const price = minPriceData.amount;
-    
+
     // Only show original price if there's a significant difference (more than 10%)
     const originalPrice = maxPriceData.amount > minPriceData.amount * 1.1 ? maxPriceData.amount : undefined;
 
-    const result = { 
-      price, 
+    const result = {
+      price,
       originalPrice,
       currency: minPriceData.currency_code.toUpperCase()
     };
 
-    
+
     return result;
   }
 
   /**
    * Extracts price data from variants, using the first available currency
    */
-  private static extractPricesFromVariants(variants: ProductVariant[]): Array<{amount: number, currency_code: string}> {
-    const prices: Array<{amount: number, currency_code: string}> = [];
+  private static extractPricesFromVariants(variants: ProductVariant[]): Array<{ amount: number, currency_code: string }> {
+    const prices: Array<{ amount: number, currency_code: string }> = [];
 
     console.log('[ProductDataMapper] Extracting prices from variants:', {
       variantCount: variants?.length,
@@ -401,7 +410,7 @@ export class ProductDataMapper {
     for (const variant of variants) {
       // Medusa v2 might use calculated_price instead of prices array
       const variantAny = variant as any;
-      
+
       // Try calculated_price first (Medusa v2)
       if (variantAny.calculated_price) {
         const calculatedPrice = variantAny.calculated_price;
@@ -493,9 +502,9 @@ export class ProductDataMapper {
         const optionValue = option.value?.toLowerCase() || '';
 
         // Look for material-related option names
-        if (optionTitle.includes('material') || 
-            optionTitle.includes('stone') || 
-            optionTitle.includes('type')) {
+        if (optionTitle.includes('material') ||
+          optionTitle.includes('stone') ||
+          optionTitle.includes('type')) {
           return option.value;
         }
 

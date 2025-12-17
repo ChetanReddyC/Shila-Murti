@@ -41,6 +41,11 @@ const nextConfig: NextConfig = {
         source: '/admin/:path*',
         destination: `${MEDUSA_BACKEND_URL}/admin/:path*`,
       },
+      // Proxy static files (product images) from backend
+      {
+        source: '/static/:path*',
+        destination: `${MEDUSA_BACKEND_URL}/static/:path*`,
+      },
     ];
   },
 };
