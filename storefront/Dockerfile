@@ -54,4 +54,3 @@ RUN chmod +x .env.local
 EXPOSE 3000
 
 CMD ["node", "server.js"]
-
