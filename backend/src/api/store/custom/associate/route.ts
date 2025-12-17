@@ -13,7 +13,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     const internalSecret = process.env.INTERNAL_API_SECRET || process.env.internal_api_secret
     const providedSecret = req.headers['x-internal-call']
-    
+
     if (!internalSecret || providedSecret !== internalSecret) {
       return res.status(401).json({ ok: false, error: 'unauthorized' })
     }
@@ -23,7 +23,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     }
 
     const adminToken = (process.env as any).MEDUSA_ADMIN_TOKEN || ''
-    const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+    const base = (process.env as any).MEDUSA_BASE_URL || (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'https://admin.shilamurti.com'
 
     if (!adminToken) {
       return res.status(200).json({ ok: false, skipped: true, reason: 'admin_token_missing' })

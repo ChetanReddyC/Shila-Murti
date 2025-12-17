@@ -70,7 +70,7 @@ interface AssociationInput {
 const ADMIN_BASE_URL =
   process.env.MEDUSA_BASE_URL ||
   (process.env as any).NEXT_PUBLIC_MEDUSA_API_BASE_URL ||
-  "http://localhost:9000"
+  "https://admin.shilamurti.com"
 
 const ADMIN_TOKEN = (process.env as any).MEDUSA_ADMIN_TOKEN || ""
 
@@ -95,7 +95,7 @@ export async function findOrCreateCustomerAccount(
   } = input
 
   const normalizedPhone = normalizePhoneNumber(phone)
-  
+
   // Generate canonical phone format for duplicate prevention
   let canonicalPhone: string;
   try {
@@ -171,24 +171,24 @@ export async function findOrCreateCustomerAccount(
     }
 
     // Update name if needed
-    const hasPlaceholderName = 
+    const hasPlaceholderName =
       !resultCustomer.first_name ||
-      resultCustomer.first_name === "Customer" || 
+      resultCustomer.first_name === "Customer" ||
       resultCustomer.first_name.trim() === "" ||
       resultCustomer.last_name === "User"
-    
-    const hasRealNameInRequest = 
-      first_name && 
-      first_name !== "Customer" && 
+
+    const hasRealNameInRequest =
+      first_name &&
+      first_name !== "Customer" &&
       first_name.trim() !== ""
-    
+
     const shouldUpdateName = hasPlaceholderName || (hasRealNameInRequest && !resultCustomer.first_name)
-    
+
     // Check if we should update email (from placeholder to real email)
     const hasPlaceholderEmail = resultCustomer.email?.includes('@guest.local')
     const hasRealEmailInRequest = email && !email.includes('@guest.local') && email_authenticated
     const shouldUpdateEmail = hasPlaceholderEmail && hasRealEmailInRequest
-    
+
     const updatePayload: Record<string, any> = {
       first_name: shouldUpdateName ? (first_name || "Customer") : resultCustomer.first_name,
       last_name: shouldUpdateName ? (last_name || "") : resultCustomer.last_name,
@@ -289,25 +289,25 @@ export async function findOrCreateCustomerAccount(
 
     // Only preserve existing name if it's not a default placeholder
     // Check for common placeholder values: "Customer" first name or "User" last name
-    const hasPlaceholderName = 
+    const hasPlaceholderName =
       !resultCustomer.first_name ||
-      resultCustomer.first_name === "Customer" || 
+      resultCustomer.first_name === "Customer" ||
       resultCustomer.first_name.trim() === "" ||
       resultCustomer.last_name === "User"
-    
-    const hasRealNameInRequest = 
-      first_name && 
-      first_name !== "Customer" && 
+
+    const hasRealNameInRequest =
+      first_name &&
+      first_name !== "Customer" &&
       first_name.trim() !== ""
-    
+
     // Use request name if: (1) existing has placeholder, OR (2) request has real name and existing doesn't
     const shouldUpdateName = hasPlaceholderName || (hasRealNameInRequest && !resultCustomer.first_name)
-    
+
     // Check if we should update email (from placeholder to real email)
     const hasPlaceholderEmail = resultCustomer.email?.includes('@guest.local')
     const hasRealEmailInRequest = email && !email.includes('@guest.local') && email_authenticated
     const shouldUpdateEmail = hasPlaceholderEmail && hasRealEmailInRequest
-    
+
     const updatePayload: Record<string, any> = {
       first_name: shouldUpdateName ? (first_name || "Customer") : resultCustomer.first_name,
       last_name: shouldUpdateName ? (last_name || "") : resultCustomer.last_name,
@@ -384,9 +384,9 @@ export async function findOrCreateCustomerAccount(
     has_account: true,
     addresses: addresses?.length
       ? transformAddresses(addresses, {
-          first_name: first_name || resultCustomer?.first_name,
-          last_name: last_name || resultCustomer?.last_name,
-        })
+        first_name: first_name || resultCustomer?.first_name,
+        last_name: last_name || resultCustomer?.last_name,
+      })
       : [],
   }
 
@@ -434,11 +434,11 @@ export async function findOrCreateCustomerAccount(
 
   const associations = finalCustomer?.id
     ? await associateCartAndOrder({
-        scope,
-        cart_id,
-        order_id,
-        customer_id: finalCustomer.id,
-      })
+      scope,
+      cart_id,
+      order_id,
+      customer_id: finalCustomer.id,
+    })
     : { cart: undefined, order: undefined }
 
   return {

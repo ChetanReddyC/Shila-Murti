@@ -208,7 +208,7 @@ export class MedusaApiClient {
     this.performanceMetrics = [];
     this.publishableApiKey = config.publishableApiKey || process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
     this.defaultSalesChannelId = config.defaultSalesChannelId || process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID || '';
-    
+
     if (!this.publishableApiKey) {
     } else {
     }
@@ -277,10 +277,10 @@ export class MedusaApiClient {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new ApiError('Request timeout', undefined, 'timeout');
       }
-      
+
       // Handle CORS-specific errors
       if (error instanceof Error && (
-        error.message.includes('CORS') || 
+        error.message.includes('CORS') ||
         error.message.includes('Failed to fetch') ||
         error.message.includes('NetworkError')
       )) {
@@ -290,7 +290,7 @@ export class MedusaApiClient {
           'network'
         );
       }
-      
+
       throw new ApiError(
         error instanceof Error ? error.message : 'Network error occurred',
         undefined,
@@ -326,7 +326,7 @@ export class MedusaApiClient {
 
     const logLevel = metrics.success ? 'info' : 'warn';
     const logMessage = `API ${metrics.method} ${metrics.endpoint} - ${metrics.duration}ms`;
-    
+
     const logData = {
       endpoint: metrics.endpoint,
       method: metrics.method,
@@ -351,7 +351,7 @@ export class MedusaApiClient {
   }
 
   public getAverageResponseTime(endpoint?: string): number {
-    const relevantMetrics = endpoint 
+    const relevantMetrics = endpoint
       ? this.performanceMetrics.filter(m => m.endpoint === endpoint && m.success)
       : this.performanceMetrics.filter(m => m.success);
 
@@ -371,11 +371,11 @@ export class MedusaApiClient {
     // Generate a unique idempotency key for this request attempt (stable across retries in this call)
     const idempotencyKey = method.toUpperCase() !== 'GET' ? `${requestKey}:${startTime}` : undefined;
     let retryCount = 0;
-    
+
     // Check if there's already a pending request for this endpoint
     if (this.pendingRequests.has(requestKey)) {
       const cachedPromise = this.pendingRequests.get(requestKey) as Promise<T>;
-      
+
       // Log cache hit
       if (this.enablePerformanceLogging) {
         const endTime = performance.now();
@@ -389,7 +389,7 @@ export class MedusaApiClient {
           cacheHit: true
         });
       }
-      
+
       return cachedPromise;
     }
 
@@ -401,7 +401,7 @@ export class MedusaApiClient {
       try {
         for (let attempt = 0; attempt <= this.retryOptions.maxRetries; attempt++) {
           retryCount = attempt;
-          
+
           try {
             // Ensure idempotency for non-GET requests to prevent duplicate effects on retries
             let normalizedHeaders: Record<string, string> = {};
@@ -428,8 +428,8 @@ export class MedusaApiClient {
             if (!response.ok) {
               const errorText = await response.text().catch(() => '');
               let errorData: any = {}
-              try { errorData = errorText ? JSON.parse(errorText) : {} } catch {}
-              
+              try { errorData = errorText ? JSON.parse(errorText) : {} } catch { }
+
               // Enhanced error logging
               console.error('[MedusaApiClient] API Error:', {
                 url,
@@ -440,33 +440,33 @@ export class MedusaApiClient {
                 method,
                 attempt
               });
-              
+
               if (response.status === 401 || response.status === 403) {
               }
               try {
                 const message = (errorData && typeof errorData.message === 'string') ? errorData.message : String(errorText || '')
                 if (message && message.toLowerCase().includes('publishable key') && message.toLowerCase().includes('sales channel')) {
                 }
-              } catch {}
+              } catch { }
               const apiError = new ApiError(
                 errorData.message || `HTTP error! status: ${response.status}`,
                 response.status,
                 'api'
               );
-              
+
               // Don't retry client errors (4xx), only server errors (5xx) and network errors
               if (response.status >= 400 && response.status < 500) {
                 throw apiError;
               }
-              
+
               lastError = apiError;
-              
+
               if (attempt === this.retryOptions.maxRetries) {
                 throw apiError;
               }
             } else {
               const data = await response.json();
-              
+
               // Log successful request
               const endTime = performance.now();
               this.logPerformanceMetrics({
@@ -478,13 +478,13 @@ export class MedusaApiClient {
                 success: true,
                 ...(retryCount > 0 && { retryCount })
               });
-              
+
               return data;
             }
           } catch (error) {
             if (error instanceof ApiError) {
               lastError = error;
-              
+
               // Don't retry timeout errors or client errors (4xx)
               if (error.type === 'timeout' || (error.status && error.status >= 400 && error.status < 500)) {
                 throw error;
@@ -496,7 +496,7 @@ export class MedusaApiClient {
                 'unknown'
               );
             }
-            
+
             if (attempt === this.retryOptions.maxRetries) {
               throw lastError;
             }
@@ -523,7 +523,7 @@ export class MedusaApiClient {
           retryCount,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
-        
+
         throw error;
       } finally {
         // Remove the request from pending requests when it completes
@@ -539,7 +539,7 @@ export class MedusaApiClient {
 
   async getProducts(params: ProductQueryParams = {}): Promise<MedusaProductsResponse> {
     const queryParams = new URLSearchParams();
-    
+
     if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
     if (params.offset !== undefined) queryParams.append('offset', params.offset.toString());
     if (params.region_id) queryParams.append('region_id', params.region_id);
@@ -558,14 +558,14 @@ export class MedusaApiClient {
     queryParams.append('fields', '*variants.calculated_price');
 
     const endpoint = `/store/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    
+
     console.log('[MedusaApiClient] Fetching products with params:', {
       endpoint,
       region_id: params.region_id,
       sales_channel_id: params.sales_channel_id,
       category_id: params.category_id
     });
-    
+
     return this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
   }
 
@@ -628,10 +628,10 @@ export class MedusaApiClient {
     const queryParams = new URLSearchParams();
     // Expand cart items with variant and product information
     queryParams.append('fields', '*items,*items.variant,*items.variant.product');
-    
+
     const endpoint = `/store/carts/${cartId}?${queryParams.toString()}`;
-    
-    
+
+
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint);
       return response.cart;
@@ -645,14 +645,14 @@ export class MedusaApiClient {
 
   async addLineItem(cartId: string, payload: AddLineItemPayload): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}/line-items`;
-    
-    
+
+
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      
+
       return response.cart;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -669,14 +669,14 @@ export class MedusaApiClient {
 
   async updateLineItem(cartId: string, lineItemId: string, payload: UpdateLineItemPayload): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}/line-items/${lineItemId}`;
-    
-    
+
+
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      
+
       return response.cart;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -693,13 +693,13 @@ export class MedusaApiClient {
 
   async removeLineItem(cartId: string, lineItemId: string): Promise<MedusaCart> {
     const endpoint = `/store/carts/${cartId}/line-items/${lineItemId}`;
-    
-    
+
+
     try {
       const response = await this.makeRequestWithRetry<MedusaCartResponse>(endpoint, {
         method: 'DELETE'
       });
-      
+
       return response.cart;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -717,14 +717,14 @@ export class MedusaApiClient {
     try {
       const regionsResponse = await this.getRegions();
       const indiaRegion = regionsResponse.regions.find(
-        region => region.name === 'India & International' || 
-                 region.currency_code === 'inr'
+        region => region.name === 'India & International' ||
+          region.currency_code === 'inr'
       );
-      
+
       if (!indiaRegion) {
         return regionsResponse.regions[0] || null;
       }
-      
+
       return indiaRegion;
     } catch (error) {
       return null;
@@ -772,7 +772,7 @@ export class MedusaApiClient {
     // For Medusa v2, we can use the handle parameter directly
     const queryParams = new URLSearchParams();
     queryParams.append('handle', handle);
-    
+
     // Medusa v2 requires region_id when using calculated_price
     if (regionId) {
       queryParams.append('region_id', regionId);
@@ -785,7 +785,7 @@ export class MedusaApiClient {
     const endpoint = `/store/products?${queryParams.toString()}`;
     console.log('[MedusaApiClient] Fetching product by handle:', { handle, endpoint, hasRegion: !!regionId });
     const response = await this.makeRequestWithRetry<MedusaProductsResponse>(endpoint);
-    
+
     if (!response.products || response.products.length === 0) {
       throw new ApiError('Product not found', 404, 'api');
     }
@@ -807,7 +807,7 @@ export class MedusaApiClient {
 
   /** Associate customer with cart using storefront API (Medusa v2 compatible) */
   async associateCustomerWithCart(cartId: string, customerId: string): Promise<void> {
-    
+
     try {
       // Use the storefront customer sync API to ensure customer association before completion
       const response = await fetch('/api/checkout/customer/associate', {
@@ -817,12 +817,12 @@ export class MedusaApiClient {
         },
         body: JSON.stringify({ cartId, customerId }),
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
         throw new Error(`Customer association failed: ${response.status} ${errorText}`);
       }
-      
+
     } catch (error: any) {
       // Don't throw - this is a best-effort optimization
       // The customer sync after order creation will handle this
@@ -884,7 +884,7 @@ export class MedusaApiClient {
     const endpoint = `/store/carts/${cartId}/complete`;
     const maxRetries = 3;
     let lastError: any;
-    
+
     // Custom retry logic for cart completion to handle inventory initialization delays
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -894,22 +894,22 @@ export class MedusaApiClient {
         return response;
       } catch (error: any) {
         lastError = error;
-        
+
         // Retry on 404 errors (inventory location not initialized) or 409 conflicts
-        const isRetryable = error instanceof ApiError && 
-                           (error.status === 404 || error.status === 409);
-        
+        const isRetryable = error instanceof ApiError &&
+          (error.status === 404 || error.status === 409);
+
         if (isRetryable && attempt < maxRetries) {
           // Exponential backoff: 500ms, 1000ms, 2000ms
           const delay = 500 * Math.pow(2, attempt);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
-        
+
         throw error;
       }
     }
-    
+
     throw lastError;
   }
 
@@ -918,7 +918,7 @@ export class MedusaApiClient {
    * Provides ACID transaction guarantees for customer linking + order creation
    */
   async completeCartAtomic(
-    cartId: string, 
+    cartId: string,
     customerId: string,
     customerData?: {
       first_name: string
@@ -931,9 +931,9 @@ export class MedusaApiClient {
     const endpoint = `/store/custom/complete-order-atomic`;
     const maxRetries = 3;
     let lastError: any;
-    
+
     console.log('[API_CLIENT][completeCartAtomic][start]', { cartId, customerId })
-    
+
     // Retry logic for workflow execution
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -945,13 +945,13 @@ export class MedusaApiClient {
             customer_data: customerData
           })
         });
-        
-        console.log('[API_CLIENT][completeCartAtomic][success]', { 
-          cartId, 
+
+        console.log('[API_CLIENT][completeCartAtomic][success]', {
+          cartId,
           orderId: response?.order?.id,
           workflowUsed: response?.metadata?.workflow_used
         })
-        
+
         // Transform response to match CompleteCartResponse format
         return {
           type: 'order',
@@ -959,36 +959,36 @@ export class MedusaApiClient {
         };
       } catch (error: any) {
         lastError = error;
-        
+
         console.error('[API_CLIENT][completeCartAtomic][error]', {
           cartId,
           attempt: attempt + 1,
           maxRetries: maxRetries + 1,
           error: error?.message || String(error)
         })
-        
+
         // Retry on specific retryable errors
-        const isRetryable = error instanceof ApiError && 
-                           (error.status === 404 || 
-                            error.status === 409 || 
-                            error.status === 504 || // Timeout
-                            error.type === 'network');
-        
+        const isRetryable = error instanceof ApiError &&
+          (error.status === 404 ||
+            error.status === 409 ||
+            error.status === 504 || // Timeout
+            error.type === 'network');
+
         if (isRetryable && attempt < maxRetries) {
           // Exponential backoff: 500ms, 1000ms, 2000ms
           const delay = 500 * Math.pow(2, attempt);
-          console.log('[API_CLIENT][completeCartAtomic][retry]', { 
-            attempt: attempt + 1, 
-            delayMs: delay 
+          console.log('[API_CLIENT][completeCartAtomic][retry]', {
+            attempt: attempt + 1,
+            delayMs: delay
           })
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
-        
+
         throw error;
       }
     }
-    
+
     throw lastError;
   }
 
