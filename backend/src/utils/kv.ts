@@ -8,6 +8,17 @@ const CF_ACCOUNT_ID = process.env.CF_KV_ACCOUNT_ID
 const CF_NAMESPACE_ID = process.env.CF_KV_NAMESPACE_ID
 const CF_API_TOKEN = process.env.CF_KV_API_TOKEN
 
+// Debug logging on startup
+console.log('[KV] Initializing KV Store...', {
+  hasCloudflareAccountId: !!CF_ACCOUNT_ID,
+  hasCloudflareNamespaceId: !!CF_NAMESPACE_ID,
+  hasCloudflareApiToken: !!CF_API_TOKEN,
+  cloudflareAccountIdPrefix: CF_ACCOUNT_ID ? CF_ACCOUNT_ID.substring(0, 8) + '...' : 'NOT SET',
+  cloudflareNamespaceIdPrefix: CF_NAMESPACE_ID ? CF_NAMESPACE_ID.substring(0, 8) + '...' : 'NOT SET',
+  hasUpstashUrl: !!KV_URL,
+  hasUpstashToken: !!KV_TOKEN,
+})
+
 function useCloudflare(): boolean {
   return Boolean(CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN)
 }
@@ -17,6 +28,9 @@ export function kvProvider(): 'cloudflare' | 'upstash' | 'none' {
   if (KV_URL && KV_TOKEN) return 'upstash'
   return 'none'
 }
+
+// Log which provider is being used
+console.log('[KV] KV Provider selected:', kvProvider())
 
 export async function kvGet<T = unknown>(key: string): Promise<T | null> {
   if (useCloudflare()) {
@@ -61,6 +75,14 @@ export async function kvSet(key: string, value: unknown, ttlSeconds?: number): P
   if (useCloudflare()) {
     const base = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
     const url = ttlSeconds ? `${base}?expiration_ttl=${ttlSeconds}` : base
+
+    console.log('[KV] Cloudflare KV SET attempting:', {
+      key: key.substring(0, 30) + '...',
+      ttlSeconds,
+      accountIdPrefix: CF_ACCOUNT_ID?.substring(0, 8),
+      namespaceIdPrefix: CF_NAMESPACE_ID?.substring(0, 8)
+    })
+
     const res = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -70,9 +92,17 @@ export async function kvSet(key: string, value: unknown, ttlSeconds?: number): P
       body: typeof value === 'string' ? value : JSON.stringify(value),
     })
     if (!res.ok) {
-      console.error('[KV] Cloudflare KV set failed:', res.status, res.statusText)
-      throw new Error(`CF KV set failed ${res.status}`)
+      // Get detailed error response
+      const errorBody = await res.text().catch(() => 'Could not read error body')
+      console.error('[KV] Cloudflare KV set failed:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorBody: errorBody,
+        url: url.replace(CF_API_TOKEN || '', '***'),
+      })
+      throw new Error(`CF KV set failed ${res.status}: ${errorBody}`)
     }
+    console.log('[KV] Cloudflare KV SET success:', key.substring(0, 30) + '...')
     return
   }
 
