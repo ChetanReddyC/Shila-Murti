@@ -21,7 +21,7 @@ export function kvProvider(): 'cloudflare' | 'upstash' | 'none' {
 export async function kvGet<T = unknown>(key: string): Promise<T | null> {
   if (useCloudflare()) {
     const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
-    const res = await fetch(url, { 
+    const res = await fetch(url, {
       headers: { Authorization: `Bearer ${CF_API_TOKEN}` },
       cache: 'no-store'
     })
@@ -31,10 +31,10 @@ export async function kvGet<T = unknown>(key: string): Promise<T | null> {
       throw new Error(`CF KV get failed ${res.status}`)
     }
     const text = await res.text()
-    try { 
-      return JSON.parse(text) as T 
-    } catch { 
-      return text as unknown as T 
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      return text as unknown as T
     }
   }
 
@@ -42,9 +42,9 @@ export async function kvGet<T = unknown>(key: string): Promise<T | null> {
     console.warn('[KV] No KV configuration found')
     return null
   }
-  
+
   const url = `${KV_URL}/get/${encodeURIComponent(key)}`
-  const res = await fetch(url, { 
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${KV_TOKEN}` },
     cache: 'no-store'
   })
@@ -80,13 +80,13 @@ export async function kvSet(key: string, value: unknown, ttlSeconds?: number): P
     console.warn('[KV] No KV configuration found, skipping set')
     return
   }
-  
+
   const url = `${KV_URL}/set/${encodeURIComponent(key)}`
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 
-      Authorization: `Bearer ${KV_TOKEN}`, 
-      'Content-Type': 'application/json' 
+    headers: {
+      Authorization: `Bearer ${KV_TOKEN}`,
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({ value, nx: false, ex: ttlSeconds }),
   })
@@ -99,9 +99,9 @@ export async function kvSet(key: string, value: unknown, ttlSeconds?: number): P
 export async function kvDel(key: string): Promise<void> {
   if (useCloudflare()) {
     const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
-    const res = await fetch(url, { 
-      method: 'DELETE', 
-      headers: { Authorization: `Bearer ${CF_API_TOKEN}` } 
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${CF_API_TOKEN}` }
     })
     if (!res.ok && res.status !== 404) {
       console.error('[KV] Cloudflare KV del failed:', res.status, res.statusText)
@@ -114,11 +114,11 @@ export async function kvDel(key: string): Promise<void> {
     console.warn('[KV] No KV configuration found, skipping delete')
     return
   }
-  
+
   const url = `${KV_URL}/del/${encodeURIComponent(key)}`
-  const res = await fetch(url, { 
+  const res = await fetch(url, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${KV_TOKEN}` } 
+    headers: { Authorization: `Bearer ${KV_TOKEN}` }
   })
   if (!res.ok && res.status !== 404) {
     console.error('[KV] Upstash del failed:', res.status, res.statusText)
