@@ -38,7 +38,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
       setHasVisitedCart(visited);
       const storedLastSeen = Number(window.sessionStorage.getItem('cartLastSeenCount') || '0');
       setLastSeenCount(Number.isFinite(storedLastSeen) ? storedLastSeen : 0);
-    } catch {}
+    } catch { }
 
     const updateRouteState = () => {
       const path = window.location.pathname || '';
@@ -70,7 +70,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           setLastSeenCount(currentCount);
           if (!hasVisitedCart) setHasVisitedCart(true);
         });
-      } catch {}
+      } catch { }
     }
   }, [isOnCartPage, hasVisitedCart, getTotalItems]);
 
@@ -95,7 +95,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
 
   const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
-    
+
     try {
       // Clear storage immediately
       if (typeof window !== 'undefined') {
@@ -105,19 +105,19 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         localStorage.removeItem('checkout_identity');
         localStorage.removeItem('magic_verification_success');
       }
-      
+
       // Fire cleanup in background (non-blocking)
       // Use sendBeacon for reliable delivery during page unload
       if (navigator.sendBeacon) {
         navigator.sendBeacon('/api/auth/logout', JSON.stringify({}));
       } else {
-        fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
+        fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => { });
       }
-      clearCustomerId().catch(() => {});
-      
+      clearCustomerId().catch(() => { });
+
       // Sign out without waiting for redirect
       await signOut({ redirect: false });
-      
+
       // Redirect immediately - loading screen will show during actual logout process
       window.location.href = '/login';
     } catch (error) {
@@ -129,18 +129,18 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
 
   return (
     <>
-      <LoadingScreen 
+      <LoadingScreen
         show={isLoggingOut}
         duration={1200}
         imagesFolder="/loading-animations"
         shaderEffect="smoke"
       />
-      <LogoutConfirmModal 
+      <LogoutConfirmModal
         isOpen={showLogoutConfirmModal}
         onClose={() => setShowLogoutConfirmModal(false)}
         onConfirm={handleLogoutConfirm}
       />
-      <motion.header 
+      <motion.header
         className={styles.header}
         animate={isProfileMenuOpen ? "stretch" : "shrink"}
         variants={{
@@ -187,6 +187,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           className="absolute inset-0 z-10"
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.25)',
+            backdropFilter: 'blur(2px)',
             backgroundImage: 'linear-gradient(to right, rgba(115,115,115,0.5), rgba(115,115,115,0.5))',
             backgroundSize: `${showProgress ? progress : 0}% 100%`,
             backgroundRepeat: 'no-repeat',
@@ -434,7 +435,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                 </svg>
               </button>
 
-              <button 
+              <button
                 className={`${styles.iconButton} ${isProfileMenuOpen ? styles.iconButtonActive : ''}`}
                 aria-label="User Profile"
                 onClick={() => {
@@ -471,7 +472,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
-                        transition={{ 
+                        transition={{
                           duration: 0.3,
                           ease: [0.175, 0.885, 0.32, 1.275]
                         }}

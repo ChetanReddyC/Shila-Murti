@@ -48,11 +48,11 @@ const DescriptionWithExpand: React.FC<{ text: string }> = React.memo(({ text }) 
   }, []);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={styles.productWrapper} style={{ gap: '1rem' }}>
       <h3 className={styles.descriptionHeading}>Description</h3>
 
       <div className={`${styles.descriptionWrapper} ${expanded ? styles.expanded : styles.collapsed}`}>
-        <p id="product-description" className={`${styles.descriptionText} text-[#6b7280] text-base font-normal leading-relaxed`}>
+        <p id="product-description" className={styles.descriptionText} style={{ color: '#6b7280', fontSize: '1rem', lineHeight: '1.6' }}>
           {text}
         </p>
         {!expanded && (
@@ -174,15 +174,15 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             inStock: productData.inStock,
             inventory: productData.inventory
           });
-          
+
           updateState({
             productData: productData,
             product: rawProduct,
             loading: false
           });
-          
+
           console.log('✅ [ProductDetailPage] State updated');
-          
+
           // Reset retry state on successful fetch
           reset();
           // Add to recently viewed
@@ -217,15 +217,15 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             inStock: matchingProduct.inStock,
             inventory: matchingProduct.inventory
           });
-          
+
           updateState({
             productData: matchingProduct,
             product: rawProduct,
             loading: false
           });
-          
+
           console.log('✅ [ProductDetailPage] State updated');
-          
+
           // Reset retry state on successful fetch
           reset();
           // Add to recently viewed
@@ -280,19 +280,19 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   // Add to cart handler
   const handleAddToCart = useCallback(async () => {
-    console.log('🛒 handleAddToCart called', { 
-      hasProductData: !!state.productData, 
+    console.log('🛒 handleAddToCart called', {
+      hasProductData: !!state.productData,
       hasProduct: !!state.product,
       inStock: state.productData?.inStock,
       variants: state.product?.variants?.length,
-      hasAddToCart: !!addToCart 
+      hasAddToCart: !!addToCart
     });
 
     if (!addToCart) {
       console.log('❌ addToCart function not available from useCart');
-      updateState({ 
+      updateState({
         addToCartError: 'Cart is not ready. Please refresh the page.',
-        addToCartSuccess: false 
+        addToCartSuccess: false
       });
       return;
     }
@@ -303,9 +303,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     }
 
     // Check if product is in stock or available via backorder/unmanaged inventory
-    console.log('📦 Stock check:', { 
+    console.log('📦 Stock check:', {
       inStock: state.productData.inStock,
-      allowBackorder: state.productData.inventory?.allowBackorder 
+      allowBackorder: state.productData.inventory?.allowBackorder
     });
 
     if (!state.productData.inStock) {
@@ -313,9 +313,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       const allowBackorder = state.productData.inventory?.allowBackorder;
       if (!allowBackorder) {
         console.log('❌ Product out of stock and no backorder');
-        updateState({ 
+        updateState({
           addToCartError: 'This product is currently out of stock.',
-          addToCartSuccess: false 
+          addToCartSuccess: false
         });
         return;
       }
@@ -326,9 +326,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     console.log('🔍 Checking variants:', state.product.variants?.length);
     if (!state.product.variants || state.product.variants.length === 0) {
       console.log('❌ No variants available');
-      updateState({ 
+      updateState({
         addToCartError: 'This product has no available variants.',
-        addToCartSuccess: false 
+        addToCartSuccess: false
       });
       return;
     }
@@ -347,7 +347,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
       // Check variant inventory
       let hasStock = false;
-      
+
       // Check Medusa v1 style inventory
       if (typeof variant.inventory_quantity === 'number' && variant.inventory_quantity > 0) {
         hasStock = true;
@@ -393,22 +393,22 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         console.log('❌ Variant rejected - no stock');
       }
     }
-    
+
     if (!selectedVariant) {
       console.log('❌ No variant selected after loop');
-      updateState({ 
+      updateState({
         addToCartError: 'No product variant with sufficient stock is available.',
-        addToCartSuccess: false 
+        addToCartSuccess: false
       });
       return;
     }
 
     console.log('🎯 Proceeding with selected variant:', selectedVariant.id);
 
-    updateState({ 
-      isAddingToCart: true, 
-      addToCartError: null, 
-      addToCartSuccess: false 
+    updateState({
+      isAddingToCart: true,
+      addToCartError: null,
+      addToCartSuccess: false
     });
 
     try {
@@ -429,7 +429,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       console.log('✅ addToCart completed successfully');
 
       // Show success feedback
-      updateState({ 
+      updateState({
         addToCartSuccess: true,
         addToCartError: null
       });
@@ -441,10 +441,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
     } catch (error) {
       console.log('❌ addToCart failed:', error);
-      
+
       // Handle specific error types
       let errorMessage = 'Failed to add item to cart. Please try again.';
-      
+
       if (error instanceof Error) {
         if (error.message.includes('insufficient stock') || error.message.includes('out of stock')) {
           errorMessage = 'This item is currently out of stock or has insufficient quantity available.';
@@ -456,8 +456,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           errorMessage = error.message;
         }
       }
-      
-      updateState({ 
+
+      updateState({
         addToCartError: errorMessage,
         addToCartSuccess: false
       });
@@ -520,15 +520,12 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // Early return if handle is not yet resolved
   if (!handle) {
     return (
-      <div
-        className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
-        style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
-      >
-        <div className="layout-container flex h-full grow flex-col">
-          <div className="px-40 flex flex-1 justify-center py-5">
-            <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
-              <div className="animate-pulse">
-                <div className="h-8 bg-[#f2f2f2] rounded w-1/3 mb-6"></div>
+      <div className={styles.pageWrapper}>
+        <div className={styles.layoutContainer}>
+          <div className={styles.mainSection}>
+            <div className={styles.contentInner}>
+              <div className={styles.loadingContainer}>
+                <div className={styles.loadingTitle}></div>
               </div>
             </div>
           </div>
@@ -540,22 +537,19 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // Loading state
   if (state.loading || isRetrying) {
     return (
-      <div
-        className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
-        style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
-      >
-        <div className="layout-container flex h-full grow flex-col">
-          <div className="px-40 flex flex-1 justify-center py-5">
-            <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
-              <div className="animate-pulse">
-                <div className="h-8 bg-[#f2f2f2] rounded w-1/3 mb-6"></div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="aspect-square bg-[#f2f2f2] rounded-lg"></div>
-                  <div className="flex flex-col gap-4">
-                    <div className="h-8 bg-[#f2f2f2] rounded w-3/4"></div>
-                    <div className="h-6 bg-[#f2f2f2] rounded w-1/2"></div>
-                    <div className="h-20 bg-[#f2f2f2] rounded"></div>
-                    <div className="h-12 bg-[#f2f2f2] rounded w-full"></div>
+      <div className={styles.pageWrapper}>
+        <div className={styles.layoutContainer}>
+          <div className={styles.mainSection}>
+            <div className={styles.contentInner}>
+              <div className={styles.loadingContainer}>
+                <div className={styles.loadingTitle}></div>
+                <div className={styles.loadingGrid}>
+                  <div className={styles.loadingImage}></div>
+                  <div className={styles.loadingInfo}>
+                    <div className={styles.loadingBarLg}></div>
+                    <div className={styles.loadingBarMd}></div>
+                    <div className={styles.loadingBarXl}></div>
+                    <div className={styles.loadingBarBtn}></div>
                   </div>
                 </div>
               </div>
@@ -569,18 +563,15 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // Error state
   if (state.error) {
     return (
-      <div
-        className="relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden"
-        style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}
-      >
-        <div className="layout-container flex h-full grow flex-col">
-          <div className="px-40 flex flex-1 justify-center py-5">
-            <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
-              <div className="text-center py-12">
-                <h1 className="text-[#141414] tracking-light text-[32px] font-bold leading-tight mb-4">
+      <div className={styles.pageWrapper}>
+        <div className={styles.layoutContainer}>
+          <div className={styles.mainSection}>
+            <div className={styles.contentInner}>
+              <div className={styles.errorStateContainer}>
+                <h1 className={styles.errorTitle}>
                   Error Loading Product
                 </h1>
-                <p className="text-[#141414] text-base font-normal leading-normal mb-6">
+                <p className={styles.errorMessage}>
                   {state.error.message}
                 </p>
                 {canRetry && (
@@ -590,9 +581,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       e.stopPropagation();
                       handleRetry();
                     }}
-                    className="flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#141414] text-white px-8 hover:bg-[#333333] transition-colors"
+                    className={styles.retryButton}
                   >
-                    <span className="text-sm font-medium leading-normal">
+                    <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
                       Try Again {retryCount > 0 && `(${retryCount}/${3})`}
                     </span>
                   </button>
@@ -611,8 +602,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     return null;
   }
 
+  // Estimated price defined here since used below
+  const estimatedPrice = state.productData.price?.toLocaleString();
+
   const product = state.productData;
-  
+
   console.log('🎨 [ProductDetailPage RENDER] Current product state:', {
     id: product?.id,
     title: product?.title,
@@ -622,60 +616,58 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   return (
     <div
-      className={`relative flex size-full min-h-screen flex-col bg-white group/design-root overflow-hidden ${styles.pageContainer}`}
-      style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}
+      className={styles.pageWrapper}
+      style={{ paddingTop: '85px' }}
     >
-      <div className="layout-container flex h-full grow flex-col">
+      <div className={styles.layoutContainer}>
         <NetworkStatus />
 
-        <div className="px-8 md:px-16 lg:px-24 xl:px-40 flex flex-1 justify-center py-12">
-          <div className={`layout-content-container flex flex-col max-w-[1200px] flex-1 ${styles.contentWrapper}`}>
+        <div className={styles.mainSection}>
+          <div className={styles.contentInner}>
             {/* Breadcrumb */}
-            <nav className="py-8 mb-4">
-              <ol className="flex items-center space-x-3 text-sm text-[#6b7280]">
+            <nav className={styles.breadcrumbNav}>
+              <ol className={styles.breadcrumbList}>
                 <li>
-                  <a href="/" className="hover:text-[#333333] transition-colors">
+                  <a href="/" className={styles.breadcrumbLink}>
                     Home
                   </a>
                 </li>
-                <li className="flex items-center">
-                  <div className="text-[#6b7280] mx-3" data-icon="CaretRight" data-size="16px" data-weight="regular">
+                <li className="flex items-center" style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className={`${styles.iconSm} ${styles.breadcrumbSeparator}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" fill="currentColor" viewBox="0 0 256 256">
                       <path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"></path>
                     </svg>
                   </div>
-                  <a href="/products" className="hover:text-[#141414] transition-colors">
+                  <a href="/products" className={styles.breadcrumbLink}>
                     Products
                   </a>
                 </li>
-                <li className="flex items-center">
-                  <div className="text-[#6b7280] mx-3" data-icon="CaretRight" data-size="16px" data-weight="regular">
+                <li className="flex items-center" style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className={`${styles.iconSm} ${styles.breadcrumbSeparator}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" fill="currentColor" viewBox="0 0 256 256">
                       <path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"></path>
                     </svg>
                   </div>
-                  <span className="text-[#141414] font-semibold">{product.title}</span>
+                  <span className={styles.breadcrumbCurrent}>{product.title}</span>
                 </li>
               </ol>
             </nav>
 
             {/* Product Detail Content */}
             <ErrorBoundary onError={handleErrorBoundaryError}>
-              <div className="flex flex-col">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 py-8">
+              <div className={styles.productWrapper}>
+                <div className={styles.productGrid}>
                   {/* Product Image */}
-                  <div className={`aspect-square relative overflow-hidden rounded-lg bg-[#f2f2f2] group ${styles.imageContainerBorder}`}>
+                  <div className={`${styles.imageWrapper} ${styles.imageContainerBorder} group`}>
                     {!state.imageLoaded && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#141414]"></div>
+                      <div className={styles.loaderWrapper}>
+                        <div className={styles.spinner}></div>
                       </div>
                     )}
                     <img
                       src={product.backgroundImage}
                       alt={product.title}
-                      className={`w-full h-full object-contain transition-all duration-300 ${state.imageLoaded ? 'opacity-100' : 'opacity-0'
-                        } ${state.showImageZoom ? 'scale-165' : 'scale-150'}`}
-                      style={{ imageRendering: 'auto' }}
+                      className={`${styles.productImage} ${state.imageLoaded ? styles.loaded : ''} ${state.showImageZoom ? styles.zoomActive : styles.zoomInactive}`}
                       onLoad={handleImageLoad}
                       onMouseEnter={handleImageMouseEnter}
                       onMouseLeave={handleImageMouseLeave}
@@ -686,14 +678,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       }}
                     />
                     {/* Image overlay for zoom effect */}
-                    <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none"></div>
+                    <div className={styles.imageOverlay}></div>
                     {/* Add subtle padding around image to prevent edge clipping when contain */}
-                    <div className="pointer-events-none absolute inset-0 p-2 md:p-3 lg:p-4"></div>
+                    <div className={styles.imagePaddingLayer}></div>
 
                     {/* Zoom indicator */}
                     {state.showImageZoom && (
-                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-lg">
-                        <svg className="w-4 h-4 text-[#141414]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className={styles.zoomIndicator}>
+                        <svg className={styles.iconSm} style={{ color: '#141414' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                         </svg>
                       </div>
@@ -701,22 +693,22 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   </div>
 
                   {/* Product Information */}
-                  <div className="flex flex-col gap-10">
+                  <div className={styles.productInfoColumn}>
                     {/* Title and Price */}
-                    <div className="flex flex-col gap-1">
-                      <h1 className="text-[#141414] tracking-tight text-4xl lg:text-5xl font-bold leading-tight">
+                    <div className={styles.titleGroup}>
+                      <h1 className={styles.productTitle}>
                         {product.title}
                       </h1>
                       {product.subtitle && (
-                        <p className="text-[#6b7280] text-xl font-normal leading-snug">
+                        <p className={styles.productSubtitle}>
                           {product.subtitle}
                         </p>
                       )}
 
                     </div>
                     {/* Price visually separated lower, creating a tighter title/subtitle pair */}
-                    <div className="flex items-center gap-1 mt-5">
-                      <span className="text-[#141414] text-3xl lg:text-4xl font-bold leading-tight">
+                    <div className={styles.priceGroup}>
+                      <span className={styles.currentPrice}>
                         {(product.currency && product.price !== undefined) ?
                           `${product.currency} ${product.price.toLocaleString()}` :
                           'Price not available'
@@ -724,10 +716,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       </span>
                       {product.originalPrice && product.originalPrice > (product.price || 0) && (
                         <>
-                          <span className="text-[#6b7280] text-xl font-normal leading-normal line-through">
+                          <span className={styles.originalPrice}>
                             {product.currency} {product.originalPrice.toLocaleString()}
                           </span>
-                          <span className="bg-red-100 text-red-800 text-sm font-semibold px-3 py-1 rounded-full">
+                          <span className={styles.discountBadge}>
+                            {(Math.round(((product.originalPrice - (product.price || 0)) / product.originalPrice) * 100))}% OFF
                           </span>
                         </>
                       )}
@@ -777,27 +770,30 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       <DescriptionWithExpand text={product.description} />
                     )}
 
+                    {/* Spacer for sticky bar */}
+                    <div className={styles.mobileSpacer}></div>
+
                     {/* Add to Cart Section */}
-                    <div className="flex flex-col gap-8 pt-8 border-t-2 border-[#e0e0e0]">
-                      <div className="flex items-center gap-6">
-                        <label htmlFor="quantity" className="text-[#141414] text-lg font-semibold">
+                    <div className={styles.mobileStickyBottom}>
+                      <div className={styles.quantityGroup}>
+                        <label htmlFor="quantity" className={styles.quantityLabel}>
                           Quantity
                         </label>
-                        <div className="flex items-center border-2 border-[#e0e0e0] rounded-2xl overflow-hidden bg-white shadow-sm">
+                        <div className={styles.quantitySelector}>
                           <button
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
                               handleQuantityChange(Math.max(1, state.selectedQuantity - 1));
                             }}
-                            className="px-4 py-3 hover:bg-[#f2f2f2] transition-colors disabled:opacity-50"
+                            className={styles.quantityBtn}
                             disabled={state.selectedQuantity <= 1}
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className={styles.iconSm} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                             </svg>
                           </button>
-                          <span className="px-6 py-3 min-w-[4rem] text-center text-lg font-semibold">
+                          <span className={styles.quantityValue}>
                             {state.selectedQuantity}
                           </span>
                           <button
@@ -806,10 +802,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                               e.stopPropagation();
                               handleQuantityChange(Math.min(10, state.selectedQuantity + 1));
                             }}
-                            className="px-4 py-3 hover:bg-[#f2f2f2] transition-colors disabled:opacity-50"
+                            className={styles.quantityBtn}
                             disabled={state.selectedQuantity >= 10}
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className={styles.iconSm} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                             </svg>
                           </button>
@@ -817,149 +813,80 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       </div>
 
                       {/* Shipping info */}
-                      <span className="font-medium text-[#6b7280]">Free shipping on orders over $50</span>
+                      <span className={styles.shippingText}>Free shipping on orders over $50</span>
 
-                      <div className="flex gap-4">
+                      <div className={styles.actionBtnGroup}>
                         <button
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             handleAddToCart();
                           }}
-                          className={`flex h-16 flex-1 shrink-0 items-center justify-center rounded-2xl font-semibold text-lg transition-all duration-200 ${product.inStock && !state.isAddingToCart && !cartLoading
-                            ? 'bg-[#141414] text-white hover:bg-[#333333] hover:shadow-xl transform hover:-translate-y-1 shadow-lg'
-                            : 'bg-[#e0e0e0] text-[#6b7280] cursor-not-allowed'
-                            }`}
+                          className={`${styles.addToCartBtn} ${product.inStock && !state.isAddingToCart && !cartLoading ? styles.btnPrimary : styles.btnDisabled}`}
                           disabled={!product.inStock || state.isAddingToCart || cartLoading}
                         >
                           {(state.isAddingToCart || cartLoading) ? (
-                            <div className="flex items-center gap-3">
+                            <>
                               <LoadingSpinner size="small" color="white" />
-                              <span className="text-lg font-semibold">Adding...</span>
-                            </div>
+                              <span>Adding...</span>
+                            </>
+                          ) : !product.inStock ? (
+                            'Out of Stock'
                           ) : (
-                            <div className="flex items-center gap-3">
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <>
+                              <svg className={styles.iconSm} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 11-4 0v-6m4 0V9a2 2 0 10-4 0v4.01" />
                               </svg>
-                              <span className="text-lg font-semibold">
-                                {product.inStock ? 'Add to Cart' : 'Out of Stock'}
+                              <span>
+                                Add to Cart
                               </span>
-                            </div>
+                            </>
                           )}
                         </button>
-
-                        {/* Wishlist button */}
                         <button
-                          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-[#e0e0e0] hover:bg-[#f2f2f2] hover:border-[#141414] transition-all duration-200 shadow-sm hover:shadow-md"
-                          title="Add to Wishlist"
+                          type="button"
+                          className={styles.wishlistBtn}
+                          aria-label="Add to wishlist"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            // Placeholder for wishlist logic
+                            console.log('Wishlist clicked');
+                          }}
                         >
-                          <svg className="w-6 h-6 text-[#141414]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          <svg className={styles.iconMd} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
                         </button>
                       </div>
-
-                      {/* Success/Error Feedback */}
-                      <div className="mt-4">
-                        <CartFeedback
-                          error={state.addToCartError || cartError}
-                          success={state.addToCartSuccess ? `Successfully added ${state.selectedQuantity} ${state.selectedQuantity === 1 ? 'item' : 'items'} to cart!` : null}
-                          onDismissError={() => {
-                            updateState({ addToCartError: null });
-                            clearError();
-                          }}
-                          onDismissSuccess={() => updateState({ addToCartSuccess: false })}
-                        />
-                      </div>
-
                     </div>
                   </div>
                 </div>
 
-                {/* Recently Viewed Section */}
-                {state.recentlyViewed.length > 1 && (
-                  <div className="mt-20 pt-12 border-t-2 border-[#e0e0e0]">
-                    <h3 className="text-[#141414] text-2xl lg:text-3xl font-bold leading-tight mb-10">
-                      Recently Viewed
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-                      {state.recentlyViewed
-                        .filter(item => item.id !== product.id)
-                        .slice(0, 3)
-                        .map((item) => (
-                          <a
-                            key={item.id}
-                            href={`/products/${generateProductHandle(item.title)}`}
-                            className="group block"
-                          >
-                            <div className="aspect-square relative overflow-hidden rounded-2xl bg-[#f2f2f2] mb-4 shadow-sm group-hover:shadow-lg transition-all duration-300">
-                              <img
-                                src={item.foregroundImage}
-                                alt={item.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = '/images/placeholder-product.svg';
-                                }}
-                              />
-                            </div>
-                            <h4 className="text-[#141414] text-base font-semibold leading-tight truncate group-hover:text-[#333333] transition-colors mb-2">
-                              {item.title}
-                            </h4>
-                            <p className="text-[#141414] text-lg font-bold leading-tight">
-                              {(item.currency && item.price !== undefined) ?
-                                `${item.currency} ${item.price.toLocaleString()}` :
-                                'Price not available'
-                              }
-                            </p>
-                          </a>
-                        ))}
-                    </div>
-                  </div>
+                {state.productData.features && (
+                  <FeaturesSection />
                 )}
 
-                {/* Product Features */}
-                <div className={`mt-16 pt-12 border-[#e0e0e0] ${styles.lastSection}`}>
-                  <FeaturesSection />
-                </div>
-
-                {/* Reviews - increase separation from the ridged section above */}
-                <div className="mt-32 md:mt-48 lg:mt-56 xl:mt-64">
+                <div className={styles.lastSection}>
+                  <SimilarProductsSection currentProduct={product} />
                   <ReviewsSection />
                 </div>
 
-                {/* Similar Products */}
-                <div className="mt-16">
-                  <SimilarProductsSection current={product} />
-                </div>
-
-                {/* Footer */}
-                <footer className={styles.footer}>
-                  <div className={styles.footerLinks}>
-                    {[
-                      { label: "About Us", href: "/about" },
-                      { label: "Contact", href: "/contact" },
-                      { label: "Terms of Service", href: "/terms" },
-                    ].map((link) => (
-                      <a
-                        key={link.label}
-                        className={styles.footerLink}
-                        href={link.href}
-                      >
-                        {link.label}
-                      </a>
-                    ))}
-                  </div>
-                  <p className={styles.footerCopyright}>
-                    © 2024 Shila Murthi. All rights reserved.
-                  </p>
-                </footer>
               </div>
             </ErrorBoundary>
           </div>
         </div>
       </div>
+
+      {/* Footer Mock */}
+      <footer className={styles.footer}>
+        <div className={styles.footerLinks}>
+          <a href="#" className={styles.footerLink}>About Us</a>
+          <a href="#" className={styles.footerLink}>Contact</a>
+          <a href="#" className={styles.footerLink}>Terms of Service</a>
+          <a href="#" className={styles.footerLink}>Privacy Policy</a>
+        </div>
+        <p className={styles.footerCopyright}>© 2024 Shila Murthi. All rights reserved.</p>
+      </footer>
     </div>
   );
 }

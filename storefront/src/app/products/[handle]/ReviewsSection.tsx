@@ -73,8 +73,8 @@ const ReviewsSection: React.FC = () => {
   const average =
     mockReviews.length > 0
       ? Math.round(
-          (mockReviews.reduce((acc, r) => acc + r.rating, 0) / mockReviews.length) * 10
-        ) / 10
+        (mockReviews.reduce((acc, r) => acc + r.rating, 0) / mockReviews.length) * 10
+      ) / 10
       : 0;
 
   return (
@@ -87,9 +87,8 @@ const ReviewsSection: React.FC = () => {
         <h3
           id="reviews-title"
           ref={titleAnim.elementRef as React.RefObject<HTMLHeadingElement>}
-          className={`tracking-tight text-[34px] md:text-[42px] lg:text-[52px] font-bold leading-[1.1] text-[#141414] transition-all duration-300 ${
-            titleAnim.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-          }`}
+          className={`tracking-tight text-[34px] md:text-[42px] lg:text-[52px] font-bold leading-[1.1] text-[#141414] transition-all duration-300 ${titleAnim.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+            }`}
         >
           What Customers Say
         </h3>
@@ -130,7 +129,7 @@ const ReviewsSection: React.FC = () => {
       </div>
 
       {/* Reviews grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-16 xl:gap-20">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-16 xl:gap-20">
         {mockReviews.map((r, idx) => {
           const anim = cardsAnims[idx];
           return (
