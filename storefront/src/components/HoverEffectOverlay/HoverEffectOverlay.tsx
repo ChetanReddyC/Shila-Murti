@@ -13,9 +13,9 @@ import { vertexShaderSource, fragmentShaderSource } from '../../utils/shaderSour
 import { edgeGradientVertexShaderSource, edgeGradientFragmentShaderSource } from '../../utils/edgeGradientShaderSources';
 
 export interface HoverOverlayAPI {
-  beginHover(cardElement: HTMLElement): void;
+  beginHover(cardElement: HTMLElement, shouldReset?: boolean): void;
   updatePointer(clientX: number, clientY: number): void;
-  endHover(): void;
+  endHover(cardElement?: HTMLElement | null): void;
 }
 
 interface CanvasRect {
@@ -84,7 +84,7 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
   }, [getContainerRect]);
 
   useImperativeHandle(ref, () => ({
-    beginHover(cardElement: HTMLElement) {
+    beginHover(cardElement: HTMLElement, shouldReset: boolean = false) {
       positionCanvasOverCard(cardElement);
       // Reparent canvas into the hovered card's image section to layer beneath its foreground
       const canvas = canvasRef.current;
@@ -115,6 +115,11 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
           }
         }
       }
+
+      // If requested, reset intensity to 0 to ensure a smooth fade-in (e.g. for scroll transitions)
+      if (shouldReset) {
+        intensityRef.current = 0;
+      }
       setActive(true);
     },
     updatePointer(clientX: number, clientY: number) {
@@ -125,7 +130,15 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
         y: clientY - containerRect.top,
       };
     },
-    endHover() {
+    endHover(cardElement?: HTMLElement | null) {
+      // Logic to prevent race conditions:
+      // If a specific card requested endHover, but we are currently hosted in a DIFFERENT card,
+      // that means another card has already taken over (called beginHover). 
+      // In this case, we should IGNORE the endHover request so we don't kill the new card's effect.
+      if (cardElement && hostElRef.current && hostElRef.current !== cardElement) {
+        return;
+      }
+
       setActive(false);
       pointerRef.current = null;
       if (isDebug) {
@@ -184,11 +197,11 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const positions = new Float32Array([
         -1, -1,
-         1, -1,
-        -1,  1,
-        -1,  1,
-         1, -1,
-         1,  1,
+        1, -1,
+        -1, 1,
+        -1, 1,
+        1, -1,
+        1, 1,
       ]);
       gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
 
@@ -461,17 +474,17 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
 
   const style: React.CSSProperties = isHostedInCard
     ? {
-        position: 'absolute',
-        left: '0px',
-        top: '0px',
-        width: '100%',
-        height: '100%',
-        opacity: 1,
-        transform: 'translateZ(0)',
-        zIndex: 50,
-      }
+      position: 'absolute',
+      left: '0px',
+      top: '0px',
+      width: '100%',
+      height: '100%',
+      opacity: 1,
+      transform: 'translateZ(0)',
+      zIndex: 50,
+    }
     : canvasRect
-    ? {
+      ? {
         left: `${Math.round(canvasRect.left)}px`,
         top: `${Math.round(canvasRect.top)}px`,
         width: `${Math.round(canvasRect.width)}px`,
@@ -480,7 +493,7 @@ const HoverEffectOverlay = forwardRef<HoverOverlayAPI, HoverEffectOverlayProps>(
         transform: 'translateZ(0)',
         zIndex: 50,
       }
-    : { opacity: 0 };
+      : { opacity: 0 };
 
   return (
     <div ref={rootRef} className={styles.overlayRoot} aria-hidden>
