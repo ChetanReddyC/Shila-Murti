@@ -41,12 +41,29 @@ const mockReviews: Review[] = [
     content:
       'Exceeded expectations. It has a lovely presence and blends perfectly with our decor. Will buy again.',
   },
+  {
+    id: 'r4',
+    author: 'Priya Singh',
+    rating: 5,
+    date: '2025-01-20',
+    content:
+      'Absolutely love it! The detailing on the idol is intricate and beautiful. It brings such a positive vibe to my home.',
+    variant: 'Standard',
+  },
+  {
+    id: 'r5',
+    author: 'Karan Mehta',
+    rating: 4,
+    date: '2025-01-25',
+    content:
+      'Good quality product. Heavier than I expected, which is nice. Packaging could be slightly better but item was safe.',
+  },
 ];
 
 function Star({ filled }: { filled: boolean }) {
   return (
     <svg
-      className={`w-4 h-4 ${filled ? 'text-[#141414]' : 'text-[#d1d5db]'}`}
+      className={`${reviewStyles.starIcon} ${filled ? reviewStyles.starFilled : reviewStyles.starEmpty}`}
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -63,12 +80,9 @@ function Star({ filled }: { filled: boolean }) {
 }
 
 const ReviewsSection: React.FC = () => {
-  const titleAnim = useScrollAnimation({ threshold: 0.2, rootMargin: '0px 0px -100px 0px' });
-  const summaryAnim = useScrollAnimation({ threshold: 0.2, rootMargin: '0px 0px -100px 0px' });
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
-  const cardsAnims = mockReviews.map(() =>
-    useScrollAnimation({ threshold: 0.15, rootMargin: '0px 0px -100px 0px' })
-  );
+
 
   const average =
     mockReviews.length > 0
@@ -77,117 +91,120 @@ const ReviewsSection: React.FC = () => {
       ) / 10
       : 0;
 
+  // State to lock height for seamless transition
+  const [fixedHeight, setFixedHeight] = React.useState<number | undefined>(undefined);
+  // Scroll the new items into view when expanded
+  const gridRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (isExpanded && gridRef.current) {
+      const grid = gridRef.current;
+      const firstNewItem = grid.children[3] as HTMLElement;
+
+      if (firstNewItem) {
+        // Scroll to specifically align the first new review at the top
+        // using requestAnimationFrame ensures layout is ready
+        requestAnimationFrame(() => {
+          grid.scrollTo({ top: firstNewItem.offsetTop - 12, behavior: 'smooth' });
+        });
+      }
+    }
+  }, [isExpanded]);
+
+  const toggleExpand = () => {
+    if (!isExpanded) {
+      // Expanding: Lock the current height to prevent layout shift
+      if (gridRef.current) {
+        setFixedHeight(gridRef.current.offsetHeight);
+      }
+      setIsExpanded(true);
+    } else {
+      // Collapsing: Reset to auto height
+      setIsExpanded(false);
+      setFixedHeight(undefined);
+      if (gridRef.current) {
+        gridRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
+
+  const visibleReviews = isExpanded ? mockReviews : mockReviews.slice(0, 3);
+
   return (
     <section
-      className="mt-32 md:mt-40 lg:mt-48 pt-4"
+      className={reviewStyles.reviewsSection}
       aria-labelledby="reviews-title"
     >
-      {/* Section header aligned left, matching page intro hierarchy */}
-      <div className="flex flex-col items-start text-left mb-16 md:mb-20 max-w-5xl gap-3 md:gap-3">
+      {/* ... header code ... */}
+      <div className={reviewStyles.headerContainer}>
+        {/* ... (keep existing header content, omitting for brevity in tool call if not replacing) ... */}
         <h3
           id="reviews-title"
-          ref={titleAnim.elementRef as React.RefObject<HTMLHeadingElement>}
-          className={`tracking-tight text-[34px] md:text-[42px] lg:text-[52px] font-bold leading-[1.1] text-[#141414] transition-all duration-300 ${titleAnim.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-            }`}
+          className={reviewStyles.title}
         >
           What Customers Say
         </h3>
-        {/* Subtitle wrapped to allow absolute/relative fine control */}
-        <div className="relative w-full">
+        <div className={reviewStyles.subtitleWrapper}>
           <p className={reviewStyles.subtitle}>
             Real experiences from people who bought this product.
           </p>
         </div>
-
-        {/* Rating summary emphasizes left alignment like price row */}
         <div
-          ref={summaryAnim.elementRef as React.RefObject<HTMLDivElement>}
-          className="flex items-center gap-6 md:gap-8 mt-2"
-          style={{
-            transition: 'opacity 250ms, transform 250ms',
-            opacity: summaryAnim.isVisible ? 1 : 0,
-            transform: summaryAnim.isVisible ? 'translateY(0)' : 'translateY(4px)',
-          }}
+          className={reviewStyles.summaryRow}
         >
-          <span className="text-[#141414] text-3xl md:text-4xl font-bold leading-tight tabular-nums">
-            {average.toFixed(1)} / 5
-          </span>
-          <div className="flex" aria-label={`${average} out of 5 stars`}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Star key={i} filled={i <= Math.round(average)} />
-            ))}
+          <span className={reviewStyles.summaryRating}>{average.toFixed(1)} / 5</span>
+          <div className={reviewStyles.starsContainer} aria-label={`${average} out of 5 stars`}>
+            {[1, 2, 3, 4, 5].map((i) => (<Star key={i} filled={i <= Math.round(average)} />))}
           </div>
-          <span className="text-[#6b7280] text-base md:text-lg">
-            {mockReviews.length} {mockReviews.length === 1 ? 'review' : 'reviews'}
-          </span>
-        </div>
-
-        {/* Subtle bottom line aligned left */}
-        <div className="mt-10 md:mt-12 w-full">
-          <div className="h-px w-40 md:w-64 bg-gradient-to-r from-[#e5e7eb] to-transparent"></div>
+          <span className={reviewStyles.reviewCount}>{mockReviews.length} {mockReviews.length === 1 ? 'review' : 'reviews'}</span>
         </div>
       </div>
 
-      {/* Reviews grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-16 xl:gap-20">
-        {mockReviews.map((r, idx) => {
-          const anim = cardsAnims[idx];
+      {/* Reviews Stack */}
+      <div
+        ref={gridRef}
+        className={`${reviewStyles.reviewsGrid} ${isExpanded ? reviewStyles.reviewsGridExpanded : ''}`}
+        style={{ height: isExpanded && fixedHeight ? `${fixedHeight}px` : undefined }}
+      >
+        {visibleReviews.map((r, idx) => {
           return (
             <article
               key={r.id}
-              ref={anim.elementRef as React.RefObject<HTMLDivElement>}
-              className={`px-6 py-6 md:px-7 md:py-7 rounded-2xl border border-[#f0f0f0] bg-white ${styles.featuresDivs} transition-all duration-500`}
-              style={{
-                transitionProperty: 'opacity, transform, filter, box-shadow',
-                transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
-                transitionDelay: anim.isVisible ? `${200 + idx * 150}ms` : '0ms',
-                opacity: anim.isVisible ? 1 : 0,
-                transform: anim.isVisible ? 'translateY(0) scale(1)' : 'translateY(24px) scale(0.99)',
-                filter: anim.isVisible ? 'blur(0)' : 'blur(4px)',
-              }}
+              className={reviewStyles.reviewCard}
             >
-              <header className="mb-5 md:mb-6">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-[#141414] to-[#333333] flex items-center justify-center text-white text-base md:text-lg font-semibold shadow-md"
-                    aria-hidden="true"
-                    style={{ animation: anim.isVisible ? 'pulseGlow 3s infinite' : 'none' }}
-                  >
-                    {r.author.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex flex-col">
-                    <h4 className="text-[#141414] text-lg md:text-[20px] font-semibold leading-tight tracking-[-0.01em]">
-                      {r.author}
-                    </h4>
-                    <p className="text-[#6b7280] text-sm md:text-[15px] leading-relaxed">
-                      {new Date(r.date).toLocaleDateString()}
-                      {r.variant ? ` • ${r.variant}` : ''}
-                    </p>
+              <header className={reviewStyles.cardHeader}>
+                <div className={reviewStyles.authorMeta}>
+                  <h4 className={reviewStyles.authorName}>{r.author}</h4>
+                  <div className={reviewStyles.subMeta}>
+                    <div className={reviewStyles.starsContainer}>
+                      {[1, 2, 3, 4, 5].map((i) => (<Star key={i} filled={i <= r.rating} />))}
+                    </div>
+                    <span className={reviewStyles.dateString}>
+                      • {r.variant ? `${r.variant}, ` : ''}{new Date(r.date).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
               </header>
-
-              <div className="mb-5 md:mb-6 flex items-center gap-3">
-                <div className="flex" aria-label={`${r.rating} out of 5 stars`}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} filled={i <= r.rating} />
-                  ))}
-                </div>
-                <span className="text-[#141414] text-base md:text-lg font-semibold tabular-nums">
-                  {r.rating}.0
-                </span>
-              </div>
-
-              <p className="text-[#141414] text-[15px] md:text-[16px] leading-7 md:leading-8 tracking-[-0.01em]">
-                {r.content}
-              </p>
+              <p className={reviewStyles.reviewContent}>{r.content}</p>
             </article>
           );
         })}
       </div>
 
+      {/* Bottom Toggle Button sitting on border */}
+      {mockReviews.length > 3 && (
+        <div className={reviewStyles.bottomToggleWrapper}>
+          <button
+            onClick={toggleExpand}
+            className={reviewStyles.controlBtn}
+          >
+            {isExpanded ? 'Show Less' : `Show ${mockReviews.length - 3} More`}
+          </button>
+        </div>
+      )}
+
       {/* Anchor target for write review (placeholder) */}
-      <div id="write-review" className="sr-only" aria-hidden="true" />
+      <div id="write-review" className={reviewStyles.srOnly} aria-hidden="true" />
     </section>
   );
 };

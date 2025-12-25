@@ -30,7 +30,7 @@ const FeaturesSection: React.FC = () => {
   return (
     <>
       <h3
-        ref={titleAnimation.elementRef as React.RefObject<HTMLHeadingElement>}
+        ref={titleAnimation.elementRef}
         className={`text-center text-2xl font-bold mb-8 text-[#141414] transition-all duration-700 ${titleAnimation.isVisible ? 'opacity-100 transform-none' : 'opacity-0 translate-y-10 blur-[4px]'}`}
         style={{
           transitionDelay: titleAnimation.isVisible ? '0ms' : '0ms'
@@ -41,7 +41,7 @@ const FeaturesSection: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
         {/* Feature 1 - Quality Guarantee */}
         <div
-          ref={feature1Animation.elementRef as React.RefObject<HTMLDivElement>}
+          ref={feature1Animation.elementRef}
           className={`flex items-center gap-3 p-3 rounded-2xl border border-[#f0f0f0] transition-all duration-700 ${styles.featuresDivs}`}
           style={{
             transitionProperty: 'opacity, transform, filter, box-shadow',
@@ -89,7 +89,7 @@ const FeaturesSection: React.FC = () => {
 
         {/* Feature 2 - Fast Shipping */}
         <div
-          ref={feature2Animation.elementRef as React.RefObject<HTMLDivElement>}
+          ref={feature2Animation.elementRef}
           className={`flex items-center gap-4 p-4 bg-white rounded-2xl border border-[#f0f0f0] transition-all duration-700 ${styles.featuresDivs}`}
           style={{
             transitionProperty: 'opacity, transform, filter, box-shadow',
@@ -137,7 +137,7 @@ const FeaturesSection: React.FC = () => {
 
         {/* Feature 3 - 24/7 Support */}
         <div
-          ref={feature3Animation.elementRef as React.RefObject<HTMLDivElement>}
+          ref={feature3Animation.elementRef}
           className={`flex items-center gap-4 p-4 bg-white rounded-2xl border border-[#f0f0f0] transition-all duration-700 ${styles.featuresDivs}`}
           style={{
             transitionProperty: 'opacity, transform, filter, box-shadow',

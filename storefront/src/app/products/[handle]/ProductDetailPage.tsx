@@ -770,6 +770,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       <DescriptionWithExpand text={product.description} />
                     )}
 
+                    {/* Reviews next to description */}
+                    <div className="mt-8 mb-4">
+                      <ReviewsSection />
+                    </div>
+
                     {/* Spacer for sticky bar */}
                     <div className={styles.mobileSpacer}></div>
 
@@ -868,7 +873,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
                 <div className={styles.lastSection}>
                   <SimilarProductsSection currentProduct={product} />
-                  <ReviewsSection />
+                  {/* Reviews moved up */}
                 </div>
 
               </div>
