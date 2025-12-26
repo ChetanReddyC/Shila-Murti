@@ -7,6 +7,7 @@ import {
   markCompletionSuccess,
   validateCashfreeOrder,
   releaseCompletionLock,
+  generateIdempotencyKey,
 } from '@/utils/orderCompletionGuard'
 import { captureMedusaPayment, getPaymentIdFromOrder } from '@/utils/medusaPaymentCapture'
 import { getOrderCartMapping } from '@/lib/cashfreeMapping'
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({})) as any
     const orderId = typeof body?.orderId === 'string' ? body.orderId : undefined
     const customerId = typeof body?.customerId === 'string' ? body.customerId : undefined
+
+    // Generate idempotency key for this completion attempt (best practice for financial transactions)
+    const idempotencyKey = cartId ? generateIdempotencyKey(cartId, orderId) : undefined
 
     console.log('============ CART ID:', cartId, 'ORDER ID:', orderId, 'CUSTOMER ID:', customerId, '============')
 
@@ -230,7 +234,7 @@ export async function POST(req: NextRequest) {
     if (!cartId) return NextResponse.json({ error: 'cartId required' }, { status: 400 })
 
     // SECURITY FIX: Acquire atomic distributed lock to prevent race conditions
-    const lockResult = await acquireCompletionLock(cartId, orderId)
+    const lockResult = await acquireCompletionLock(cartId, orderId, idempotencyKey)
     if (!lockResult.allowed) {
       try { console.warn('[COMPLETE_API][blocked]', { cartId, orderId, reason: lockResult.reason }) } catch { }
 
@@ -378,8 +382,8 @@ export async function POST(req: NextRequest) {
 
       // Mark completion as successful to prevent duplicates
       if (createdOrderId) {
-        await markCompletionSuccess(cartId, createdOrderId)
-        try { console.log('[COMPLETE_API][marked_success]', { cartId, orderId: createdOrderId }) } catch { }
+        await markCompletionSuccess(cartId, createdOrderId, idempotencyKey)
+        try { console.log('[COMPLETE_API][marked_success]', { cartId, orderId: createdOrderId, idempotencyKey }) } catch { }
       }
 
       // Store Cashfree order ID in Medusa order metadata for future refunds

@@ -46,21 +46,45 @@ export function generateIdempotencyKey(cartId: string, orderId?: string): string
  * 
  * SECURITY FIX: Uses distributed lock with atomic SET NX to prevent race conditions
  * 
+ * @param idempotencyKey - Optional idempotency key for instant duplicate detection
  * @returns Lock object if allowed, reason if blocked
  */
 export async function acquireCompletionLock(
   cartId: string,
-  orderId?: string
+  orderId?: string,
+  idempotencyKey?: string
 ): Promise<CompletionLock> {
   try {
+    // Fast path: Check idempotency key first (instant duplicate detection)
+    if (idempotencyKey) {
+      const idempotencyIndex = `idempotency:${idempotencyKey}`
+      const existingByKey = await kvGet<{ cartId: string; orderId: string; timestamp: number }>(idempotencyIndex)
+
+      if (existingByKey) {
+        console.info('[COMPLETION_GUARD][idempotent_by_key]', {
+          idempotencyKey,
+          existingCartId: existingByKey.cartId,
+          existingOrderId: existingByKey.orderId,
+          message: 'Request already processed (idempotency key match)',
+        })
+        return {
+          allowed: false,
+          reason: 'Request already processed (duplicate idempotency key)',
+          existingOrderId: existingByKey.orderId,
+        }
+      }
+    }
+
     // Check if cart is already completed (idempotency check)
     const completedKey = `order:completed:${cartId}`
     const existingCompletion = await kvGet<CompletionAttempt>(completedKey)
-    
+
     if (existingCompletion?.status === 'completed') {
       console.info('[COMPLETION_GUARD][idempotent_return]', {
         cartId,
         existingOrderId: existingCompletion.orderId,
+        idempotencyKey: existingCompletion.idempotencyKey,
+        message: 'Cart already completed - returning existing order (idempotency protection)',
       })
       return {
         allowed: false,
@@ -72,7 +96,7 @@ export async function acquireCompletionLock(
     // Check attempt count to prevent brute force
     const attemptKey = `order:attempts:${cartId}`
     const attempts = await kvGet<number>(attemptKey) || 0
-    
+
     if (attempts >= MAX_ATTEMPTS_PER_CART) {
       console.warn('[COMPLETION_GUARD][max_attempts]', { cartId, attempts })
       return {
@@ -84,12 +108,12 @@ export async function acquireCompletionLock(
     // Rate limiting per cart
     const rateLimitKey = `order:ratelimit:${cartId}`
     const requestCount = await kvIncr(rateLimitKey)
-    
+
     if (requestCount === 1) {
       // Set TTL on first request
       await kvSet(rateLimitKey, requestCount, RATE_LIMIT_WINDOW)
     }
-    
+
     if (requestCount && requestCount > MAX_REQUESTS_PER_MINUTE) {
       console.warn('[COMPLETION_GUARD][rate_limited]', { cartId, requestCount })
       return {
@@ -101,7 +125,7 @@ export async function acquireCompletionLock(
     // SECURITY FIX: Acquire atomic distributed lock
     const lockResource = `cart:complete:${cartId}`
     const lockResult = await acquireDistributedLock(lockResource, COMPLETION_LOCK_TTL)
-    
+
     if (!lockResult.success) {
       console.warn('[COMPLETION_GUARD][lock_failed]', {
         cartId,
@@ -126,7 +150,7 @@ export async function acquireCompletionLock(
       allowed: true,
       lock: lockResult.lock,
     }
-    
+
   } catch (error) {
     console.error('[COMPLETION_GUARD][acquire_lock][error]', {
       cartId,
@@ -146,7 +170,7 @@ export async function acquireCompletionLock(
 export async function releaseCompletionLock(lock: Lock): Promise<void> {
   try {
     const released = await releaseDistributedLock(lock)
-    
+
     if (released) {
       console.log('[COMPLETION_GUARD][lock_released]', {
         resource: lock.resource,
@@ -190,7 +214,13 @@ export async function markCompletionSuccess(
     // Also track by orderId for webhook validation
     const orderKey = `order:cart:${orderId}`
     await kvSet(orderKey, cartId, 86400 * 7) // 7 days
-    
+
+    // Store by idempotency key for instant duplicate detection (best practice)
+    if (idempotencyKey) {
+      const idempotencyIndex = `idempotency:${idempotencyKey}`
+      await kvSet(idempotencyIndex, { cartId, orderId, timestamp: Date.now() }, 86400 * 7) // 7 days
+    }
+
     console.log('[COMPLETION_GUARD][success_marked]', {
       cartId,
       orderId,
