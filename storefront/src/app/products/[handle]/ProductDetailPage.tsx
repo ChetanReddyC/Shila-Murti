@@ -871,10 +871,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   <FeaturesSection />
                 )}
 
-                <div className={styles.lastSection}>
-                  <SimilarProductsSection currentProduct={product} />
-                  {/* Reviews moved up */}
-                </div>
+                <SimilarProductsSection current={product} />
+                {/* Reviews moved up */}
 
               </div>
             </ErrorBoundary>
@@ -884,13 +882,15 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
       {/* Footer Mock */}
       <footer className={styles.footer}>
-        <div className={styles.footerLinks}>
-          <a href="#" className={styles.footerLink}>About Us</a>
-          <a href="#" className={styles.footerLink}>Contact</a>
-          <a href="#" className={styles.footerLink}>Terms of Service</a>
-          <a href="#" className={styles.footerLink}>Privacy Policy</a>
+        <div className={styles.footerContent}>
+          <div className={styles.footerLinks}>
+            <a href="#" className={styles.footerLink}>About Us</a>
+            <a href="#" className={styles.footerLink}>Contact</a>
+            <a href="#" className={styles.footerLink}>Terms of Service</a>
+            <a href="#" className={styles.footerLink}>Privacy Policy</a>
+          </div>
+          <p className={styles.footerCopyright}>© 2024 Shila Murthi. All rights reserved.</p>
         </div>
-        <p className={styles.footerCopyright}>© 2024 Shila Murthi. All rights reserved.</p>
       </footer>
     </div>
   );

@@ -109,18 +109,20 @@ const SimilarProductsSection: React.FC<SimilarProductsSectionProps> = ({ current
           <h3 className={styles.title}>Similar Products</h3>
           <Link href="/products" className={styles.viewAll}>View all</Link>
         </div>
-        <div className={styles.grid}>
-          {Array.from({ length: Math.min(limit, 8) }, (_, i) => (
-            <div key={`sim-skel-${i}`} className={styles.cardWrapper}>
-              {/* Reuse the skeleton look by minimal placeholder to avoid Tailwind, ProductCardSkeleton is used in grid; here keep light */}
-              <div style={{
-                aspectRatio: '1 / 1',
-                width: '100%',
-                borderRadius: '16px',
-                background: '#f2f2f2'
-              }} />
-            </div>
-          ))}
+        <div className={styles.gradientContainer}>
+          <div className={styles.grid}>
+            {Array.from({ length: Math.min(limit, 8) }, (_, i) => (
+              <div key={`sim-skel-${i}`} className={styles.cardWrapper}>
+                {/* Reuse the skeleton look by minimal placeholder to avoid Tailwind, ProductCardSkeleton is used in grid; here keep light */}
+                <div style={{
+                  aspectRatio: '1 / 1',
+                  width: '100%',
+                  borderRadius: '16px',
+                  background: '#f2f2f2'
+                }} />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -133,7 +135,9 @@ const SimilarProductsSection: React.FC<SimilarProductsSectionProps> = ({ current
           <h3 className={styles.title}>Similar Products</h3>
           <Link href="/products" className={styles.viewAll}>View all</Link>
         </div>
-        <p className={styles.emptyState}>Unable to load similar products.</p>
+        <div className={styles.gradientContainer}>
+          <p className={styles.emptyState}>Unable to load similar products.</p>
+        </div>
       </section>
     );
   }
@@ -149,16 +153,18 @@ const SimilarProductsSection: React.FC<SimilarProductsSectionProps> = ({ current
           <h3 className={styles.title}>Similar Products</h3>
           <Link href="/products" className={styles.viewAll}>View all</Link>
         </div>
-        <div className={styles.grid}>
-          {state.products.map((prod) => {
-            const handle = generateProductHandle(prod.title);
-            return (
-              <div key={prod.id ?? handle} className={styles.cardWrapper}>
-                {/* Use the exact card used on /products to inherit the hover effect */}
-                <ProductCardWithShader product={prod} overlayRef={overlayRef} />
-              </div>
-            );
-          })}
+        <div className={styles.gradientContainer}>
+          <div className={styles.grid}>
+            {state.products.map((prod) => {
+              const handle = generateProductHandle(prod.title);
+              return (
+                <div key={prod.id ?? handle} className={styles.cardWrapper}>
+                  {/* Use the exact card used on /products to inherit the hover effect */}
+                  <ProductCardWithShader product={prod} overlayRef={overlayRef} />
+                </div>
+              );
+            })}
+          </div>
         </div>
         <HoverEffectOverlay ref={overlayRef} debug={process.env.NODE_ENV !== 'production'} />
       </section>
