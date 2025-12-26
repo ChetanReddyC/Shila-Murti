@@ -357,12 +357,21 @@ export async function POST(req: NextRequest) {
 
       // Debug: Log full order structure to find payment ID location
       try {
+        const paymentCollections = createdOrder?.payment_collections || []
+        const firstPaymentCollection = paymentCollections[0]
+        const payments = firstPaymentCollection?.payments || []
+        const firstPayment = payments[0]
+
         console.log('[COMPLETE_API][order_structure]', {
           orderId: createdOrderId,
           hasPayment: 'payment' in (createdOrder || {}),
           hasPayments: 'payments' in (createdOrder || {}),
           hasPaymentId: 'payment_id' in (createdOrder || {}),
           hasPaymentCollection: 'payment_collection' in (createdOrder || {}),
+          hasPaymentCollections: Array.isArray(paymentCollections) && paymentCollections.length > 0,
+          paymentCollectionsCount: paymentCollections.length,
+          paymentsCount: payments.length,
+          extractedPaymentId: firstPayment?.id,
           orderKeys: Object.keys(createdOrder || {})
         })
       } catch { }
@@ -464,38 +473,52 @@ export async function POST(req: NextRequest) {
         // Attempt 2: Medusa payment capture (fallback when Cashfree already settled)
         if (!capturedViaCashfree) {
           try {
-            const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
-            const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+            // Extract payment ID directly from the already-expanded order
+            // (completeCart now requests expanded payment_collections.payments)
+            let paymentId: string | undefined = createdOrder?.payment_collections?.[0]?.payments?.[0]?.id
 
-            // Fetch order with properly expanded payment_collections.payments
-            let paymentId: string | undefined
+            // Fallback: If payment ID wasn't in the completed order, fetch it separately
+            if (!paymentId) {
+              console.warn('[COMPLETE_API][fallback_payment_fetch]', {
+                orderId: createdOrderId,
+                reason: 'Payment ID not in completed order response'
+              })
 
-            try {
-              const orderResponse = await fetch(
-                `${baseUrl}/store/orders/${createdOrderId}?fields=*payment_collections.payments`,
-                {
-                  method: 'GET',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'x-publishable-api-key': publishableKey || ''
+              const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
+              const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+
+              try {
+                const orderResponse = await fetch(
+                  `${baseUrl}/store/orders/${createdOrderId}?fields=*payment_collections.payments`,
+                  {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-publishable-api-key': publishableKey || ''
+                    }
                   }
-                }
-              )
+                )
 
-              if (orderResponse.ok) {
-                const orderData = await orderResponse.json()
-                const order = orderData?.order
-                paymentId = order?.payment_collections?.[0]?.payments?.[0]?.id
-              } else {
-                console.error('[COMPLETE_API][order_fetch_failed]', {
+                if (orderResponse.ok) {
+                  const orderData = await orderResponse.json()
+                  const order = orderData?.order
+                  paymentId = order?.payment_collections?.[0]?.payments?.[0]?.id
+                } else {
+                  console.error('[COMPLETE_API][order_fetch_failed]', {
+                    orderId: createdOrderId,
+                    status: orderResponse.status
+                  })
+                }
+              } catch (fetchError: any) {
+                console.error('[COMPLETE_API][order_fetch_exception]', {
                   orderId: createdOrderId,
-                  status: orderResponse.status
+                  error: fetchError?.message || String(fetchError)
                 })
               }
-            } catch (fetchError: any) {
-              console.error('[COMPLETE_API][order_fetch_exception]', {
+            } else {
+              console.log('[COMPLETE_API][payment_id_from_order]', {
                 orderId: createdOrderId,
-                error: fetchError?.message || String(fetchError)
+                paymentId
               })
             }
 

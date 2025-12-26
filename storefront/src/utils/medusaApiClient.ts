@@ -881,7 +881,8 @@ export class MedusaApiClient {
 
   /** Complete the cart and expect an order in response */
   async completeCart(cartId: string): Promise<CompleteCartResponse> {
-    const endpoint = `/store/carts/${cartId}/complete`;
+    // Request expanded payment_collections.payments for auto-capture
+    const endpoint = `/store/carts/${cartId}/complete?fields=*payment_collections.payments`;
     const maxRetries = 3;
     let lastError: any;
 
