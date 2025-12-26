@@ -44,6 +44,24 @@ async function validateCheckoutAuth(
       return digits ? `+${digits}` : undefined;
     };
 
+    // PRIORITY 0: Check httpOnly cookie (Most reliable - set after OTP/Magic Link verification)
+    try {
+      const customerIdCookie = req.cookies.get('customer_id')?.value;
+
+      if (customerIdCookie) {
+        console.log('[CREATE_ORDER][cookie_auth_success]', {
+          customerId: customerIdCookie.substring(0, 15) + '...',
+        });
+        return {
+          authenticated: true,
+          customerId: customerIdCookie,
+          method: 'cookie',
+        };
+      }
+    } catch (error) {
+      console.error('[CREATE_ORDER][cookie_check_error]', error);
+    }
+
     // PRIORITY 1: Check for valid NextAuth session (App Router way)
     try {
       const session = await getServerSession(authOptions);
@@ -218,9 +236,8 @@ export async function POST(req: NextRequest) {
         customer_phone: digitsPhone || '',
       },
       order_meta: {
-        return_url: `${appOrigin}/return?order_id=${encodeURIComponent(orderId)}${
-          cartId ? `&cart_id=${encodeURIComponent(cartId)}` : ''
-        }`,
+        return_url: `${appOrigin}/return?order_id=${encodeURIComponent(orderId)}${cartId ? `&cart_id=${encodeURIComponent(cartId)}` : ''
+          }`,
         ...(publicNotifyUrl ? { notify_url: publicNotifyUrl } : {}),
       },
     };

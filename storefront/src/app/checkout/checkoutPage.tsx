@@ -152,7 +152,7 @@ export default function CheckoutPage() {
 
   const [cartIdFromUrl, setCartIdFromUrl] = useState<string | null>(null)
 
-  
+
 
   // Conditional mediation state
 
@@ -165,7 +165,7 @@ export default function CheckoutPage() {
   const [purchaseReady, setPurchaseReady] = useState(false)
 
   const [customerId, setCustomerId] = useState<string | null>(null)
-  
+
   // Cache flag to avoid repeated API calls for customer ID retrieval
   const [customerIdFetched, setCustomerIdFetched] = useState(false)
 
@@ -394,7 +394,7 @@ export default function CheckoutPage() {
 
           });
 
-          
+
 
           if (!response.ok) {
 
@@ -406,11 +406,11 @@ export default function CheckoutPage() {
 
           }
 
-          
+
 
           const data = await response.json();
 
-          
+
 
           if (data?.valid === true) {
 
@@ -418,7 +418,7 @@ export default function CheckoutPage() {
 
             setPurchaseReady(true);
 
-            
+
 
             // Extract customerId from session if available
 
@@ -496,13 +496,13 @@ export default function CheckoutPage() {
 
     };
 
-    
+
 
     validateSession();
 
   }, [status, session]);
 
-  
+
 
   // On mount: Try to retrieve customer ID from hybrid storage if not already set
 
@@ -520,17 +520,17 @@ export default function CheckoutPage() {
 
       }
 
-      
+
 
       console.log('[CHECKOUT] Checking for existing customer ID in hybrid storage on mount...');
 
-      
+
 
       try {
 
         const result = await getCustomerIdHybrid();
 
-        
+
 
         if (result.ok && result.customerId) {
 
@@ -560,7 +560,7 @@ export default function CheckoutPage() {
 
     };
 
-    
+
 
     retrieveCustomerId();
 
@@ -576,7 +576,7 @@ export default function CheckoutPage() {
 
     let abortController: AbortController | null = null
 
-    
+
 
     const startConditionalUI = async () => {
 
@@ -596,7 +596,7 @@ export default function CheckoutPage() {
 
         setConditionalUIActive(true)
 
-        
+
 
         // Check if conditional mediation is supported
 
@@ -612,13 +612,13 @@ export default function CheckoutPage() {
 
         }
 
-        
+
 
         // Create abort controller to cancel the request if needed
 
         abortController = new AbortController()
 
-        
+
 
         // Get a generic challenge for conditional UI (doesn't need user identifier)
 
@@ -634,7 +634,7 @@ export default function CheckoutPage() {
 
         })
 
-        
+
 
         if (!optionsRes.ok) {
 
@@ -644,17 +644,17 @@ export default function CheckoutPage() {
 
         }
 
-        
+
 
         const { options, userId: canonicalUserId } = await optionsRes.json()
 
-        
+
 
         // Start conditional authentication (non-blocking, waits for user input)
 
         const { data, error: authError } = await authenticateConditional(options)
 
-        
+
 
         if (authError) {
 
@@ -666,7 +666,7 @@ export default function CheckoutPage() {
 
         }
 
-        
+
 
         if (data) {
 
@@ -674,7 +674,7 @@ export default function CheckoutPage() {
 
           setIdentityError('Authenticating with passkey...')
 
-          
+
 
           // Verify the passkey
 
@@ -696,7 +696,7 @@ export default function CheckoutPage() {
 
           })
 
-          
+
 
           if (!verifyRes.ok) {
 
@@ -706,13 +706,13 @@ export default function CheckoutPage() {
 
           }
 
-          
+
 
           const result = await verifyRes.json()
 
           console.log('🔵 [Checkout ConditionalUI] Verify response:', result)
 
-          
+
 
           // Extract identifier from result (email or phone)
 
@@ -720,7 +720,7 @@ export default function CheckoutPage() {
 
           console.log('🔵 [Checkout ConditionalUI] Extracted userIdentifier:', userIdentifier)
 
-          
+
 
           // Mark passkey authentication success
 
@@ -756,7 +756,7 @@ export default function CheckoutPage() {
 
           }
 
-          
+
 
           // Ensure customer exists
 
@@ -768,13 +768,13 @@ export default function CheckoutPage() {
 
             console.log('🔵 [Checkout ConditionalUI] Ensuring customer for:', id)
 
-            const ensure = await fetch('/api/account/customer/ensure', { 
+            const ensure = await fetch('/api/account/customer/ensure', {
 
-              method: 'POST', 
+              method: 'POST',
 
-              headers: { 'Content-Type': 'application/json' }, 
+              headers: { 'Content-Type': 'application/json' },
 
-              body: JSON.stringify(id) 
+              body: JSON.stringify(id)
 
             })
 
@@ -806,7 +806,7 @@ export default function CheckoutPage() {
 
           }
 
-          
+
 
           // Set purchase ready state
 
@@ -818,7 +818,7 @@ export default function CheckoutPage() {
 
             setIdentityError('✅ Authenticated with passkey! You can now place your order.')
 
-            
+
 
             // Update NextAuth session
 
@@ -826,19 +826,19 @@ export default function CheckoutPage() {
 
               const { signIn } = await import('next-auth/react')
 
-              const signInResult = await signIn('session', { 
+              const signInResult = await signIn('session', {
 
-                identifier: userIdentifier, 
+                identifier: userIdentifier,
 
-                customerId: ensuredCustomerId, 
+                customerId: ensuredCustomerId,
 
-                hasPasskey: true, 
+                hasPasskey: true,
 
                 redirect: false
 
               })
 
-              
+
 
               if (!signInResult?.ok) {
 
@@ -852,17 +852,17 @@ export default function CheckoutPage() {
 
               }
 
-              
+
 
               console.log('✅ [Checkout ConditionalUI] Session created successfully')
 
-              
+
 
               // Wait for session cookie to be set and force session refresh
 
               await new Promise(resolve => setTimeout(resolve, 800))
 
-              
+
 
               // Force session validation by making a direct check
 
@@ -878,11 +878,11 @@ export default function CheckoutPage() {
 
                 });
 
-                
+
 
                 const validationData = await validationResponse.json();
 
-                
+
 
                 if (validationData?.valid !== true) {
 
@@ -896,7 +896,7 @@ export default function CheckoutPage() {
 
                 }
 
-                
+
 
                 console.log('✅ [Checkout ConditionalUI] Session validated successfully')
 
@@ -912,7 +912,7 @@ export default function CheckoutPage() {
 
               }
 
-              
+
 
             } catch (e) {
 
@@ -926,7 +926,7 @@ export default function CheckoutPage() {
 
             }
 
-            
+
 
             // Auto-hide success message after 5 seconds
 
@@ -958,7 +958,7 @@ export default function CheckoutPage() {
 
     }
 
-    
+
 
     // CRITICAL: Start immediately on component mount (just like login page)
 
@@ -972,7 +972,7 @@ export default function CheckoutPage() {
 
     }
 
-    
+
 
     // Cleanup: abort the request if component unmounts
 
@@ -1092,7 +1092,7 @@ export default function CheckoutPage() {
 
           const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
 
-          
+
 
           const payload: any = { email: emailParam };
 
@@ -1100,7 +1100,7 @@ export default function CheckoutPage() {
 
           if (phoneParam) payload.phone = phoneParam;
 
-          
+
 
           // Include form data for account creation
 
@@ -1614,7 +1614,7 @@ export default function CheckoutPage() {
 
   const cartTotals = cart ? PriceCalculationService.calculateCartTotals(cart, selectedShippingOptionId || undefined, shippingOptions) : null;
 
-  
+
 
   const effectiveShippingAmount = cartTotals?.shipping ?? backendShippingAmount;
 
@@ -1756,7 +1756,7 @@ export default function CheckoutPage() {
 
     });
 
-    
+
 
     // Clear error for this field when user starts typing
 
@@ -1776,7 +1776,7 @@ export default function CheckoutPage() {
 
   };
 
-  
+
 
   // Validate individual field on blur
 
@@ -1784,7 +1784,7 @@ export default function CheckoutPage() {
 
     const { name, value } = e.target;
 
-    
+
 
     // Only validate fields that are part of AddressInput
 
@@ -1792,11 +1792,11 @@ export default function CheckoutPage() {
 
     if (!addressFields.includes(name)) return;
 
-    
+
 
     const error = validateAddressField(name as keyof AddressInput, value);
 
-    
+
 
     if (error) {
 
@@ -2025,15 +2025,15 @@ export default function CheckoutPage() {
 
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
 
-      
+
 
       const cr = await fetch('/api/auth/session/checkout/verify', {
 
         method: 'POST', headers: { 'Content-Type': 'application/json' },
 
-        body: JSON.stringify({ 
+        body: JSON.stringify({
 
-          phone, 
+          phone,
 
           cartId: cart.id,
 
@@ -2094,7 +2094,7 @@ export default function CheckoutPage() {
       setShowOtpModal(false);
       setOtpCode('');
       setOtpSent(false);
-      
+
       setPurchaseReady(true);
 
 
@@ -2221,14 +2221,34 @@ export default function CheckoutPage() {
 
             setMagicVerified(true)
 
-            // Checkout verify
+            // Checkout verify - include phone and formData for customer creation
+            const fullName = (formData.name || '').trim()
+            const nameParts = fullName.split(/\s+/).filter(Boolean)
+            const firstName = nameParts[0] || 'Customer'
+            const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+
+            const verifyPayload: any = {
+              email: em,
+              cartId: cart.id,
+              phone: formData.contactNumber || phone || '',
+              formData: {
+                first_name: firstName,
+                last_name: lastName,
+                phone: formData.contactNumber || phone || '',
+                address: {
+                  address_1: formData.address,
+                  city: formData.city,
+                  postal_code: formData.postalCode,
+                  province: formData.state,
+                  country_code: 'in',
+                  phone: formData.contactNumber || phone || ''
+                }
+              }
+            }
 
             const cr = await fetch('/api/auth/session/checkout/verify', {
-
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-
-              body: JSON.stringify({ email: em, cartId: cart.id })
-
+              body: JSON.stringify(verifyPayload)
             })
 
             const cj = await cr.json().catch(() => ({}))
@@ -2422,14 +2442,14 @@ export default function CheckoutPage() {
         // If we have customerId in state, mark it as fetched
         setCustomerIdFetched(true)
       }
-      
+
       if (!actualCustomerId) {
         console.error('[CASHFREE] Customer ID required')
         alert('Please complete identity verification before payment. Use phone OTP or email magic link in the Identity Verification section.')
         setCashfreeLoading(false)
         return
       }
-      
+
       console.log('[CASHFREE] Using customer ID:', actualCustomerId)
 
       // GATE 2: Associate customer with cart (BLOCKING with retries)
@@ -2441,17 +2461,17 @@ export default function CheckoutPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ cartId: cart.id, customerId: actualCustomerId }),
             })
-            
+
             if (!response.ok) {
               const errorData = await response.json().catch(() => ({ error: 'unknown' }))
               throw new Error(`Association failed: ${errorData.error || response.statusText}`)
             }
-            
+
             const data = await response.json()
             if (data.fallback === true || data.ok === false) {
               throw new Error(`Association not completed: ${data.adminError || data.message || 'Backend association failed'}`)
             }
-            
+
             return true
           } catch (error: any) {
             if (attempt < retries) {
@@ -2479,7 +2499,7 @@ export default function CheckoutPage() {
         const { medusaApiClient } = await import('../../utils/medusaApiClient')
         const cartAfterAssociation = await medusaApiClient.getCart(cart.id)
         const verifiedCustomerId = (cartAfterAssociation as any).customer_id
-        
+
         if (verifiedCustomerId !== actualCustomerId) {
           console.error('[CASHFREE] Cart verification failed: customer mismatch')
           alert('Cart verification failed. Please refresh the page and try again.')
@@ -2582,9 +2602,9 @@ export default function CheckoutPage() {
         try { await medusaApiClient.createPaymentSessions(cart.id) } catch { }
 
       } catch (prepError) {
-
-
       }
+
+      // Customer sync moved to AFTER Cashfree order creation (see line ~2797)
 
 
 
@@ -2736,6 +2756,48 @@ export default function CheckoutPage() {
 
       }
 
+      // 0.5) Sync Customer Profile (CRITICAL FIX: Ensure name is updated before payment)
+      // Moved here so orderId is available for complete audit trail
+      if (actualCustomerId && formData.name) {
+        try {
+          const fullName = (formData.name || '').trim()
+          const nameParts = fullName.split(/\s+/).filter(Boolean)
+          const firstName = nameParts[0] || 'Customer'
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+
+          console.log('[CASHFREE] Syncing customer profile before payment redirect:', { customerId: actualCustomerId, orderId })
+
+          await fetch('/api/checkout/customer/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customerId: actualCustomerId,
+              cartId: cart.id,
+              orderId, // Now available - Cashfree order ID
+              formData: {
+                first_name: firstName,
+                last_name: lastName,
+                phone: formData.contactNumber || phone,
+                address: {
+                  address_1: formData.address,
+                  city: formData.city,
+                  postal_code: formData.postalCode,
+                  province: formData.state,
+                  country_code: 'in',
+                  phone: formData.contactNumber || phone
+                }
+              },
+              identityMethod: identityMethod === 'login' ? undefined : identityMethod,
+              whatsapp_authenticated: identityMethod === 'phone',
+              email_authenticated: identityMethod === 'email'
+            })
+          })
+        } catch (syncError) {
+          console.error('[CASHFREE] Customer sync failed:', syncError)
+          // Non-blocking - continue to payment even if sync fails
+        }
+      }
+
 
 
       const paymentSessionId = (data as any)?.payment_session_id
@@ -2748,7 +2810,7 @@ export default function CheckoutPage() {
 
       }
 
-      
+
 
       // CRITICAL: Store cart ID mapping before redirecting to Cashfree
 
@@ -2817,7 +2879,7 @@ export default function CheckoutPage() {
 
     }
 
-    
+
 
     // Validate address before proceeding
 
@@ -2837,7 +2899,7 @@ export default function CheckoutPage() {
 
     });
 
-    
+
 
     if (!addressValidation.valid) {
 
@@ -2863,11 +2925,11 @@ export default function CheckoutPage() {
 
       });
 
-      
+
 
       setFormErrors(errorMap);
 
-      
+
 
       // Show alert with first error
 
@@ -2877,7 +2939,7 @@ export default function CheckoutPage() {
 
     }
 
-    
+
 
     // Show warnings if any (don't block submission)
 
@@ -3288,8 +3350,8 @@ export default function CheckoutPage() {
       // Fallbacks when checkout fails
 
       // Handle authentication errors
-      if (result.error?.message?.includes('authentication_required') || 
-          result.error?.message?.includes('identity verification')) {
+      if (result.error?.message?.includes('authentication_required') ||
+        result.error?.message?.includes('identity verification')) {
         setAuthModalMessage('You must verify your identity before placing an order. Please complete the Identity Verification section using OTP, Magic Link, or Login.')
         setAuthModalOpen(true)
         return
@@ -3413,9 +3475,9 @@ export default function CheckoutPage() {
   // Handle "Verify Now" button click in auth modal - scroll to identity verification section
   const handleScrollToVerification = () => {
     if (identityVerificationRef.current) {
-      identityVerificationRef.current.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
+      identityVerificationRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
       })
       // Add a subtle highlight effect
       identityVerificationRef.current.style.transition = 'box-shadow 0.3s ease'
@@ -4428,14 +4490,14 @@ export default function CheckoutPage() {
               {otpVerifying ? 'Verifying...' : 'Verify'}
             </button>
             <div className={loginStyles.modalActions}>
-              <button 
+              <button
                 className={loginStyles.modalLink}
                 onClick={sendOtp}
                 disabled={otpSending}
               >
                 {otpSending ? 'Sending...' : 'Resend OTP'}
               </button>
-              <button 
+              <button
                 className={loginStyles.modalLink}
                 onClick={() => {
                   setShowOtpModal(false)

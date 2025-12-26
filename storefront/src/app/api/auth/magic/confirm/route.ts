@@ -19,14 +19,28 @@ export async function GET(req: NextRequest) {
   if (!ok) return new Response(JSON.stringify({ ok: false, error: 'invalid_token' }), { status: 400 })
 
   await kvDel(`magic:${email}`) // single-use
+
   // Mark verified with explicit state binding when provided
-  try { await kvSet(`magic:ok:${email}${state ? `:${state}` : ''}`, 1, 5 * 60) } catch {}
-  try { await kafkaEmit('auth.combo_mfa_passed', { identifier: email, factor: 'magic', timestamp: Date.now() }) } catch {}
-  try { const c = await getCounter({ name: 'auth_magic_confirm_success_total', help: 'Magic confirm success total' }); c.inc() } catch {}
+  const verificationKey = `magic:ok:${email}${state ? `:${state}` : ''}`
+  console.log('[MAGIC_CONFIRM] Setting verification marker:', {
+    email,
+    state,
+    verificationKey,
+    ttlSeconds: 5 * 60,
+  })
+
+  try {
+    await kvSet(verificationKey, 1, 5 * 60)
+    console.log('[MAGIC_CONFIRM] Verification marker set successfully')
+  } catch (kvError) {
+    console.error('[MAGIC_CONFIRM] Failed to set verification marker:', kvError)
+  }
+  try { await kafkaEmit('auth.combo_mfa_passed', { identifier: email, factor: 'magic', timestamp: Date.now() }) } catch { }
+  try { const c = await getCounter({ name: 'auth_magic_confirm_success_total', help: 'Magic confirm success total' }); c.inc() } catch { }
 
   // Smart redirect based on context
   const base = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
-  
+
   // If this is a checkout flow, redirect directly to checkout page
   if (state?.startsWith('checkout-')) {
     // Use cart ID from record (more reliable) or fallback to state
@@ -34,7 +48,7 @@ export async function GET(req: NextRequest) {
     const checkoutUrl = `${base}/checkout?verified=true&email=${encodeURIComponent(email)}${cartId ? `&cartId=${encodeURIComponent(cartId)}` : ''}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}`
     return new Response(null, { status: 302, headers: { Location: checkoutUrl } })
   }
-  
+
   // For regular login flows, redirect to the new welcome page
   const welcomeUrl = `${base}/welcome?email=${encodeURIComponent(email)}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}${state ? `&state=${encodeURIComponent(state)}` : ''}`
   return new Response(null, { status: 302, headers: { Location: welcomeUrl } })

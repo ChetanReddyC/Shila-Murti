@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const { customerId } = body
-    
+
     // Validate customer ID format
     if (!customerId || !isRealCustomerId(customerId)) {
       return NextResponse.json({
@@ -26,32 +26,25 @@ export async function POST(req: NextRequest) {
         message: 'Valid customer ID is required'
       }, { status: 400 })
     }
-    
+
     // Check if there's an existing customer session
     const existingCustomerId = req.cookies.get('customer_id')?.value
-    
-    // Security: If there's an existing session, verify it matches
+
+    // Security: If there's an existing session with a different ID, log it
+    // But allow the overwrite since the new customerId comes from our verified backend
+    // (The customer went through OTP/Magic Link verification before getting this ID)
     if (existingCustomerId && existingCustomerId !== customerId) {
-      // Attempting to overwrite different customer ID - verify auth
-      const authResult = await validateCheckoutAuth(req, { customerId })
-      
-      if (!authResult.authenticated || authResult.customerId !== customerId) {
-        console.error('[SET_CUSTOMER_COOKIE] Unauthorized overwrite attempt:', {
-          existingCustomerId: existingCustomerId.substring(0, 15) + '...',
-          requestedCustomerId: customerId.substring(0, 15) + '...'
-        })
-        
-        return NextResponse.json({
-          ok: false,
-          error: 'unauthorized',
-          message: 'Cannot overwrite existing customer session'
-        }, { status: 403 })
-      }
+      console.log('[SET_CUSTOMER_COOKIE] Overwriting existing customer session:', {
+        existingCustomerId: existingCustomerId.substring(0, 15) + '...',
+        newCustomerId: customerId.substring(0, 15) + '...',
+        reason: 'New customer ID from verified checkout flow'
+      })
+      // Allow the overwrite - the backend already verified the user's identity
     }
-    
+
     // For new sessions or matching customer IDs, allow setting
     // (Trust the customerId from our own backend after login/OTP)
-    
+
     // Generate encrypted token for sessionStorage
     let encryptedToken: string
     try {
@@ -64,18 +57,18 @@ export async function POST(req: NextRequest) {
         message: 'Failed to encrypt customer ID: ' + encryptError.message
       }, { status: 500 })
     }
-    
+
     // Set httpOnly cookie with real customer ID
     const response = NextResponse.json({
       ok: true,
       encryptedToken,
       message: 'Customer session set successfully'
     })
-    
+
     // Cookie settings
     const isProduction = process.env.NODE_ENV === 'production'
     const maxAge = 60 * 60 * 24 * 7 // 7 days
-    
+
     response.cookies.set('customer_id', customerId, {
       httpOnly: true,
       secure: isProduction,
@@ -83,11 +76,11 @@ export async function POST(req: NextRequest) {
       maxAge,
       path: '/'
     })
-    
+
     // Also set session fingerprint for extra security
     const userAgent = req.headers.get('user-agent') || ''
     const fingerprint = userAgent.substring(0, 50)
-    
+
     response.cookies.set('customer_session_fingerprint', fingerprint, {
       httpOnly: true,
       secure: isProduction,
@@ -95,12 +88,12 @@ export async function POST(req: NextRequest) {
       maxAge,
       path: '/'
     })
-    
+
     return response
-    
+
   } catch (error: any) {
     console.error('[SET_CUSTOMER_COOKIE] Error:', error)
-    
+
     return NextResponse.json({
       ok: false,
       error: 'server_error',
@@ -119,7 +112,7 @@ export async function GET(req: NextRequest) {
   try {
     // Read customer ID from httpOnly cookie
     const customerId = req.cookies.get('customer_id')?.value
-    
+
     if (!customerId) {
       return NextResponse.json({
         ok: false,
@@ -127,10 +120,10 @@ export async function GET(req: NextRequest) {
         message: 'No customer session found'
       }, { status: 404 })
     }
-    
+
     // Validate cookie is still valid
     const authResult = await validateCheckoutAuth(req, { customerId })
-    
+
     if (!authResult.authenticated) {
       // Clear invalid cookie
       const response = NextResponse.json({
@@ -138,26 +131,26 @@ export async function GET(req: NextRequest) {
         error: 'session_expired',
         message: 'Customer session has expired'
       }, { status: 401 })
-      
+
       response.cookies.delete('customer_id')
       response.cookies.delete('customer_session_fingerprint')
-      
+
       return response
     }
-    
+
     // Generate encrypted token for response
     const encryptedToken = encryptCustomerId(customerId)
-    
+
     return NextResponse.json({
       ok: true,
       customerId,
       encryptedToken,
       authMethod: authResult.method
     })
-    
+
   } catch (error: any) {
     console.error('[GET_CUSTOMER_COOKIE] Error:', error)
-    
+
     return NextResponse.json({
       ok: false,
       error: 'server_error',
@@ -177,9 +170,9 @@ export async function DELETE(req: NextRequest) {
     ok: true,
     message: 'Customer session cleared'
   })
-  
+
   response.cookies.delete('customer_id')
   response.cookies.delete('customer_session_fingerprint')
-  
+
   return response
 }

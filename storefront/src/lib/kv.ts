@@ -17,6 +17,18 @@ export function kvProvider(): 'cloudflare' | 'upstash' | 'none' {
   return 'none'
 }
 
+// Log KV provider on module load (server-side only)
+if (typeof window === 'undefined') {
+  const provider = kvProvider()
+  console.log(`[KV] Provider: ${provider}`, {
+    cloudflare: useCloudflare() ? 'configured' : 'not configured',
+    upstash: (KV_URL && KV_TOKEN) ? 'configured' : 'not configured',
+  })
+  if (provider === 'none') {
+    console.warn('[KV] WARNING: No KV provider configured. Magic link verification will NOT work!')
+  }
+}
+
 export async function kvSet(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
   if (useCloudflare()) {
     const base = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
@@ -56,10 +68,10 @@ export async function kvSetNX(key: string, value: unknown, ttlSeconds?: number):
     // This is NOT truly atomic but better than nothing for Cloudflare
     const existing = await kvGet(key)
     if (existing !== null) return false
-    
+
     // Cloudflare KV requires minimum TTL of 60 seconds
     const actualTTL = ttlSeconds && ttlSeconds >= 60 ? ttlSeconds : 60
-    
+
     const base = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
     const url = `${base}?expiration_ttl=${actualTTL}`
     const res = await fetch(url, {
@@ -82,23 +94,23 @@ export async function kvSetNX(key: string, value: unknown, ttlSeconds?: number):
     const url = `${KV_URL}/set/${encodeURIComponent(key)}`
     const body: any = { value, nx: true }
     if (ttlSeconds) body.ex = ttlSeconds
-    
+
     const res = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    
+
     if (!res.ok) {
       const errorText = await res.text().catch(() => 'Unknown error')
       throw new Error(`KV setNX failed ${res.status}: ${errorText}`)
     }
-    
+
     const json = await res.json().catch(() => null)
     // Upstash returns { result: "OK" } on success, { result: null } if key exists
     return json?.result === 'OK'
   }
-  
+
   // No KV store configured - critical error
   throw new Error('KV store not configured. Cannot acquire distributed lock. Set CF_KV_* or KV_REST_API_* environment variables.')
 }
