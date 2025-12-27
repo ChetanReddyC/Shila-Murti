@@ -419,7 +419,9 @@ export async function findOrCreateCustomerAccount(
   let wasCreated = true
 
   try {
-    const { result } = await createCustomersWorkflow(scope).run({
+    // Extract container from scope - createCustomersWorkflow expects a container
+    const container = scope as any
+    const { result } = await createCustomersWorkflow(container).run({
       input: {
         customersData: [customerCreateData],
       },

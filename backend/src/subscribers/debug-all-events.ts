@@ -13,17 +13,17 @@ export default async function debugAllEventsSubscriber({
   container,
 }: SubscriberArgs<any>) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
-  
-  const eventName = (event as any).name || event.eventName || "unknown"
-  
+
+  const eventName = (event as any).name || (event as any).eventName || "unknown"
+
   // Only log inventory/reservation related events to reduce noise
-  if (eventName.toLowerCase().includes('reservation') || 
-      eventName.toLowerCase().includes('inventory') ||
-      eventName.toLowerCase().includes('cart')) {
-    logger.warn(`🔔🔔🔔 [DEBUG] Event: ${eventName}`, {
+  if (eventName.toLowerCase().includes('reservation') ||
+    eventName.toLowerCase().includes('inventory') ||
+    eventName.toLowerCase().includes('cart')) {
+    logger.warn(`🔔🔔🔔 [DEBUG] Event: ${eventName} ${JSON.stringify({
       fullEvent: event,
       dataKeys: event.data ? Object.keys(event.data) : [],
-    })
+    })}`)
   }
 }
 

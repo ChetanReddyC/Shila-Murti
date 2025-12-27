@@ -20,23 +20,23 @@ export interface PhoneConflictDetails {
  * Detects conflicts between primary phone and shipping address phones.
  */
 export async function validatePhoneConsistency(
-  req: MedusaRequest, 
-  res: MedusaResponse, 
+  req: MedusaRequest,
+  res: MedusaResponse,
   next: MedusaNextFunction
 ) {
-  const { phone, addresses } = req.body || {};
-  
+  const { phone, addresses } = (req.body || {}) as { phone?: string; addresses?: any[] };
+
   if (phone && addresses?.length) {
     const primaryPhone = normalizePhoneNumber(phone);
     const shippingPhones = addresses
       .map((addr: any) => normalizePhoneNumber(addr.phone))
       .filter(Boolean);
-    
+
     if (shippingPhones.length > 0) {
       // Check for phone number conflicts
       const conflicts = shippingPhones.filter(sp => !arePhoneNumbersEquivalent(sp, primaryPhone));
       const hasConflicts = conflicts.length > 0;
-      
+
       if (hasConflicts) {
         console.warn('[PhoneConsistency] Phone number conflict detected:', {
           endpoint: req.path,
@@ -45,7 +45,7 @@ export async function validatePhoneConsistency(
           conflicts,
           conflictCount: conflicts.length
         });
-        
+
         // Add conflict resolution metadata to request
         req.phoneConflictDetected = true;
         req.phoneConflictDetails = {
@@ -54,7 +54,7 @@ export async function validatePhoneConsistency(
           conflicts: true,
           conflictCount: conflicts.length
         } as PhoneConflictDetails;
-        
+
         // Log metrics for monitoring
         console.info('[Metrics] phone_conflict_detected_total++', {
           endpoint: req.path,
@@ -69,7 +69,7 @@ export async function validatePhoneConsistency(
           conflicts: false,
           conflictCount: 0
         } as PhoneConflictDetails;
-        
+
         console.log('[PhoneConsistency] Phone numbers are consistent:', {
           endpoint: req.path,
           primaryPhone,
@@ -78,7 +78,7 @@ export async function validatePhoneConsistency(
       }
     }
   }
-  
+
   next();
 }
 
@@ -87,8 +87,8 @@ export async function validatePhoneConsistency(
  * Should be used after validatePhoneConsistency middleware.
  */
 export async function enhanceCustomerLookup(
-  req: MedusaRequest, 
-  res: MedusaResponse, 
+  req: MedusaRequest,
+  res: MedusaResponse,
   next: MedusaNextFunction
 ) {
   if (req.phoneConflictDetected && req.phoneConflictDetails) {
@@ -96,7 +96,7 @@ export async function enhanceCustomerLookup(
       endpoint: req.path,
       conflictDetails: req.phoneConflictDetails
     });
-    
+
     // Add enhanced lookup flag to request
     req.enhancedLookupRequired = true;
     req.phoneNumbers = {
@@ -104,11 +104,11 @@ export async function enhanceCustomerLookup(
       shipping: req.phoneConflictDetails.shipping,
       all: [req.phoneConflictDetails.primary, ...req.phoneConflictDetails.shipping]
     };
-    
+
     // Log enhanced lookup activation
     console.info('[Metrics] enhanced_lookup_activated_total++');
   }
-  
+
   next();
 }
 
@@ -116,8 +116,8 @@ export async function enhanceCustomerLookup(
  * Combined middleware that applies both phone consistency validation and enhanced lookup.
  */
 export async function phoneConsistencyMiddleware(
-  req: MedusaRequest, 
-  res: MedusaResponse, 
+  req: MedusaRequest,
+  res: MedusaResponse,
   next: MedusaNextFunction
 ) {
   await validatePhoneConsistency(req, res, async () => {

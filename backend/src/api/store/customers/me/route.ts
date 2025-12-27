@@ -34,8 +34,9 @@ export async function PATCH(req: MedusaRequest, res: MedusaResponse) {
     }
     const allowed = ["first_name", "last_name", "email", "phone", "metadata", "addresses"]
     const payload: Record<string, any> = {}
+    const requestBody = (req.body || {}) as Record<string, any>
     for (const k of allowed) {
-      if (k in (req.body || {})) payload[k] = (req.body as any)[k]
+      if (requestBody && typeof requestBody === 'object' && k in requestBody) payload[k] = requestBody[k]
     }
     if (Object.keys(payload).length === 0) {
       return res.status(400).json({ message: "No valid fields supplied" })

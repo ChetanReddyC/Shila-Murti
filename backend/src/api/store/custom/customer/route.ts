@@ -30,9 +30,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     // Extract and sanitize body
     const input: UpdatableCustomerInput = {};
+    const requestBody = (req.body || {}) as Record<string, any>;
     for (const field of CUSTOMER_FIELDS) {
-      if (field in (req.body || {})) {
-        (input as any)[field] = (req.body as any)[field];
+      if (requestBody && typeof requestBody === 'object' && field in requestBody) {
+        (input as any)[field] = requestBody[field];
       }
     }
 
