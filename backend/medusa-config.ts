@@ -120,19 +120,6 @@ module.exports = defineConfig({
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
       // AUTH_JWKS_URL is consumed by custom middlewares to verify JWTs from the storefront
     },
-    currencies: [
-      {
-        code: "inr",
-        symbol: "₹",
-        symbol_native: "₹",
-        name: "Indian Rupee",
-      },
-    ],
-  },
-
-  jobs: {
-    // Enable scheduled job processing (works without Redis)
-    enabled: true,
   },
 
   // (Optional) This mainly affects dev server behavior; safe to keep.

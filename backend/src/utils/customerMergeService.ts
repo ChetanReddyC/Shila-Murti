@@ -198,9 +198,14 @@ export class CustomerMergeService {
    * @param email - Email to search for
    * @returns Best matching customer or null
    */
-  async findBestExistingCustomer(phone: string, email?: string): Promise<any | null> {
+  async findBestExistingCustomer(phone?: string, email?: string): Promise<any | null> {
+    if (!phone && !email) {
+      return null; // Need at least one identifier
+    }
+
     try {
       const detectionResult = await this.detectDuplicateCustomers({ phone, email });
+
 
       if (detectionResult.hasDuplicates && detectionResult.primaryCustomerId) {
         // Return the highest confidence match

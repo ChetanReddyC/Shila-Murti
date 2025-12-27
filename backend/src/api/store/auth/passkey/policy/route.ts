@@ -22,7 +22,7 @@ export async function GET(
     // Extract and verify JWT token
     const authHeader = req.headers.authorization;
     const token = extractBearerToken(authHeader);
-    
+
     if (!token) {
       return res.status(401).json({
         error: "Unauthorized",
@@ -35,7 +35,7 @@ export async function GET(
       tokenPayload = await verifyAccessToken(token, req.scope);
     } catch (error) {
       return res.status(401).json({
-        error: "Unauthorized", 
+        error: "Unauthorized",
         message: "Invalid authentication token"
       });
     }
@@ -54,7 +54,7 @@ export async function GET(
 
     // Get customer service to check user's passkey status
     const customerModuleService: any = req.scope.resolve(Modules.CUSTOMER);
-    
+
     // Look up customer by email or phone
     const customers = await customerModuleService.listCustomers({
       $or: [
@@ -73,13 +73,13 @@ export async function GET(
     }
 
     const customer = customers[0];
-    
+
     // Check if customer has passkey registered in metadata
     // This is a simplified check - in a real implementation, you would check
     // against a passkey registry or WebAuthn credential store
     const hasPasskey = customer.metadata?.passkey_registered === true ||
-                      customer.metadata?.webauthn_credentials?.length > 0 ||
-                      false; // Default to false if no passkey info found
+      customer.metadata?.webauthn_credentials?.length > 0 ||
+      false; // Default to false if no passkey info found
 
     // Generate a simple device fingerprint based on request headers
     // In production, you might want a more sophisticated device fingerprinting
@@ -96,7 +96,7 @@ export async function GET(
 
   } catch (error) {
     console.error('[PASSKEY_POLICY_ERROR]', error);
-    
+
     // Return a safe default that allows the nudge to show
     // This ensures the system fails open rather than closed
     return res.status(200).json({
@@ -123,7 +123,7 @@ export async function POST(
     // Extract and verify JWT token
     const authHeader = req.headers.authorization;
     const token = extractBearerToken(authHeader);
-    
+
     if (!token) {
       return res.status(401).json({
         error: "Unauthorized",
@@ -141,8 +141,8 @@ export async function POST(
       });
     }
 
-    const { hasPasskey, credentialId, deviceFingerprint } = req.body || {};
-    
+    const { hasPasskey, credentialId, deviceFingerprint } = (req.body || {}) as { hasPasskey?: boolean; credentialId?: string; deviceFingerprint?: string };
+
     if (typeof hasPasskey !== 'boolean') {
       return res.status(400).json({
         error: "Bad Request",
@@ -164,7 +164,7 @@ export async function POST(
 
     // Get customer service to update user's passkey status
     const customerModuleService: any = req.scope.resolve(Modules.CUSTOMER);
-    
+
     // Look up customer by email or phone
     const customers = await customerModuleService.listCustomers({
       $or: [
@@ -183,7 +183,7 @@ export async function POST(
     }
 
     const customer = customers[0];
-    
+
     // Update customer metadata with passkey status
     const updatedMetadata = {
       ...(customer.metadata || {}),
@@ -202,7 +202,7 @@ export async function POST(
         device_fingerprint: deviceFingerprint,
         last_used: new Date().toISOString()
       };
-      
+
       // Add new credential if not already present
       const credentialExists = existingCredentials.some((cred: any) => cred.id === credentialId);
       if (!credentialExists) {
