@@ -11,14 +11,22 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     try {
       const bearer = extractBearerToken(req.headers.authorization as string | undefined)
+      console.log('[FIND_OR_CREATE] Authorization header present:', Boolean(bearer))
+
       if (bearer) {
         const claims = await verifyAccessToken(bearer, req.scope)
         authSubject = claims.sub || null
+        console.log('[FIND_OR_CREATE] JWT verified successfully, subject:', authSubject)
+      } else {
+        console.warn('[FIND_OR_CREATE] No bearer token in Authorization header')
       }
-    } catch {}
+    } catch (error: any) {
+      console.error('[FIND_OR_CREATE] JWT verification failed:', error?.message || error)
+    }
 
     // Customer authentication is required - no bypass allowed
     if (!authSubject) {
+      console.warn('[FIND_OR_CREATE] Rejecting request - no valid auth subject')
       return res.status(401).json({ message: "Customer authentication required" })
     }
 
@@ -37,14 +45,23 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       order_id,
     } = (req.body as any) ?? {}
 
-    if (!phone || typeof phone !== "string" || !phone.trim()) {
-      return res.status(400).json({ message: "Phone number is required" })
+    // Validate identifier based on identity method
+    // Either phone or email must be provided, but not necessarily both
+    const hasPhone = phone && typeof phone === "string" && phone.trim()
+    const hasEmail = email && typeof email === "string" && email.includes("@")
+
+    // At least one identifier is required
+    if (!hasPhone && !hasEmail) {
+      return res.status(400).json({ message: "Either phone number or email is required" })
     }
 
-    const normalizedPhone = normalizePhoneNumber(phone)
-
-    if (!normalizedPhone || normalizedPhone.length < 12) {
-      return res.status(400).json({ message: "Phone number must be a valid Indian mobile number" })
+    // Validate phone format if provided
+    let normalizedPhone: string | undefined
+    if (hasPhone) {
+      normalizedPhone = normalizePhoneNumber(phone)
+      if (!normalizedPhone || normalizedPhone.length < 12) {
+        return res.status(400).json({ message: "Phone number must be a valid Indian mobile number" })
+      }
     }
 
     if (!whatsapp_authenticated && !email_authenticated) {
@@ -54,9 +71,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       })
     }
 
+    // Validate email if using email authentication
     if (email_authenticated && identity_method === "email") {
-      if (!email || typeof email !== "string" || !email.includes("@")) {
+      if (!hasEmail) {
         return res.status(400).json({ message: "Valid email is required for email authentication" })
+      }
+    }
+
+    // Validate phone if using phone/WhatsApp authentication
+    if (whatsapp_authenticated && identity_method === "phone") {
+      if (!hasPhone) {
+        return res.status(400).json({ message: "Valid phone number is required for WhatsApp authentication" })
       }
     }
 
@@ -88,7 +113,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         cart_id,
         order_id,
         auth_subject: authSubject,
-        requireAuthSubjectMatch: true, // Always require auth subject match
+        requireAuthSubjectMatch: false, // Allow updating auth subject if token is valid
       })
 
       if (!result.ok) {

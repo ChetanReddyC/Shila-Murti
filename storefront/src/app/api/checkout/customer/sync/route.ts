@@ -12,8 +12,8 @@ export interface PhoneConflictInfo {
 }
 
 export async function GET(req: NextRequest) {
-  return new Response(JSON.stringify({ 
-    ok: true, 
+  return new Response(JSON.stringify({
+    ok: true,
     message: 'Customer sync endpoint is accessible',
     timestamp: Date.now()
   }), { status: 200 })
@@ -21,45 +21,45 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const startedAt = Date.now()
-  
+
   try {
     const body = await req.json().catch(() => ({}))
     const { customerId, cartId, orderId, formData, orderCreated, whatsapp_authenticated = false, email_authenticated = false, identityMethod = 'phone' } = body
-    try { console.log('[SYNC_API][start]', { customerId, cartId, orderId, identityMethod, whatsapp_authenticated, email_authenticated }) } catch {}
-    
+    try { console.log('[SYNC_API][start]', { customerId, cartId, orderId, identityMethod, whatsapp_authenticated, email_authenticated }) } catch { }
+
     // Enhanced input validation
     if (!customerId || typeof customerId !== 'string') {
-      return new Response(JSON.stringify({ 
-        ok: false, 
+      return new Response(JSON.stringify({
+        ok: false,
         error: 'invalid_customer_id',
         message: 'Valid customer ID is required'
       }), { status: 400 })
     }
-    
+
     // SECURITY FIX: Detect authenticated real customers (not guest accounts)
     // Real customer IDs start with "cus_" and don't have "@guest.local"
     const isRealCustomer = customerId.startsWith('cus_') && !customerId.includes('@guest.local')
-    
+
     if (isRealCustomer) {
       // GATE: Verify cart/order actually has this customer linked before skipping sync
       try {
-        console.log('[SYNC_API][verify_customer_link]', { 
-          customerId, 
-          cartId, 
+        console.log('[SYNC_API][verify_customer_link]', {
+          customerId,
+          cartId,
           orderId,
           checking: 'Verifying customer is actually linked to cart/order'
         })
-        
+
         // Fetch cart to verify customer association
         const BACKEND_URL = process.env.MEDUSA_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
         const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
-        
+
         if (!PUBLISHABLE_KEY) {
           throw new Error('Missing API configuration')
         }
-        
+
         let cartCustomerId: string | null = null
-        
+
         // Try to get cart if cartId is provided
         if (cartId) {
           try {
@@ -70,11 +70,11 @@ export async function POST(req: NextRequest) {
               },
               signal: AbortSignal.timeout(5000) // 5 second timeout
             })
-            
+
             if (cartResponse.ok) {
               const cartData = await cartResponse.json()
               cartCustomerId = cartData?.cart?.customer_id || null
-              
+
               console.log('[SYNC_API][cart_verification]', {
                 cartId,
                 cartCustomerId,
@@ -91,31 +91,22 @@ export async function POST(req: NextRequest) {
             // If cart fetch fails, we can't verify - proceed with sync to be safe
           }
         }
-        
-        // CRITICAL CHECK: Only skip sync if cart actually has the customer linked
+
+        // CRITICAL CHECK: Verify customer is linked to cart for security
         if (cartCustomerId === customerId) {
-          // Customer is verified to be linked - safe to skip sync
-          console.log('[SYNC_API][skip_authenticated_customer]', { 
-            customerId, 
-            cartId,
-            verified: true,
-            reason: 'Real authenticated customer with verified cart linkage'
-          })
-          
-          return new Response(JSON.stringify({
-            ok: true,
-            customerUpdated: false,
-            skipped: true,
-            verified: true,
-            reason: 'authenticated_customer_verified',
-            message: 'Sync skipped for authenticated customer - cart linkage verified',
+          // Customer is verified to be linked - we can trust this request
+          // BUT - we should NOT skip the sync if we have form data to update!
+          // The customer might have just entered their name in the checkout form
+          console.log('[SYNC_API][authenticated_customer_verified]', {
             customerId,
             cartId,
-            timestamp: Date.now(),
-            duration: Date.now() - startedAt
-          }), { status: 200 })
+            verified: true,
+            reason: 'Real authenticated customer with verified cart linkage. Proceeding with profile update.'
+          })
+
+          // Proceed to update logic below...
         } else {
-          // Customer NOT linked to cart - must proceed with sync!
+          // Customer NOT linked to cart - potentially suspicious or just out of sync
           console.warn('[SYNC_API][linkage_verification_failed]', {
             customerId,
             cartId,
@@ -123,11 +114,10 @@ export async function POST(req: NextRequest) {
             expectedCustomerId: customerId,
             action: 'Proceeding with full sync to establish link'
           })
-          
+
           // Fall through to normal sync flow below
-          // This will create/update customer and link to cart
         }
-        
+
       } catch (verificationError: any) {
         // If verification fails, be safe and proceed with sync
         console.error('[SYNC_API][verification_error]', {
@@ -136,54 +126,53 @@ export async function POST(req: NextRequest) {
           error: verificationError.message,
           action: 'Proceeding with sync as safety measure'
         })
-        
         // Fall through to normal sync flow
       }
     }
-    
+
     if (!formData || typeof formData !== 'object') {
-      return new Response(JSON.stringify({ 
-        ok: false, 
+      return new Response(JSON.stringify({
+        ok: false,
         error: 'invalid_form_data',
         message: 'Valid form data is required'
       }), { status: 400 })
     }
-    
+
     // Validate required form fields
     if (!formData.first_name || typeof formData.first_name !== 'string' || formData.first_name.trim().length === 0) {
-      return new Response(JSON.stringify({ 
-        ok: false, 
+      return new Response(JSON.stringify({
+        ok: false,
         error: 'missing_required_fields',
         message: 'First name is required and must be a non-empty string'
       }), { status: 400 })
     }
-    
+
     if (!formData.phone || typeof formData.phone !== 'string' || formData.phone.trim().length === 0) {
-      return new Response(JSON.stringify({ 
-        ok: false, 
+      return new Response(JSON.stringify({
+        ok: false,
         error: 'missing_required_fields',
         message: 'Phone number is required and must be a non-empty string'
       }), { status: 400 })
     }
-    
+
     // Extract identifier from customerId based on authentication method
     let primaryIdentifier: string;
     let primaryPhone: string;
-    
+
     if (identityMethod === 'email' || email_authenticated) {
       // For email authentication, customerId is the email address
       primaryIdentifier = customerId;
       primaryPhone = normalizePhoneNumber(formData.phone); // Use form phone as primary
-      
+
     } else {
       // For WhatsApp/phone authentication, extract phone from customerId
       // customerId format: "919014711878@guest.local" 
       const whatsappPhone = customerId.replace('@guest.local', '');
       primaryIdentifier = whatsappPhone;
       primaryPhone = normalizePhoneNumber(whatsappPhone);
-      
+
     }
-    
+
     // Enhanced phone conflict detection based on authentication method
     const phoneConflictInfo: PhoneConflictInfo = {
       whatsappPhone: identityMethod === 'phone' ? primaryPhone : '',
@@ -191,7 +180,7 @@ export async function POST(req: NextRequest) {
       conflictDetected: identityMethod === 'phone' ? !arePhoneNumbersEquivalent(primaryIdentifier, formData.phone) : false,
       resolutionStrategy: identityMethod === 'phone' ? 'use_whatsapp' : 'use_shipping' // For email auth, use shipping phone
     };
-    
+
     if (phoneConflictInfo.conflictDetected) {
       // VALID SCENARIO: User authenticated with one number but wants delivery to another
       // Example: Login with personal WhatsApp (917780104586) but deliver to office (917452675836)
@@ -202,71 +191,71 @@ export async function POST(req: NextRequest) {
       });
       // Do NOT treat this as an error - just log it for analytics
     }
-    
+
     // Use appropriate phone based on authentication method
     const normalizedPhone = primaryPhone;
-    
+
     // Validate the resolved primary phone
     if (!normalizedPhone || normalizedPhone.length < 12) {
-      return new Response(JSON.stringify({ 
-        ok: false, 
+      return new Response(JSON.stringify({
+        ok: false,
         error: 'invalid_phone_format',
         message: 'Phone number must be a valid Indian mobile number'
       }), { status: 400 })
     }
-    
+
     // Validate address if provided
     if (formData.address) {
       const requiredAddressFields = ['address_1', 'city', 'postal_code'];
       for (const field of requiredAddressFields) {
         if (!formData.address[field] || typeof formData.address[field] !== 'string' || formData.address[field].trim().length === 0) {
-          return new Response(JSON.stringify({ 
-            ok: false, 
+          return new Response(JSON.stringify({
+            ok: false,
             error: 'invalid_address_data',
             message: `Address field '${field}' is required and must be a non-empty string`
           }), { status: 400 })
         }
       }
-      
+
       // Validate country code format if provided
       if (formData.address.country_code && formData.address.country_code.length !== 2) {
-        return new Response(JSON.stringify({ 
-          ok: false, 
+        return new Response(JSON.stringify({
+          ok: false,
           error: 'invalid_country_code',
           message: 'Country code must be a 2-character ISO code (e.g., "IN")'
         }), { status: 400 })
       }
-      
+
       // Validate postal code format for India
       if (formData.address.postal_code && !/^\d{6}$/.test(formData.address.postal_code.trim())) {
-        return new Response(JSON.stringify({ 
-          ok: false, 
+        return new Response(JSON.stringify({
+          ok: false,
           error: 'invalid_postal_code',
           message: 'Postal code must be 6 digits for Indian addresses'
         }), { status: 400 })
       }
     }
-    
+
     // Ensure customer is properly authenticated (either WhatsApp or email)
     if (!whatsapp_authenticated && !email_authenticated) {
-      return new Response(JSON.stringify({ 
-        ok: false, 
+      return new Response(JSON.stringify({
+        ok: false,
         error: 'customer_not_authenticated',
         message: 'Customer must be authenticated via WhatsApp or email',
-        requires_authentication: true 
+        requires_authentication: true
       }), { status: 400 })
     }
-    
-    
+
+
     // Initialize retry variables
     let lastError: Error | null = null
     let attempt = 0
     const maxRetries = 2
-    
+
     // Enhanced backend configuration with fallbacks
     const BACKEND_URL = process.env.MEDUSA_BASE_URL || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
     const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
-    
+
     if (!PUBLISHABLE_KEY) {
       return new Response(JSON.stringify({
         ok: false,
@@ -274,7 +263,7 @@ export async function POST(req: NextRequest) {
         message: 'API configuration error'
       }), { status: 500 })
     }
-    
+
     // Prepare update payload for backend /store/custom route with conflict resolution
     const updatePayload: any = {
       customer_id: customerId, // Pass customer ID so backend can detect authenticated users
@@ -284,7 +273,7 @@ export async function POST(req: NextRequest) {
       whatsapp_authenticated: whatsapp_authenticated,
       email_authenticated: email_authenticated,
     }
-    
+
     // Set email based on authentication method
     if (identityMethod === 'email' || email_authenticated) {
       // For email authentication, use the actual email from customerId
@@ -316,7 +305,7 @@ export async function POST(req: NextRequest) {
       duplicate_prevention: true,
       enhanced_sync: true
     };
-    
+
     // Add address if provided, using shipping phone for the address itself
     if (formData.address) {
       updatePayload.addresses = [{
@@ -339,14 +328,14 @@ export async function POST(req: NextRequest) {
         },
       }]
     }
-    
-    
+
+
     // Begin retry loop
-    
+
     while (attempt <= maxRetries) {
       try {
         attempt++
-        
+
         const res = await fetch(`${BACKEND_URL}/store/custom`, {
           method: 'POST',
           headers: {
@@ -356,11 +345,11 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({ ...updatePayload, cart_id: cartId, order_id: orderId }),
           signal: AbortSignal.timeout(15000) // 15 second timeout
         })
-        try { console.log('[SYNC_API][call_backend]', { status: res.status }) } catch {}
-        
+        try { console.log('[SYNC_API][call_backend]', { status: res.status }) } catch { }
+
         const responseText = await res.text().catch(() => '')
-        
-        
+
+
         if (res.ok) {
           // Success! Parse the response
           let result
@@ -369,16 +358,16 @@ export async function POST(req: NextRequest) {
           } catch {
             result = { customer: null }
           }
-          
-          try { 
-            const counter = await getCounter({ 
-              name: 'checkout_customer_sync_success_total', 
-              help: 'Successful customer profile syncs from checkout' 
+
+          try {
+            const counter = await getCounter({
+              name: 'checkout_customer_sync_success_total',
+              help: 'Successful customer profile syncs from checkout'
             })
             counter.inc()
-          } catch {}
-          
-          
+          } catch { }
+
+
           return new Response(JSON.stringify({
             ok: true,
             customerUpdated: true,
@@ -388,29 +377,29 @@ export async function POST(req: NextRequest) {
             consolidationInfo: result.consolidation_info || null
           }), { status: 200 })
         }
-        
+
         // Handle specific error cases
         if (res.status === 404) {
           // Customer not found - this is a permanent error, don't retry
           throw new Error(`Customer not found: ${customerId}`)
         }
-        
+
         if (res.status === 400) {
           // Parse error response to check for WhatsApp authentication requirement
           let errorData = null;
           try {
             errorData = JSON.parse(responseText);
-          } catch {}
-          
+          } catch { }
+
           if (errorData?.requires_whatsapp_auth) {
             // This is a specific WhatsApp authentication error
             throw new Error('Customer must be WhatsApp authenticated to create account');
           }
-          
+
           // Other bad request errors - likely permanent, don't retry
           throw new Error(`Invalid request: ${responseText}`);
         }
-        
+
         if (res.status >= 500) {
           // Server error - might be temporary, can retry
           lastError = new Error(`Backend server error (${res.status}): ${responseText}`)
@@ -419,41 +408,41 @@ export async function POST(req: NextRequest) {
             continue
           }
         }
-        
+
         // Other errors
         throw new Error(`Backend update failed (${res.status}): ${responseText}`)
-        
+
       } catch (error: any) {
         lastError = error
-        
+
         // Don't retry on certain errors
         if (error.name === 'AbortError' || error.message.includes('Customer not found') || error.message.includes('Invalid request')) {
           break
         }
-        
+
         if (attempt <= maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         }
       }
     }
-    
+
     // All attempts failed
     throw lastError || new Error('Unknown error during backend communication')
-    
+
   } catch (error: any) {
-    
-    try { 
-      const counter = await getCounter({ 
-        name: 'checkout_customer_sync_failure_total', 
-        help: 'Failed customer profile syncs from checkout' 
+
+    try {
+      const counter = await getCounter({
+        name: 'checkout_customer_sync_failure_total',
+        help: 'Failed customer profile syncs from checkout'
       })
       counter.inc()
-    } catch {}
-    
+    } catch { }
+
     // Categorize errors for better handling
     let errorType = 'sync_failed'
     let statusCode = 500
-    
+
     if (error.message?.includes('Customer not found')) {
       errorType = 'customer_not_found'
       statusCode = 404
@@ -470,8 +459,8 @@ export async function POST(req: NextRequest) {
       errorType = 'configuration_error'
       statusCode = 500
     }
-    
-    try { console.log('[SYNC_API][error]', { error: error?.message }) } catch {}
+
+    try { console.log('[SYNC_API][error]', { error: error?.message }) } catch { }
     return new Response(JSON.stringify({
       ok: false,
       error: errorType,

@@ -44,25 +44,25 @@ export async function acquireDistributedLock(
   retryDelayMs: number = DEFAULT_RETRY_DELAY
 ): Promise<LockAcquisitionResult> {
   const lockKey = `lock:${resource}`
-  
+
   // Generate unique token for this lock to prevent releasing someone else's lock
   const token = randomUUID()
-  
+
   const lockData = {
     token,
     acquiredAt: Date.now(),
     expiresAt: Date.now() + ttlSeconds * 1000,
     resource,
   }
-  
+
   let attempts = 0
-  
+
   while (attempts <= retryAttempts) {
     try {
       // Atomic SET NX operation - only sets if key doesn't exist
-      // Uses Upstash Redis for true atomicity
-      const acquired = await kvSetNXAtomic(lockKey, JSON.stringify(lockData), ttlSeconds)
-      
+      // Store as object (KV handles JSON serialization)
+      const acquired = await kvSetNXAtomic(lockKey, lockData, ttlSeconds)
+
       if (acquired) {
         return {
           success: true,
@@ -73,7 +73,7 @@ export async function acquireDistributedLock(
           },
         }
       }
-      
+
       // Lock is held by someone else
       if (attempts < retryAttempts) {
         // Wait before retrying
@@ -81,27 +81,27 @@ export async function acquireDistributedLock(
         attempts++
         continue
       }
-      
+
       // Max retries reached
       return {
         success: false,
         error: 'Lock is held by another process',
       }
-      
+
     } catch (error) {
       console.error('[DISTRIBUTED_LOCK][acquire][error]', {
         resource,
         attempt: attempts + 1,
         error: String(error),
       })
-      
+
       return {
         success: false,
         error: `Failed to acquire lock: ${String(error)}`,
       }
     }
   }
-  
+
   return {
     success: false,
     error: 'Failed to acquire lock after retries',
@@ -117,21 +117,20 @@ export async function acquireDistributedLock(
  */
 export async function releaseDistributedLock(lock: Lock): Promise<boolean> {
   const lockKey = `lock:${lock.resource}`
-  
+
   try {
     // Verify lock ownership before deleting
-    const currentLockData = await kvGet<string>(lockKey)
-    
-    if (!currentLockData) {
+    // KV returns already-parsed object, not string
+    const currentLock = await kvGet<{ token: string; acquiredAt: number; expiresAt: number; resource: string }>(lockKey)
+
+    if (!currentLock) {
       // Lock already expired or doesn't exist
       console.warn('[DISTRIBUTED_LOCK][release][already_expired]', {
         resource: lock.resource,
       })
       return false
     }
-    
-    const currentLock = JSON.parse(currentLockData)
-    
+
     // Only delete if token matches (prevents releasing someone else's lock)
     if (currentLock.token !== lock.token) {
       console.warn('[DISTRIBUTED_LOCK][release][token_mismatch]', {
@@ -141,16 +140,16 @@ export async function releaseDistributedLock(lock: Lock): Promise<boolean> {
       })
       return false
     }
-    
+
     // Delete the lock
     await kvDel(lockKey)
-    
+
     console.log('[DISTRIBUTED_LOCK][release][success]', {
       resource: lock.resource,
     })
-    
+
     return true
-    
+
   } catch (error) {
     console.error('[DISTRIBUTED_LOCK][release][error]', {
       resource: lock.resource,
@@ -168,23 +167,22 @@ export async function releaseDistributedLock(lock: Lock): Promise<boolean> {
  */
 export async function isLockHeld(resource: string): Promise<boolean> {
   const lockKey = `lock:${resource}`
-  
+
   try {
-    const lockData = await kvGet<string>(lockKey)
-    
-    if (!lockData) return false
-    
-    const lock = JSON.parse(lockData)
-    
+    // KV returns already-parsed object
+    const lock = await kvGet<{ token: string; acquiredAt: number; expiresAt: number; resource: string }>(lockKey)
+
+    if (!lock) return false
+
     // Check if lock has expired (defensive check in case TTL didn't work)
     if (lock.expiresAt && Date.now() > lock.expiresAt) {
       // Clean up expired lock
       await kvDel(lockKey)
       return false
     }
-    
+
     return true
-    
+
   } catch (error) {
     console.error('[DISTRIBUTED_LOCK][isLockHeld][error]', {
       resource,
@@ -204,19 +202,18 @@ export async function isLockHeld(resource: string): Promise<boolean> {
  */
 export async function extendLock(lock: Lock, additionalSeconds: number): Promise<boolean> {
   const lockKey = `lock:${lock.resource}`
-  
+
   try {
-    const currentLockData = await kvGet<string>(lockKey)
-    
-    if (!currentLockData) {
+    // KV returns already-parsed object
+    const currentLock = await kvGet<{ token: string; acquiredAt: number; expiresAt: number; resource: string }>(lockKey)
+
+    if (!currentLock) {
       console.warn('[DISTRIBUTED_LOCK][extend][not_found]', {
         resource: lock.resource,
       })
       return false
     }
-    
-    const currentLock = JSON.parse(currentLockData)
-    
+
     // Verify ownership
     if (currentLock.token !== lock.token) {
       console.warn('[DISTRIBUTED_LOCK][extend][token_mismatch]', {
@@ -224,19 +221,19 @@ export async function extendLock(lock: Lock, additionalSeconds: number): Promise
       })
       return false
     }
-    
+
     // Update expiration time
     const newExpiresAt = Date.now() + additionalSeconds * 1000
     currentLock.expiresAt = newExpiresAt
-    
-    // Re-set with new TTL
+
+    // Re-set with new TTL (store as object, KV handles serialization)
     await kvDel(lockKey)
-    await kvSetNX(lockKey, JSON.stringify(currentLock), additionalSeconds)
-    
+    await kvSetNX(lockKey, currentLock, additionalSeconds)
+
     lock.expiresAt = newExpiresAt
-    
+
     return true
-    
+
   } catch (error) {
     console.error('[DISTRIBUTED_LOCK][extend][error]', {
       resource: lock.resource,

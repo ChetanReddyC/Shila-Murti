@@ -19,13 +19,17 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
     rootMargin = '0px',
     triggerOnce = true
   } = options;
-  
-  const elementRef = useRef<HTMLElement | null>(null);
+
+  const [element, setElement] = useState<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
+  // Callback ref to handle dynamic element mounting
+  const elementRef = (node: HTMLElement | null) => {
+    setElement(node);
+  };
+
   useEffect(() => {
-    const element = elementRef.current;
     if (!element) return;
 
     // Cleanup previous observer if it exists
@@ -38,7 +42,7 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
         const [entry] = entries;
         if (entry.isIntersecting) {
           setIsVisible(true);
-          
+
           // If triggerOnce is true, disconnect the observer after the element becomes visible
           if (triggerOnce && observerRef.current) {
             observerRef.current.disconnect();
@@ -58,7 +62,7 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
         observerRef.current.disconnect();
       }
     };
-  }, [threshold, rootMargin, triggerOnce]);
+  }, [element, threshold, rootMargin, triggerOnce]);
 
   return { elementRef, isVisible };
 };

@@ -110,7 +110,7 @@ async function retryWithBackoff<T>(
       return await operation()
     } catch (error: any) {
       lastError = error
-      
+
       if (attempt < maxRetries) {
         const delay = baseDelay * Math.pow(2, attempt)
         console.log(`[CHECKOUT][${operationName}][retry]`, {
@@ -159,43 +159,64 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         error: { step: 'validate-customer', message: errorMessage },
       }
     }
-    
+
     logs.push({ step: 'validate-customer', details: { customerId: input.customerId, passed: true } })
     console.log('[CHECKOUT][GATE_1_PASSED]', { cartId, customerId: input.customerId })
 
     // 1) Update cart with email and shipping/billing addresses
     currentStep = 'update-cart'
     const updatedCart = await client.updateCart(cartId, cartUpdate)
-    try { console.log('[CHECKOUT][update-cart]', { cartId, email: (cartUpdate as any)?.email, shipping_first_name: (cartUpdate as any)?.shipping_address?.first_name }) } catch {}
-    logs.push({ step: 'update-cart', details: { 
-      cartId: updatedCart.id,
-      customerId: input.customerId
-    } })
-    
+    try { console.log('[CHECKOUT][update-cart]', { cartId, email: (cartUpdate as any)?.email, shipping_first_name: (cartUpdate as any)?.shipping_address?.first_name }) } catch { }
+    logs.push({
+      step: 'update-cart', details: {
+        cartId: updatedCart.id,
+        customerId: input.customerId
+      }
+    })
+
     // GATE 2: Associate customer with cart (BLOCKING with retries)
     currentStep = 'associate-customer'
     console.log('[CHECKOUT][GATE_2_START]', { cartId, customerId: input.customerId })
-    
+
     try {
+      // ROOT CAUSE FIX: Extract email and phone from available data
+      // This prevents the associate API from having to fetch customer details
+      const email = (cartUpdate as any)?.email
+      const phone = input.checkoutFormData?.phone || (cartUpdate as any)?.shipping_address?.phone
+
+      console.log('[CHECKOUT][ASSOCIATE_DATA_EXTRACTED]', {
+        cartId,
+        customerId: input.customerId,
+        hasEmail: !!email,
+        hasPhone: !!phone,
+        emailPrefix: email?.substring(0, 15),
+        phonePrefix: phone?.substring(0, 10)
+      })
+
       await retryWithBackoff(
         async () => {
           const response = await fetch('/api/checkout/customer/associate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cartId, customerId: input.customerId }),
+            body: JSON.stringify({
+              cartId,
+              customerId: input.customerId,
+              email,      // ROOT CAUSE FIX: Pass email
+              phone       // ROOT CAUSE FIX: Pass phone
+            }),
           })
-          
+
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'unknown' }))
             throw new Error(`Association failed: ${errorData.error || response.statusText}`)
           }
-          
+
           const data = await response.json()
           // CRITICAL FIX: Check if response indicates fallback (which means actual failure)
           if (data.fallback === true) {
             throw new Error(`Association not completed: ${data.adminError || 'Backend association failed'}`)
           }
-          
+
           return data
         },
         {
@@ -204,45 +225,45 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           operationName: 'associate-customer'
         }
       )
-      
+
       console.log('[CHECKOUT][GATE_2_PASSED]', { cartId, customerId: input.customerId })
       logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: true, blocking: true } })
     } catch (error: any) {
       const errorMessage = `Failed to link customer to cart after multiple attempts: ${error?.message || String(error)}`
-      console.error('[CHECKOUT][GATE_2_FAILED]', { 
-        cartId, 
-        customerId: input.customerId, 
+      console.error('[CHECKOUT][GATE_2_FAILED]', {
+        cartId,
+        customerId: input.customerId,
         error: error?.message || String(error)
       })
-      
+
       // BLOCKING ERROR - Stop checkout process
       return {
         success: false,
         cartId,
         logs,
-        error: { 
-          step: 'associate-customer', 
+        error: {
+          step: 'associate-customer',
           message: errorMessage
         },
       }
     }
-    
+
     // GATE 3: Verify customer association succeeded (BLOCKING)
     currentStep = 'verify-association'
     console.log('[CHECKOUT][GATE_3_START]', { cartId, expectedCustomerId: input.customerId })
-    
+
     try {
       const cartAfterAssociation = await client.getCart(cartId)
       const actualCustomerId = (cartAfterAssociation as any).customer_id
-      
+
       if (actualCustomerId !== input.customerId) {
         const errorMessage = `Cart customer verification failed. Expected: ${input.customerId}, Got: ${actualCustomerId || 'null'}`
-        console.error('[CHECKOUT][GATE_3_FAILED]', { 
-          cartId, 
+        console.error('[CHECKOUT][GATE_3_FAILED]', {
+          cartId,
           expectedCustomerId: input.customerId,
           actualCustomerId: actualCustomerId || 'null'
         })
-        
+
         return {
           success: false,
           cartId,
@@ -250,19 +271,21 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           error: { step: 'verify-association', message: errorMessage },
         }
       }
-      
+
       console.log('[CHECKOUT][GATE_3_PASSED]', { cartId, customerId: actualCustomerId })
-      logs.push({ step: 'verify-association', details: { 
-        customerId: actualCustomerId, 
-        verified: true 
-      } })
+      logs.push({
+        step: 'verify-association', details: {
+          customerId: actualCustomerId,
+          verified: true
+        }
+      })
     } catch (error: any) {
       const errorMessage = `Failed to verify cart customer association: ${error?.message || String(error)}`
-      console.error('[CHECKOUT][GATE_3_FAILED]', { 
-        cartId, 
+      console.error('[CHECKOUT][GATE_3_FAILED]', {
+        cartId,
         error: error?.message || String(error)
       })
-      
+
       return {
         success: false,
         cartId,
@@ -273,7 +296,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
     // 2) Fetch shipping options and select one (per profile)
     currentStep = 'fetch-shipping-options'
-    
+
     const options = await client.getShippingOptionsForCart(cartId)
     logs.push({ step: 'fetch-shipping-options', details: { count: options.length } })
 
@@ -314,7 +337,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
       }
 
       if (!chosen) continue
-      
+
       await client.addShippingMethod(cartId, chosen.id)
       added.push({ profile: profileId, optionId: chosen.id })
     }
@@ -327,10 +350,10 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
       client.getShippingOptionsForCart(cartId),
     ])
     const itemProfiles = new Set<string>()
-    ;(cartAfterShipping.items as any[])?.forEach((it: any) => {
-      const pid = it?.variant?.product?.shipping_profile_id || it?.variant?.product?.profile_id
-      if (pid) itemProfiles.add(String(pid))
-    })
+      ; (cartAfterShipping.items as any[])?.forEach((it: any) => {
+        const pid = it?.variant?.product?.shipping_profile_id || it?.variant?.product?.profile_id
+        if (pid) itemProfiles.add(String(pid))
+      })
     const hasMethods = Array.isArray((cartAfterShipping as any).shipping_methods) ? (cartAfterShipping as any).shipping_methods : []
     const methodProfiles = new Set<string>()
     hasMethods.forEach((sm: any) => {
@@ -346,7 +369,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         const candidates = remainingOptions.filter((o: any) => String((o as any).shipping_profile_id || (o as any).profile_id) === String(target))
         const pick = selectCheapestOption(candidates as any)
         if (pick) {
-          
+
           await client.addShippingMethod(cartId, pick.id)
           added.push({ profile: target, optionId: pick.id })
         }
@@ -356,14 +379,14 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
     // 3) Initialize and select payment session (manual)
     currentStep = 'create-payment-sessions'
-    
+
     const cartWithSessions = await client.createPaymentSessions(cartId)
     logs.push({ step: 'create-payment-sessions', details: { sessions: cartWithSessions.payment_sessions?.length ?? 0 } })
 
     if (useManual) {
       currentStep = 'select-payment-session'
       const providerId = MedusaApiClient.MANUAL_PAYMENT_PROVIDER_ID
-      
+
       const cartWithSelected = await client.selectPaymentSession(cartId, providerId)
       logs.push({ step: 'select-payment-session', details: { providerId, selected: true } })
     }
@@ -371,21 +394,21 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     // GATE 4: Validate prices before completing cart (BLOCKING)
     currentStep = 'validate-pricing'
     console.log('[CHECKOUT][GATE_4_START]', { cartId })
-    
+
     try {
       // Fetch fresh cart to get accurate totals with shipping methods applied
       const cartForValidation = await client.getCart(cartId)
-      
+
       // Calculate server-side prices (source of truth)
       const serverPrices = PriceValidationService.calculateServerPrices(
         cartForValidation,
         selectedIds.size > 0 ? Array.from(selectedIds)[0] : undefined
       )
-      
+
       // If client provided explicit amounts, validate them
       if (targetAmount !== undefined) {
         const shippingDiff = Math.abs(serverPrices.shipping - targetAmount)
-        
+
         if (shippingDiff > 0.01) {
           console.error('[CHECKOUT][GATE_4_FAILED][PRICE_MISMATCH]', {
             cartId,
@@ -394,7 +417,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
             difference: shippingDiff,
             severity: shippingDiff > 1 ? 'high' : 'medium'
           })
-          
+
           // Log as potential fraud attempt
           logs.push({
             step: 'price-validation-failed',
@@ -405,7 +428,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
               difference: shippingDiff
             }
           })
-          
+
           return {
             success: false,
             cartId,
@@ -417,13 +440,13 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           }
         }
       }
-      
+
       console.log('[CHECKOUT][GATE_4_PASSED]', {
         cartId,
         serverTotal: serverPrices.total,
         serverShipping: serverPrices.shipping
       })
-      
+
       logs.push({
         step: 'validate-pricing',
         details: {
@@ -436,13 +459,13 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           }
         }
       })
-      
+
     } catch (validationError: any) {
       console.error('[CHECKOUT][GATE_4_FAILED][EXCEPTION]', {
         cartId,
         error: validationError?.message || String(validationError)
       })
-      
+
       // BLOCKING ERROR - Price validation is critical for security
       return {
         success: false,
@@ -458,46 +481,46 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     // GATE 5: Complete the cart (customer already verified and linked)
     currentStep = 'complete-cart'
     console.log('[CHECKOUT][GATE_5_START]', { cartId, customerId: input.customerId })
-    
+
     // Use atomic workflow if enabled (Issue #5 fix)
     const useAtomicWorkflow = process.env.NEXT_PUBLIC_USE_ATOMIC_CHECKOUT === 'true'
     let completion: CompleteCartResponse
-    
+
     if (useAtomicWorkflow) {
       console.log('[CHECKOUT][GATE_5][ATOMIC_WORKFLOW]', { cartId, customerId: input.customerId })
-      
+
       // Call atomic workflow endpoint that provides ACID transaction guarantees
       completion = await client.completeCartAtomic(
-        cartId, 
+        cartId,
         input.customerId,
         input.checkoutFormData
       )
-      
-      console.log('[CHECKOUT][GATE_5][ATOMIC_WORKFLOW_SUCCESS]', { 
-        cartId, 
+
+      console.log('[CHECKOUT][GATE_5][ATOMIC_WORKFLOW_SUCCESS]', {
+        cartId,
         orderId: completion?.order?.id,
         workflowUsed: true
       })
     } else {
       console.log('[CHECKOUT][GATE_5][LEGACY_METHOD]', { cartId })
-      
+
       // Legacy method: separate blocking gates (Issues #1-4 fixes)
       completion = await client.completeCart(cartId)
-      
-      console.log('[CHECKOUT][GATE_5_COMPLETED]', { 
-        cartId, 
-        hasOrder: Boolean((completion as any)?.order), 
+
+      console.log('[CHECKOUT][GATE_5_COMPLETED]', {
+        cartId,
+        hasOrder: Boolean((completion as any)?.order),
         orderId: (completion as any)?.order?.id
       })
     }
-    
-    logs.push({ 
-      step: 'complete-cart', 
-      details: { 
-        type: completion.type, 
+
+    logs.push({
+      step: 'complete-cart',
+      details: {
+        type: completion.type,
         customerLinked: true,
         atomicWorkflow: useAtomicWorkflow
-      } 
+      }
     })
 
     if (!completion.order) {
@@ -515,12 +538,12 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
     // NEW: Customer profile sync after successful order creation
     if (order && input.customerId && input.checkoutFormData) {
       try {
-        
-        
+
+
         // Enhanced sync with timeout and retry logic
         const syncController = new AbortController()
         const syncTimeout = setTimeout(() => syncController.abort(), 10000) // 10 second timeout
-        
+
         const syncResult = await fetch('/api/checkout/customer/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -536,81 +559,81 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
           }),
           signal: syncController.signal
         })
-        
+
         clearTimeout(syncTimeout)
-        try { console.log('[CHECKOUT][sync][status]', { status: syncResult.status }) } catch {}
-        
+        try { console.log('[CHECKOUT][sync][status]', { status: syncResult.status }) } catch { }
+
         const syncResponse = await syncResult.text()
         let parsedResponse = null
-        
+
         try {
           parsedResponse = JSON.parse(syncResponse)
         } catch {
           parsedResponse = { error: 'invalid_response', rawResponse: syncResponse }
         }
-        
-        
-        
+
+
+
         if (syncResult.ok && parsedResponse?.ok) {
-          logs.push({ 
-            step: 'customer-profile-sync', 
-            details: { 
-              customerId: input.customerId, 
+          logs.push({
+            step: 'customer-profile-sync',
+            details: {
+              customerId: input.customerId,
               success: true,
               attempts: parsedResponse.attempts || 1
-            } 
+            }
           })
-          try { console.log('[CHECKOUT][sync][ok]', { customerId: input.customerId, attempts: parsedResponse.attempts || 1 }) } catch {}
+          try { console.log('[CHECKOUT][sync][ok]', { customerId: input.customerId, attempts: parsedResponse.attempts || 1 }) } catch { }
         } else {
           // Enhanced error categorization
           const errorType = parsedResponse?.error || 'unknown_error'
           const errorMessage = parsedResponse?.message || syncResponse || 'Unknown sync error'
-          
-          
-          
-          logs.push({ 
-            step: 'customer-profile-sync-failed', 
-            details: { 
+
+
+
+          logs.push({
+            step: 'customer-profile-sync-failed',
+            details: {
               customerId: input.customerId,
               status: syncResult.status,
               errorType,
               errorMessage,
               recoverable: errorType !== 'customer_not_found' && errorType !== 'invalid_request'
-            } 
+            }
           })
-          try { console.log('[CHECKOUT][sync][fail]', { customerId: input.customerId, status: syncResult.status, errorType, errorMessage }) } catch {}
+          try { console.log('[CHECKOUT][sync][fail]', { customerId: input.customerId, status: syncResult.status, errorType, errorMessage }) } catch { }
         }
-        
+
       } catch (error: any) {
         // Handle network errors, timeouts, etc.
         const isTimeout = error.name === 'AbortError' || error.message?.includes('timeout')
         const errorType = isTimeout ? 'network_timeout' : 'network_error'
-        
-        
-        
-        logs.push({ 
-          step: 'customer-profile-sync-error', 
-          details: { 
+
+
+
+        logs.push({
+          step: 'customer-profile-sync-error',
+          details: {
             customerId: input.customerId,
             errorType,
             errorMessage: error.message || String(error),
             recoverable: true // Network errors are generally recoverable
-          } 
+          }
         })
-        
-        
+
+
       }
     } else {
       // Log why sync was skipped
-      const skipReason = !order ? 'no_order' : 
-                        !input.customerId ? 'no_customer_id' : 
-                        !input.checkoutFormData ? 'no_form_data' : 'unknown'
-      
-      
-      
-      logs.push({ 
-        step: 'customer-profile-sync-skipped', 
-        details: { reason: skipReason } 
+      const skipReason = !order ? 'no_order' :
+        !input.customerId ? 'no_customer_id' :
+          !input.checkoutFormData ? 'no_form_data' : 'unknown'
+
+
+
+      logs.push({
+        step: 'customer-profile-sync-skipped',
+        details: { reason: skipReason }
       })
     }
 

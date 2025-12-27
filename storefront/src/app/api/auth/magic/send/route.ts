@@ -30,30 +30,49 @@ export async function POST(req: NextRequest) {
     if (count > MAGIC_RATE_LIMIT_PER_WINDOW) {
       return new Response(JSON.stringify({ ok: false, error: 'rate_limited' }), { status: 429 })
     }
-  } catch {}
+  } catch { }
   const token = generateToken()
   const tokenHash = await bcrypt.hash(token, 10)
-  await kvSet(`magic:${normalized}`, { 
-    tokenHash, 
+
+  const magicRecord = {
+    tokenHash,
     phonePrimary: typeof phone === 'string' ? phone : undefined,
     cartId: typeof cartId === 'string' ? cartId : undefined
-  }, MAGIC_TTL_SECONDS)
+  }
+
+  console.log('[MAGIC_SEND] Storing magic link token:', {
+    email: normalized,
+    state,
+    cartId: magicRecord.cartId,
+    kvKey: `magic:${normalized}`,
+  })
+
+  await kvSet(`magic:${normalized}`, magicRecord, MAGIC_TTL_SECONDS)
+
   const qs = new URLSearchParams({ token, email: normalized })
   if (state && typeof state === 'string') qs.set('state', state)
-  const url = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/auth/magic/confirm?${qs.toString()}`
+
+  const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
+  const url = `${baseUrl}/api/auth/magic/confirm?${qs.toString()}`
+
+  console.log('[MAGIC_SEND] Generated magic link URL:', {
+    baseUrl,
+    fullUrl: url,
+    stateInUrl: state,
+  })
   const res = await sendMagicLink(normalized, url)
   if (!res.ok) {
     return new Response(JSON.stringify({ ok: false, error: 'email_send_failed', details: res.error }), { status: 502 })
   }
   try {
     await kafkaEmit('auth.magiclink_sent', { email: normalized, timestamp: Date.now() })
-  } catch {}
+  } catch { }
   try {
     const c = await getCounter({ name: 'auth_magic_send_total', help: 'Total magic link sends' })
     c.inc()
     const h = await getHistogram({ name: 'auth_magic_send_latency_ms', help: 'Magic link send latency (ms)' })
     h.observe(Date.now() - start)
-  } catch {}
+  } catch { }
   return new Response(JSON.stringify({ ok: true }), { status: 200 })
 }
 

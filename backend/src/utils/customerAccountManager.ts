@@ -16,7 +16,7 @@ type Scope = {
 
 export interface CustomerAccountInput {
   scope: Scope
-  phone: string
+  phone?: string  // Optional - either phone or email required
   first_name?: string
   last_name?: string
   email?: string
@@ -94,23 +94,28 @@ export async function findOrCreateCustomerAccount(
     requireAuthSubjectMatch = false,
   } = input
 
-  const normalizedPhone = normalizePhoneNumber(phone)
+  // Only normalize phone if it's provided
+  const normalizedPhone = phone ? normalizePhoneNumber(phone) : undefined
 
-  // Generate canonical phone format for duplicate prevention
-  let canonicalPhone: string;
-  try {
-    canonicalPhone = normalizePhoneToCanonical(phone);
-  } catch (error) {
-    throw new Error(`Invalid phone number format: ${phone}`);
+  // Generate canonical phone format for duplicate prevention (only if phone provided)
+  let canonicalPhone: string | undefined
+  if (phone) {
+    try {
+      canonicalPhone = normalizePhoneToCanonical(phone)
+    } catch (error) {
+      // Phone is optional, so just log and continue without canonical format
+      console.warn(`[CUSTOMER_ACCOUNT_MANAGER] Could not normalize phone: ${phone}`)
+    }
   }
 
   const customerModuleService: any = scope.resolve(Modules.CUSTOMER)
   const enhancedCustomerService = createEnhancedCustomerService(customerModuleService)
   const customerMergeService = createCustomerMergeService(customerModuleService)
 
+  // Generate effective email: use provided email OR generate placeholder from phone (for phone-only auth)
   const effectiveEmail =
     email ||
-    (identity_method === "phone" && whatsapp_authenticated
+    (identity_method === "phone" && whatsapp_authenticated && phone
       ? generatePlaceholderEmail(phone)
       : undefined)
 
@@ -408,13 +413,49 @@ export async function findOrCreateCustomerAccount(
     customerCreateData.metadata.auth_subject_last_verified_at = new Date().toISOString()
   }
 
-  const { result } = await createCustomersWorkflow(scope).run({
-    input: {
-      customersData: [customerCreateData],
-    },
-  })
+  // Wrap customer creation in try-catch to handle race condition
+  // If two parallel requests try to create the same customer, one will fail with "already exists"
+  let customer: any = null
+  let wasCreated = true
 
-  const customer = result?.[0]
+  try {
+    const { result } = await createCustomersWorkflow(scope).run({
+      input: {
+        customersData: [customerCreateData],
+      },
+    })
+    customer = result?.[0]
+  } catch (createError: any) {
+    const errorMessage = createError?.message || String(createError)
+
+    // Check if this is a "customer already exists" race condition error
+    if (errorMessage.includes('already exists')) {
+      console.log('[CUSTOMER_ACCOUNT_MANAGER] Race condition detected - customer already created by parallel request, looking up existing customer')
+
+      // Look up the existing customer by email
+      const effectiveEmail = customerCreateData.email
+      if (effectiveEmail) {
+        const [existingCustomer] = await customerModuleService.listCustomers(
+          { email: effectiveEmail },
+          { take: 1, relations: ["addresses"] }
+        )
+
+        if (existingCustomer) {
+          customer = existingCustomer
+          wasCreated = false
+          console.log('[CUSTOMER_ACCOUNT_MANAGER] Found existing customer after race condition:', existingCustomer.id)
+        }
+      }
+
+      // If still no customer found, rethrow
+      if (!customer) {
+        throw createError
+      }
+    } else {
+      // Not a race condition error, rethrow
+      throw createError
+    }
+  }
 
   let finalCustomer = customer
 
@@ -444,8 +485,8 @@ export async function findOrCreateCustomerAccount(
   return {
     ok: true,
     customer: finalCustomer,
-    wasCreated: true,
-    statusCode: 201,
+    wasCreated,
+    statusCode: wasCreated ? 201 : 200,
     lookupStrategy,
     consolidationInfo,
     cartAssociation: associations.cart,

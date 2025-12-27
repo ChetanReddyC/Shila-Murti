@@ -9,6 +9,7 @@
 }
 
 /* Main card container */
+/* Main card container */
 .cardContainer {
     position: relative;
     display: inline-block;
@@ -25,14 +26,14 @@
     /* Base z-index for non-hovered state */
     border-radius: 8px;
     /* Explicitly set border radius for shader canvas inheritance */
-    margin-bottom: 30px;
-    /* Add margin to ensure cards don't overlap */
+    margin-bottom: 0;
+    /* Let parent grid handle spacing */
 }
 
 /* Add hover state for the container to increase its stacking context */
 .cardContainerHovered {
-    z-index: 999 !important;
-    /* Very high z-index to ensure it's above everything */
+    z-index: 40 !important;
+    /* Elevated but below sticky headers/footers (z-index 100+) */
 }
 
 .cardWrapper {

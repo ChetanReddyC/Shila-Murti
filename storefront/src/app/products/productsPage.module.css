@@ -1,8 +1,10 @@
 .productsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 60px; /* Increased gap to allow more space for the product details */
-  padding: 30px 16px 60px; /* Increased bottom padding */
+  gap: 60px;
+  /* Increased gap to allow more space for the product details */
+  padding: 30px 16px 60px;
+  /* Increased bottom padding */
   justify-items: center;
   position: relative;
   /* Create a stacking context for child elements */
@@ -10,7 +12,8 @@
   /* Preserve 3D transformations */
   perspective: 1000px;
   /* Add perspective to the grid */
-  margin-bottom: 60px; /* Increased bottom margin to ensure cards don't get cut off */
+  margin-bottom: 60px;
+  /* Increased bottom margin to ensure cards don't get cut off */
 }
 
 /* Pill filter button to match the screenshot */
@@ -18,17 +21,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px; /* compact height */
-  background: #f2f2f2; /* light gray */
+  padding: 6px 12px;
+  /* compact height */
+  background: #f2f2f2;
+  /* light gray */
   color: #141414;
   border: none;
-  border-radius: 12px; /* smoother boxy instead of full pill */
+  border-radius: 12px;
+  /* smoother boxy instead of full pill */
   cursor: pointer;
-  height: 32px; /* approx h-8 */
+  height: 32px;
+  /* approx h-8 */
   line-height: 1;
   transition: background 160ms ease, transform 120ms ease, box-shadow 160ms ease;
-  white-space: nowrap; /* keep pill label on one line */
-  flex: 0 0 auto; /* never stretch in the row */
+  white-space: nowrap;
+  /* keep pill label on one line */
+  flex: 0 0 auto;
+  /* never stretch in the row */
 }
 
 .pillFilterButton:hover {
@@ -82,7 +91,7 @@
   background: #ffffff;
   border: 1px solid #e5e5e5;
   border-radius: 10px;
-  box-shadow: 0 8px 16px rgba(20,20,20,0.06);
+  box-shadow: 0 8px 16px rgba(20, 20, 20, 0.06);
   padding: 8px;
   display: grid;
   gap: 6px;
@@ -116,8 +125,10 @@
 }
 
 .pillFilterLabel {
-  font-size: 0.875rem; /* text-sm */
-  font-weight: 500; /* medium */
+  font-size: 0.875rem;
+  /* text-sm */
+  font-weight: 500;
+  /* medium */
   color: #141414;
 }
 
@@ -142,8 +153,10 @@
 .sortButton {
   /* inherits pillFilterButton, just ensures space between label and chevron */
   justify-content: space-between;
-  padding-right: 8px; /* a bit tighter than default */
-  border-radius: 12px; /* smoother boxy, not full pill */
+  padding-right: 8px;
+  /* a bit tighter than default */
+  border-radius: 12px;
+  /* smoother boxy, not full pill */
 }
 
 .sortMenu {
@@ -154,10 +167,12 @@
   min-width: 220px;
   background: #ffffff;
   border: 1px solid #e5e5e5;
-  border-radius: 10px; /* less rounded to match page */
-  box-shadow: 0 8px 16px rgba(20,20,20,0.06);
+  border-radius: 10px;
+  /* less rounded to match page */
+  box-shadow: 0 8px 16px rgba(20, 20, 20, 0.06);
   overflow: hidden;
-  padding: 8px; /* inner space to show item corner radius */
+  padding: 8px;
+  /* inner space to show item corner radius */
   display: grid;
   gap: 8px;
   list-style: none;
@@ -185,15 +200,19 @@
   width: 100%;
   text-align: left;
   padding: 10px 12px;
-  font-size: 0.875rem; /* text-sm */
+  font-size: 0.875rem;
+  /* text-sm */
   color: #141414;
   background: transparent;
   border: none;
   cursor: pointer;
-  border-radius: 10px; /* rounded box for each item */
-  margin: 0; /* spacing handled by container gap */
+  border-radius: 10px;
+  /* rounded box for each item */
+  margin: 0;
+  /* spacing handled by container gap */
   position: relative;
-  z-index: 1; /* keeps above highlight */
+  z-index: 1;
+  /* keeps above highlight */
   transition: background-color 160ms ease, color 160ms ease;
 }
 
@@ -214,7 +233,8 @@
   right: 8px;
   height: 0;
   border-radius: 10px;
-  background: #f5f5f5; /* clean, plain highlight without border */
+  background: #f5f5f5;
+  /* clean, plain highlight without border */
   border: none;
   box-shadow: none;
   z-index: 0;
@@ -225,7 +245,7 @@
 }
 
 /* Reset list item spacing to avoid layout drift */
-.sortMenu > li {
+.sortMenu>li {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -235,8 +255,10 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  min-height: 580px; /* Increased to ensure enough space for the card with details */
-  padding-bottom: 20px; /* Add padding at the bottom */
+  min-height: 580px;
+  /* Increased to ensure enough space for the card with details */
+  padding-bottom: 20px;
+  /* Add padding at the bottom */
 }
 
 /* Wrap both pill rows in a bounded container so tags stay left-side */
@@ -268,5 +290,23 @@
 @media (min-width: 1024px) {
   .productsGrid {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+}
+
+/* Mobile responsive layout for proper centering */
+.pageWrapper {
+  padding-left: 160px;
+  /* px-40 equivalent */
+  padding-right: 160px;
+}
+
+@media (max-width: 768px) {
+  .pageWrapper {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .pillContainer {
+    width: 100%;
   }
 }

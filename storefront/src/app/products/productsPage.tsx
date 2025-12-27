@@ -42,11 +42,11 @@ export default function ProductsPage() {
   // Optimized state update function to minimize re-renders
   const updateState = useCallback((updates: Partial<ProductsState>) => {
     if (!isMountedRef.current) return;
-    
+
     setState(prevState => {
       // Only update if there are actual changes
       const newState = { ...prevState, ...updates };
-      
+
       // Shallow comparison to prevent unnecessary updates
       if (
         newState.loading === prevState.loading &&
@@ -55,7 +55,7 @@ export default function ProductsPage() {
       ) {
         return prevState;
       }
-      
+
       return newState;
     });
   }, []);
@@ -64,9 +64,9 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       updateState({ loading: true, error: null });
-      
+
       const fetchedProducts = await productsService.fetchProducts();
-      
+
       if (isMountedRef.current) {
         updateState({ products: fetchedProducts, loading: false });
         // Reset retry state on successful fetch
@@ -112,14 +112,14 @@ export default function ProductsPage() {
     }
 
     if (shouldFetchAll) {
-    fetchProducts();
+      fetchProducts();
     }
-    
+
     // Make debug function available in browser console
     if (typeof window !== 'undefined') {
       (window as any).debugMedusaApi = debugMedusaApiResponse;
     }
-    
+
     return () => {
       isMountedRef.current = false;
     };
@@ -130,7 +130,7 @@ export default function ProductsPage() {
   // Retry handler using the retry hook
   const handleRetry = useCallback(async () => {
     if (!canRetry || !isMountedRef.current) return;
-    
+
     try {
       await retry(fetchProducts);
     } catch (err) {
@@ -140,14 +140,14 @@ export default function ProductsPage() {
 
   // Error boundary error handler - memoized to prevent re-renders
   const handleErrorBoundaryError = useCallback((error: Error, errorInfo: any) => {
-    
+
     // You could send this to an error reporting service
     // errorReportingService.captureException(error, { extra: errorInfo });
   }, []);
 
   // Memoize computed values to prevent unnecessary re-renders
   const isLoading = useMemo(() => state.loading || isRetrying, [state.loading, isRetrying]);
-  
+
   // Sort state and derived sorted products
   const [sortOpen, setSortOpen] = useState<boolean>(false);
   const [sortOption, setSortOption] = useState<SortOption>('price-asc');
@@ -345,7 +345,7 @@ export default function ProductsPage() {
 
     return annotated.map(x => x.product);
   }, [state.products, sortOption]);
-  
+
   // Memoize grid props to prevent unnecessary re-renders of ProductsGrid
   const gridProps = useMemo(() => ({
     products: sortedProducts,
@@ -369,111 +369,90 @@ export default function ProductsPage() {
       <div className="layout-container flex h-full grow flex-col">
         {/* Header is now in root layout */}
 
-        <div className="px-40 flex flex-1 justify-center py-5">
-          <div className="layout-content-container flex flex-col gap-6 max-w-[960px] flex-1">
-            <p className="py-8 text-[#141414] tracking-light text-[32px] font-bold leading-tight">Stone Idols</p>
+        <div className={`${styles.pageWrapper} flex flex-1 justify-center py-5`}>
+          <div className={`layout-content-container ${styles.contentContainer} flex flex-col gap-4 max-w-[960px] flex-1`}>
+            <p className="pt-8 pb-0 text-[#141414] tracking-light text-[32px] font-bold leading-tight">Stone Idols</p>
             <div className="flex flex-col gap-6 items-start">
               <div className={styles.pillContainer}>
-              <div className={styles.pillGrid}>
-                {/* Selected categories appear as pills */}
-                {Array.from(selectedCategories).map((key) => {
-                  const label = toLabel(String(key));
-                  return (
-                    <button
-                      key={String(key)}
-                      type="button"
-                      onClick={() => toggleCategory(key)}
-                      className={styles.pillFilterButton}
-                      aria-pressed={selectedCategories.has(key)}
-                      aria-label={`Toggle ${label} category`}
-                    >
-                      <span className={styles.pillFilterLabel}>{label}</span>
-                      <svg
-                        className={styles.pillClose}
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 256 256"
-                        aria-hidden="true"
-                        onClick={(e) => { e.stopPropagation(); toggleCategory(key); }}
+                <div className={styles.pillGrid}>
+                  {/* Selected categories appear as pills */}
+                  {Array.from(selectedCategories).map((key) => {
+                    const label = toLabel(String(key));
+                    return (
+                      <button
+                        key={String(key)}
+                        type="button"
+                        onClick={() => toggleCategory(key)}
+                        className={styles.pillFilterButton}
+                        aria-pressed={selectedCategories.has(key)}
+                        aria-label={`Toggle ${label} category`}
                       >
-                        <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
+                        <span className={styles.pillFilterLabel}>{label}</span>
+                        <svg
+                          className={styles.pillClose}
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 256 256"
+                          aria-hidden="true"
+                          onClick={(e) => { e.stopPropagation(); toggleCategory(key); }}
+                        >
+                          <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z" />
+                        </svg>
+                      </button>
+                    );
+                  })}
+                  {/* More button */}
+                  <div className={styles.moreMenuWrapper} ref={moreMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setMoreOpen(o => !o)}
+                      className={styles.pillFilterButton}
+                      aria-expanded={moreOpen}
+                      aria-haspopup="listbox"
+                    >
+                      <span className={styles.pillFilterLabel}>More</span>
+                      <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
+                        <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
                       </svg>
                     </button>
-                  );
-                })}
-                {/* More button */}
-                <div className={styles.moreMenuWrapper} ref={moreMenuRef}>
+                    {moreOpen && (
+                      <ul className={styles.moreMenu} role="listbox">
+                        {allCategories
+                          .filter((c) => !selectedCategories.has(c.handle))
+                          .map((c) => (
+                            <li key={c.id} role="option" aria-selected={selectedCategories.has(c.handle)}>
+                              <button
+                                type="button"
+                                className={styles.moreMenuItem}
+                                onClick={() => toggleCategory(c.handle)}
+                              >
+                                <span className={styles.pillFilterLabel}>{c.name || toLabel(c.handle)}</span>
+                                {selectedCategories.has(c.handle) ? (
+                                  <svg className={styles.pillClose} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256" aria-hidden="true">
+                                    <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z" />
+                                  </svg>
+                                ) : null}
+                              </button>
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
+                  {/* Clear button follows immediately after More */}
                   <button
                     type="button"
-                    onClick={() => setMoreOpen(o => !o)}
-                    className={styles.pillFilterButton}
-                    aria-expanded={moreOpen}
-                    aria-haspopup="listbox"
+                    onClick={clearCategories}
+                    className={`${styles.pillFilterButton} ${styles.pillClearButton}`}
+                    aria-label="Clear category filters"
                   >
-                    <span className={styles.pillFilterLabel}>More</span>
-                  <svg className={styles.pillChevron} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256" aria-hidden="true">
-                    <path fill="currentColor" d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                  </svg>
-                </button>
-                  {moreOpen && (
-                    <ul className={styles.moreMenu} role="listbox">
-                      {allCategories
-                        .filter((c) => !selectedCategories.has(c.handle))
-                        .map((c) => (
-                        <li key={c.id} role="option" aria-selected={selectedCategories.has(c.handle)}>
-                          <button
-                            type="button"
-                            className={styles.moreMenuItem}
-                            onClick={() => toggleCategory(c.handle)}
-                          >
-                            <span className={styles.pillFilterLabel}>{c.name || toLabel(c.handle)}</span>
-                            {selectedCategories.has(c.handle) ? (
-                              <svg className={styles.pillClose} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256" aria-hidden="true">
-                                <path fill="currentColor" d="M200.49,55.51a12,12,0,0,0-17,0L128,111,72.49,55.51a12,12,0,0,0-17,17L111,128,55.51,183.51a12,12,0,1,0,17,17L128,145l55.51,55.51a12,12,0,0,0,17-17L145,128l55.51-55.51A12,12,0,0,0,200.49,55.51Z"/>
-                  </svg>
-                            ) : null}
-                </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-              </div>
-                {/* Clear button follows immediately after More */}
-                <button
-                  type="button"
-                  onClick={clearCategories}
-                  className={`${styles.pillFilterButton} ${styles.pillClearButton}`}
-                  aria-label="Clear category filters"
-                >
-                  <span className={styles.pillFilterLabel}>Clear</span>
-                </button>
-              </div>
-              {/* Removed missing category notice per updated design */}
-              </div>
-            </div>
-            <div className="@container">
-              <div className="relative flex w-full flex-col items-start justify-between gap-3 p-4 @[480px]:flex-row">
-                <p className="text-[#141414] text-base font-medium leading-normal w-full shrink-[3]">Price Range</p>
-                <div className="flex h-[38px] w-full pt-1.5">
-                  <div className="flex h-1 w-full rounded-sm bg-[#e0e0e0] pl-[60%] pr-[15%]">
-                    <div className="relative">
-                      <div className="absolute -left-3 -top-1.5 flex flex-col items-center gap-1">
-                        <div className="size-4 rounded-full bg-[#141414]"></div>
-                        <p className="text-[#141414] text-sm font-normal leading-normal">0</p>
-                      </div>
-                    </div>
-                    <div className="h-1 flex-1 rounded-sm bg-[#141414]"></div>
-                    <div className="relative">
-                      <div className="absolute -left-3 -top-1.5 flex flex-col items-center gap-1">
-                        <div className="size-4 rounded-full bg-[#141414]"></div>
-                        <p className="text-[#141414] text-sm font-normal leading-normal">1000</p>
-                      </div>
-                    </div>
-                  </div>
+                    <span className={styles.pillFilterLabel}>Clear</span>
+                  </button>
                 </div>
+                {/* Removed missing category notice per updated design */}
               </div>
             </div>
+
             <div className="flex gap-3 p-3 flex-wrap pr-4">
               <div className={styles.sortWrapper} ref={sortMenuRef}>
                 <button
@@ -487,45 +466,45 @@ export default function ProductsPage() {
                   <p className="text-[#141414] text-sm font-medium leading-normal">Sort by: {sortLabel}</p>
                   <div className={styles.pillChevron} data-icon="CaretDown" data-size="18px" data-weight="regular">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true">
-                    <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
-                  </svg>
-                </div>
-              </button>
+                      <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path>
+                    </svg>
+                  </div>
+                </button>
 
                 <ul
                   id="sort-menu"
                   role="listbox"
                   className={`${styles.sortMenu} ${sortOpen ? styles.sortMenuOpen : ''}`}
                 >
-                    <div
-                      ref={highlightRef}
-                      className={styles.sortMenuHighlight}
-                      style={{ transform: highlightStyle.transform, height: highlightStyle.height, opacity: highlightStyle.opacity }}
-                      aria-hidden="true"
-                    />
-                    <li role="option" aria-selected={sortOption === 'price-asc'} style={{ listStyle: 'none' }}>
-                      <button
-                        type="button"
-                        onClick={() => { setSortOption('price-asc'); }}
-                        className={`${styles.sortMenuItem} ${sortOption === 'price-asc' ? styles.sortMenuItemActive : ''}`}
-                      >
-                        Price: Low to High
-                      </button>
-                    </li>
-                    <li role="option" aria-selected={sortOption === 'price-desc'} style={{ listStyle: 'none' }}>
-                      <button
-                        type="button"
-                        onClick={() => { setSortOption('price-desc'); }}
-                        className={`${styles.sortMenuItem} ${sortOption === 'price-desc' ? styles.sortMenuItemActive : ''}`}
-                      >
-                        Price: High to Low
-                      </button>
-                    </li>
-                
+                  <div
+                    ref={highlightRef}
+                    className={styles.sortMenuHighlight}
+                    style={{ transform: highlightStyle.transform, height: highlightStyle.height, opacity: highlightStyle.opacity }}
+                    aria-hidden="true"
+                  />
+                  <li role="option" aria-selected={sortOption === 'price-asc'} style={{ listStyle: 'none' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setSortOption('price-asc'); }}
+                      className={`${styles.sortMenuItem} ${sortOption === 'price-asc' ? styles.sortMenuItemActive : ''}`}
+                    >
+                      Price: Low to High
+                    </button>
+                  </li>
+                  <li role="option" aria-selected={sortOption === 'price-desc'} style={{ listStyle: 'none' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setSortOption('price-desc'); }}
+                      className={`${styles.sortMenuItem} ${sortOption === 'price-desc' ? styles.sortMenuItemActive : ''}`}
+                    >
+                      Price: High to Low
+                    </button>
+                  </li>
+
                 </ul>
               </div>
             </div>
-            
+
             {/* Products Grid with Enhanced Loading and Error States */}
             <ErrorBoundary onError={handleErrorBoundaryError}>
               <ProductsGrid {...gridProps} />

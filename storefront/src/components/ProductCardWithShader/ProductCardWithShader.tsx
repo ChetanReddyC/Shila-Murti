@@ -133,7 +133,8 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
     resetTilt();
     setIsHovering(false);
     setIsHoveringImageSection(false);
-    overlayRef?.current?.endHover?.();
+    const target = imageSectionRef.current || containerRef.current;
+    overlayRef?.current?.endHover?.(target);
   }, [resetTilt, overlayRef]);
 
   const handleContainerMouseEnter = useCallback(() => {
@@ -158,6 +159,89 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
     resetTilt();
     // Do not end overlay here; keep it visible while hovering the details section
   }, [resetTilt]);
+
+  // Mobile: Scroll-based hover activation
+  // Mobile: Scroll-based hover activation using robust Media Query and IntersectionObserver
+  useEffect(() => {
+    // Logic only applies to client-side
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    let observer: IntersectionObserver | null = null;
+
+    const cleanupObserver = () => {
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
+    };
+
+    const setupObserver = () => {
+      // 1. Clean up any existing observer first
+      cleanupObserver();
+
+      // 2. Only create observer if we are on a mobile/tablet view
+      if (!mediaQuery.matches) return;
+
+      const targetEl = containerRef.current;
+      if (!targetEl) return;
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const hoverTarget = imageSectionRef.current || containerRef.current;
+
+            if (entry.isIntersecting) {
+              // Card is in view: Active State
+              setIsHovering(true);
+              if (hoverTarget) {
+                // Force reset intensity to 0 for smooth fade-in on scroll
+                overlayRef?.current?.beginHover?.(hoverTarget, true);
+              }
+            } else {
+              // Card left view: Inactive State
+              setIsHovering(false);
+              resetTilt();
+              if (hoverTarget) {
+                overlayRef?.current?.endHover?.(hoverTarget);
+              }
+            }
+          });
+        },
+        {
+          threshold: 0.6, // 60% visibility ensures "center focus" feel
+          rootMargin: '0px',
+        }
+      );
+
+      observer.observe(targetEl);
+    };
+
+    // Handle Resize/Orientation Changes
+    const handleMediaChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setupObserver();
+      } else {
+        // Switched to Desktop: Clean up mobile specific logic
+        cleanupObserver();
+        setIsHovering(false);
+        resetTilt();
+        const hoverTarget = imageSectionRef.current || containerRef.current;
+        overlayRef?.current?.endHover?.(hoverTarget);
+      }
+    };
+
+    // Initialize
+    setupObserver();
+
+    // Listen for breakpoints changes
+    mediaQuery.addEventListener('change', handleMediaChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleMediaChange);
+      cleanupObserver();
+    };
+  }, [overlayRef, resetTilt]);
 
   return (
     <Link href={`/products/${productHandle}`} className={styles.cardLink}>

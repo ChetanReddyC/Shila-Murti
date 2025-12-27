@@ -8,7 +8,7 @@
 import { normalizePhoneNumber, generatePlaceholderEmail, arePhoneNumbersEquivalent, generatePhoneVariations, normalizePhoneToCanonical } from './phoneNormalization';
 
 export interface CustomerLookupRequest {
-  phone: string;
+  phone?: string;  // Optional - either phone or email required
   email?: string;
   whatsapp_authenticated: boolean;
   email_authenticated?: boolean;
@@ -48,86 +48,100 @@ export class EnhancedCustomerService {
    * Implements the enhanced lookup algorithm from the design document.
    */
   async findCustomerWithEnhancedLookup(request: CustomerLookupRequest): Promise<CustomerLookupResult> {
-    const normalizedPhone = normalizePhoneNumber(request.phone);
-    
-    // Use canonical phone format for lookups to prevent duplicates
-    let canonicalPhone: string;
-    try {
-      canonicalPhone = normalizePhoneToCanonical(request.phone);
-    } catch (error) {
-      console.error('[EnhancedCustomerService] Invalid phone format:', request.phone);
-      throw new Error(`Invalid phone number format: ${request.phone}`);
+    // Handle optional phone - only normalize if provided
+    let normalizedPhone: string | undefined
+    let canonicalPhone: string | undefined
+
+    if (request.phone) {
+      normalizedPhone = normalizePhoneNumber(request.phone)
+
+      // Use canonical phone format for lookups to prevent duplicates
+      try {
+        canonicalPhone = normalizePhoneToCanonical(request.phone)
+      } catch (error) {
+        console.error('[EnhancedCustomerService] Invalid phone format:', request.phone)
+        // Continue without canonical phone - will fall back to other lookup methods
+      }
     }
-    
-    const effectiveEmail = request.email || generatePlaceholderEmail(request.phone);
-    
+
+    // Generate effective email - use provided email, or generate from phone for phone-only auth
+    const effectiveEmail = request.email ||
+      (request.phone ? generatePlaceholderEmail(request.phone) : undefined)
+
     console.log('[EnhancedCustomerService] Starting enhanced lookup:', {
       normalizedPhone,
       canonicalPhone,
       effectiveEmail,
-      whatsapp_authenticated: request.whatsapp_authenticated
-    });
+      whatsapp_authenticated: request.whatsapp_authenticated,
+      email_authenticated: request.email_authenticated,
+      identity_method: request.identity_method
+    })
 
-    // Strategy 1: Exact email match
-    const emailResult = await this.lookupByEmail(effectiveEmail);
-    if (emailResult.customer) {
-      console.log('[EnhancedCustomerService] Found customer by email match');
-      return {
-        customer: emailResult.customer,
-        lookupStrategy: 'email_match',
-        conflictDetected: this.detectPhoneConflict(emailResult.customer, normalizedPhone),
-        phoneConflicts: this.getPhoneConflicts(emailResult.customer, normalizedPhone),
-        consolidationRequired: false
-      };
-    }
-
-    // Strategy 2: Canonical phone metadata lookup (MOST RELIABLE)
-    const canonicalPhoneResult = await this.lookupByCanonicalPhone(canonicalPhone);
-    if (canonicalPhoneResult.customer) {
-      return {
-        customer: canonicalPhoneResult.customer,
-        lookupStrategy: 'canonical_phone_match',
-        conflictDetected: false,
-        consolidationRequired: emailResult.customer ? true : false
-      };
-    }
-
-    // Strategy 3: Phone metadata lookup (legacy)
-    const phoneMetadataResult = await this.lookupByPhoneMetadata(normalizedPhone);
-    if (phoneMetadataResult.customer) {
-      console.log('[EnhancedCustomerService] Found customer by phone metadata');
-      return {
-        customer: phoneMetadataResult.customer,
-        lookupStrategy: 'phone_metadata',
-        conflictDetected: false,
-        consolidationRequired: emailResult.customer ? true : false
-      };
-    }
-
-    // Strategy 4: Legacy phone field lookup
-    const phoneFieldResult = await this.lookupByPhoneField(normalizedPhone);
-    if (phoneFieldResult.customer) {
-      console.log('[EnhancedCustomerService] Found customer by phone field');
-      return {
-        customer: phoneFieldResult.customer,
-        lookupStrategy: 'phone_field',
-        conflictDetected: false,
-        consolidationRequired: false
-      };
-    }
-
-    // Strategy 5: Phone variation lookup for WhatsApp authenticated customers (legacy fallback)
-    if (request.whatsapp_authenticated) {
-      const variationResult = await this.lookupByPhoneVariations(normalizedPhone);
-      if (variationResult.customer) {
-        console.log('[EnhancedCustomerService] Found customer by phone variation');
+    // Strategy 1: Exact email match (primary strategy for email-only auth)
+    if (effectiveEmail) {
+      const emailResult = await this.lookupByEmail(effectiveEmail);
+      if (emailResult.customer) {
+        console.log('[EnhancedCustomerService] Found customer by email match');
         return {
-          customer: variationResult.customer,
-          lookupStrategy: 'phone_variation',
-          conflictDetected: true,
-          phoneConflicts: [normalizedPhone],
-          consolidationRequired: true
+          customer: emailResult.customer,
+          lookupStrategy: 'email_match',
+          conflictDetected: normalizedPhone ? this.detectPhoneConflict(emailResult.customer, normalizedPhone) : false,
+          phoneConflicts: normalizedPhone ? this.getPhoneConflicts(emailResult.customer, normalizedPhone) : [],
+          consolidationRequired: false
         };
+      }
+    }
+
+    // Phone-based lookup strategies (only if phone is provided)
+    if (normalizedPhone && canonicalPhone) {
+      // Strategy 2: Canonical phone metadata lookup (MOST RELIABLE)
+      const canonicalPhoneResult = await this.lookupByCanonicalPhone(canonicalPhone);
+      if (canonicalPhoneResult.customer) {
+        return {
+          customer: canonicalPhoneResult.customer,
+          lookupStrategy: 'canonical_phone_match',
+          conflictDetected: false,
+          consolidationRequired: false
+        };
+      }
+
+      // Strategy 3: Phone metadata lookup (legacy)
+      const phoneMetadataResult = await this.lookupByPhoneMetadata(normalizedPhone);
+      if (phoneMetadataResult.customer) {
+        console.log('[EnhancedCustomerService] Found customer by phone metadata');
+        return {
+          customer: phoneMetadataResult.customer,
+          lookupStrategy: 'phone_metadata',
+          conflictDetected: false,
+          consolidationRequired: false
+        };
+      }
+
+      // Strategy 4: Legacy phone field lookup
+      const phoneFieldResult = await this.lookupByPhoneField(normalizedPhone);
+      if (phoneFieldResult.customer) {
+        console.log('[EnhancedCustomerService] Found customer by phone field');
+        return {
+          customer: phoneFieldResult.customer,
+          lookupStrategy: 'phone_field',
+          conflictDetected: false,
+          consolidationRequired: false
+        };
+      }
+
+      // Strategy 5: Phone variation lookup for WhatsApp authenticated customers (legacy fallback)
+      if (request.whatsapp_authenticated) {
+        const variationResult = await this.lookupByPhoneVariations(normalizedPhone);
+        if (variationResult.customer) {
+          console.log('[EnhancedCustomerService] Found customer by phone variation');
+          return {
+            customer: variationResult.customer,
+            lookupStrategy: 'phone_variation',
+            conflictDetected: true,
+            phoneConflicts: [normalizedPhone],
+            consolidationRequired: true
+          };
+        }
       }
     }
 
@@ -146,11 +160,11 @@ export class EnhancedCustomerService {
    */
   async findOrCreateCustomer(request: CustomerLookupRequest): Promise<{ customer: any; consolidationInfo: CustomerConsolidationInfo }> {
     const lookupResult = await this.findCustomerWithEnhancedLookup(request);
-    
+
     if (lookupResult.customer) {
       // Update existing customer with consolidation
       const updatedCustomer = await this.updateCustomerWithConsolidation(lookupResult.customer, request, lookupResult);
-      
+
       return {
         customer: updatedCustomer,
         consolidationInfo: {
@@ -162,7 +176,7 @@ export class EnhancedCustomerService {
     } else {
       // Create new customer with enhanced metadata
       const newCustomer = await this.createNewCustomerWithMetadata(request);
-      
+
       return {
         customer: newCustomer,
         consolidationInfo: {
@@ -194,11 +208,11 @@ export class EnhancedCustomerService {
   private async lookupByCanonicalPhone(canonicalPhone: string): Promise<{ customer: any | null }> {
     try {
       const customers = await this.customerModuleService.listCustomers({}, { take: 200 });
-      
-      const matchingCustomer = customers.find((customer: any) => 
+
+      const matchingCustomer = customers.find((customer: any) =>
         customer.metadata?.phone_canonical === canonicalPhone
       );
-      
+
       return { customer: matchingCustomer || null };
     } catch (error) {
       console.error('[EnhancedCustomerService] Canonical phone lookup error:', error);
@@ -209,12 +223,12 @@ export class EnhancedCustomerService {
   private async lookupByPhoneMetadata(normalizedPhone: string): Promise<{ customer: any | null }> {
     try {
       const customers = await this.customerModuleService.listCustomers({}, { take: 100 });
-      
-      const matchingCustomer = customers.find((customer: any) => 
+
+      const matchingCustomer = customers.find((customer: any) =>
         customer.metadata?.phone_normalized === normalizedPhone ||
         customer.metadata?.phone === normalizedPhone
       );
-      
+
       return { customer: matchingCustomer || null };
     } catch (error) {
       console.error('[EnhancedCustomerService] Phone metadata lookup error:', error);
@@ -239,14 +253,14 @@ export class EnhancedCustomerService {
     try {
       const variations = generatePhoneVariations(normalizedPhone);
       const customers = await this.customerModuleService.listCustomers({}, { take: 200 });
-      
+
       const matchingCustomer = customers.find((customer: any) => {
         if (!customer.metadata?.whatsapp_authenticated) return false;
-        
+
         const customerPhone = customer.metadata?.phone_normalized || customer.phone;
         return variations.some(variation => arePhoneNumbersEquivalent(customerPhone, variation));
       });
-      
+
       return { customer: matchingCustomer || null };
     } catch (error) {
       console.error('[EnhancedCustomerService] Phone variation lookup error:', error);
@@ -262,46 +276,49 @@ export class EnhancedCustomerService {
   private getPhoneConflicts(customer: any, newPhone: string): string[] {
     const conflicts: string[] = [];
     const existingPhone = customer.metadata?.phone_normalized || customer.phone;
-    
+
     if (existingPhone && !arePhoneNumbersEquivalent(existingPhone, newPhone)) {
       conflicts.push(existingPhone);
     }
-    
+
     return conflicts;
   }
 
   private async updateCustomerWithConsolidation(
-    existingCustomer: any, 
-    request: CustomerLookupRequest, 
+    existingCustomer: any,
+    request: CustomerLookupRequest,
     lookupResult: CustomerLookupResult
   ): Promise<any> {
-    const normalizedPhone = normalizePhoneNumber(request.phone);
-    
-    // Get canonical phone for storage
-    let canonicalPhone: string;
-    try {
-      canonicalPhone = normalizePhoneToCanonical(request.phone);
-    } catch (error) {
-      console.error('[EnhancedCustomerService] Invalid phone during update:', request.phone);
-      canonicalPhone = normalizedPhone; // Fallback to normalized
+    // Handle optional phone - only normalize if provided
+    const normalizedPhone = request.phone ? normalizePhoneNumber(request.phone) : undefined
+
+    // Get canonical phone for storage (only if phone provided)
+    let canonicalPhone: string | undefined
+    if (request.phone) {
+      try {
+        canonicalPhone = normalizePhoneToCanonical(request.phone)
+      } catch (error) {
+        console.error('[EnhancedCustomerService] Invalid phone during update:', request.phone)
+        canonicalPhone = normalizedPhone // Fallback to normalized
+      }
     }
-    
+
     // Only preserve existing name if it's not a default placeholder
     // Check for common placeholder values: "Customer" first name or "User" last name
-    const hasPlaceholderName = 
+    const hasPlaceholderName =
       !existingCustomer.first_name ||
-      existingCustomer.first_name === "Customer" || 
+      existingCustomer.first_name === "Customer" ||
       existingCustomer.first_name.trim() === "" ||
       existingCustomer.last_name === "User";
-    
-    const hasRealNameInRequest = 
-      request.first_name && 
-      request.first_name !== "Customer" && 
+
+    const hasRealNameInRequest =
+      request.first_name &&
+      request.first_name !== "Customer" &&
       request.first_name.trim() !== "";
-    
+
     // Use request name if: (1) existing has placeholder, OR (2) request has real name and existing doesn't
     const shouldUpdateName = hasPlaceholderName || (hasRealNameInRequest && !existingCustomer.first_name);
-    
+
     const updatePayload = {
       first_name: shouldUpdateName ? (request.first_name || "Customer") : existingCustomer.first_name,
       last_name: shouldUpdateName ? (request.last_name || "") : existingCustomer.last_name,
@@ -335,27 +352,33 @@ export class EnhancedCustomerService {
   }
 
   private async createNewCustomerWithMetadata(request: CustomerLookupRequest): Promise<any> {
-    const normalizedPhone = normalizePhoneNumber(request.phone);
-    
-    // Get canonical phone for storage
-    let canonicalPhone: string;
-    try {
-      canonicalPhone = normalizePhoneToCanonical(request.phone);
-    } catch (error) {
-      console.error('[EnhancedCustomerService] Invalid phone during creation:', request.phone);
-      canonicalPhone = normalizedPhone; // Fallback to normalized
+    // Handle optional phone - only normalize if provided
+    const normalizedPhone = request.phone ? normalizePhoneNumber(request.phone) : undefined
+
+    // Get canonical phone for storage (only if phone provided)
+    let canonicalPhone: string | undefined
+    if (request.phone) {
+      try {
+        canonicalPhone = normalizePhoneToCanonical(request.phone)
+      } catch (error) {
+        console.error('[EnhancedCustomerService] Invalid phone during creation:', request.phone)
+        canonicalPhone = normalizedPhone // Fallback to normalized
+      }
     }
-    
+
     // Handle email based on authentication method
-    let effectiveEmail: string;
+    let effectiveEmail: string
     if (request.email_authenticated && request.identity_method === 'email') {
       // For email authentication, use the provided email
-      effectiveEmail = request.email || '';
-    } else {
+      effectiveEmail = request.email || ''
+    } else if (request.phone) {
       // For WhatsApp authentication, generate placeholder email from phone
-      effectiveEmail = request.email || generatePlaceholderEmail(request.phone);
+      effectiveEmail = request.email || generatePlaceholderEmail(request.phone)
+    } else {
+      // No phone and no email - use provided email or empty
+      effectiveEmail = request.email || ''
     }
-    
+
     const customerData = {
       first_name: request.first_name || "Customer",
       last_name: request.last_name || "",
@@ -368,8 +391,8 @@ export class EnhancedCustomerService {
         phone_canonical: canonicalPhone, // Store canonical format for future lookups
         created_via: 'enhanced_customer_service',
         creation_timestamp: new Date().toISOString(),
-        profile_source: request.whatsapp_authenticated ? 'whatsapp_authenticated' : 
-                       request.email_authenticated ? 'email_authenticated' : 'checkout',
+        profile_source: request.whatsapp_authenticated ? 'whatsapp_authenticated' :
+          request.email_authenticated ? 'email_authenticated' : 'checkout',
         whatsapp_authenticated: request.whatsapp_authenticated || false,
         email_authenticated: request.email_authenticated || false,
         identity_method: request.identity_method || 'phone',

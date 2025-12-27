@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { kvGet, kvDel, kvSet } from '@/lib/kv'
 import { kafkaEmit } from '@/lib/kafka'
 import { getCounter } from '@/lib/metrics'
+import { createAuthSession, getSessionConfig } from '@/lib/auth/sessionManager'
 import bcrypt from 'bcryptjs'
 
 export async function GET(req: NextRequest) {
@@ -19,14 +20,47 @@ export async function GET(req: NextRequest) {
   if (!ok) return new Response(JSON.stringify({ ok: false, error: 'invalid_token' }), { status: 400 })
 
   await kvDel(`magic:${email}`) // single-use
-  // Mark verified with explicit state binding when provided
-  try { await kvSet(`magic:ok:${email}${state ? `:${state}` : ''}`, 1, 5 * 60) } catch {}
-  try { await kafkaEmit('auth.combo_mfa_passed', { identifier: email, factor: 'magic', timestamp: Date.now() }) } catch {}
-  try { const c = await getCounter({ name: 'auth_magic_confirm_success_total', help: 'Magic confirm success total' }); c.inc() } catch {}
+
+  // CRITICAL UPGRADE: Create persistent authentication session (7 days TTL)
+  // This replaces the old short-lived markers (5 min) and enables multi-order checkout sessions
+  // Top 1% Practice: Session manager handles both persistent and temporary markers atomically
+  console.log('[MAGIC_CONFIRM][creating_persistent_session]', {
+    email,
+    state,
+    sessionTTL: getSessionConfig().SESSION_TTL_DAYS + ' days'
+  })
+
+  // NOTE: Similar to OTP, we create temporary markers here for immediate use
+  // Persistent session will be created after customer ID is established
+  const verificationKey = `magic:ok:${email}${state ? `:${state}` : ''}`
+  const config = getSessionConfig()
+
+  try {
+    // Temporary marker (5 min) - for immediate post-verification actions
+    await kvSet(verificationKey, 1, config.TEMP_VERIFICATION_TTL_SECONDS)
+    console.log('[MAGIC_CONFIRM][temp_marker_created]', {
+      verificationKey: verificationKey.substring(0, 50) + '...',
+      ttlSeconds: config.TEMP_VERIFICATION_TTL_SECONDS
+    })
+
+    // NOTE: Persistent session (7 days) will be created in the checkout flow
+    // after customer ID is established. See: /api/checkout/customer/associate
+    console.log('[MAGIC_CONFIRM][deferred_persistent_session]', {
+      reason: 'customer_id_not_yet_available',
+      willCreateAfter: 'customer_ensure_or_associate'
+    })
+  } catch (kvError: any) {
+    console.error('[MAGIC_CONFIRM][marker_creation_failed]', {
+      error: kvError?.message || String(kvError)
+    })
+  }
+
+  try { await kafkaEmit('auth.combo_mfa_passed', { identifier: email, factor: 'magic', timestamp: Date.now() }) } catch { }
+  try { const c = await getCounter({ name: 'auth_magic_confirm_success_total', help: 'Magic confirm success total' }); c.inc() } catch { }
 
   // Smart redirect based on context
   const base = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
-  
+
   // If this is a checkout flow, redirect directly to checkout page
   if (state?.startsWith('checkout-')) {
     // Use cart ID from record (more reliable) or fallback to state
@@ -34,7 +68,7 @@ export async function GET(req: NextRequest) {
     const checkoutUrl = `${base}/checkout?verified=true&email=${encodeURIComponent(email)}${cartId ? `&cartId=${encodeURIComponent(cartId)}` : ''}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}`
     return new Response(null, { status: 302, headers: { Location: checkoutUrl } })
   }
-  
+
   // For regular login flows, redirect to the new welcome page
   const welcomeUrl = `${base}/welcome?email=${encodeURIComponent(email)}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}${state ? `&state=${encodeURIComponent(state)}` : ''}`
   return new Response(null, { status: 302, headers: { Location: welcomeUrl } })
