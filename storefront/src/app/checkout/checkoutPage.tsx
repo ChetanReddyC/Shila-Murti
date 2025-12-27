@@ -2099,34 +2099,51 @@ export default function CheckoutPage() {
 
 
 
-      // Update NextAuth session with the customerId to trigger passkey nudge
-
+      // Update NextAuth session with the customerId to trigger automatic login
       try {
-
         const identifierValue = (identityMethod === 'email')
-
           ? (email || '').trim().toLowerCase()
-
           : (phone || '').trim();
 
         if (identifierValue) {
+          console.log('[CHECKOUT][AUTO_LOGIN][START]', {
+            identityMethod,
+            identifierLength: identifierValue.length,
+            customerId: customerIdValue?.substring(0, 15) + '...'
+          })
 
-          import('next-auth/react').then(({ signIn }) => {
+          // Use proper async/await instead of Promise chaining
+          const { signIn } = await import('next-auth/react')
 
-            signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
+          const result = await signIn('session', {
+            identifier: identifierValue,
+            customerId: String(cj.customerId || ''),
+            redirect: false
+          })
 
-              .catch((e) => {
-
-
-              });
-
-          }).catch(() => { });
-
+          if (result?.ok) {
+            console.log('[CHECKOUT][AUTO_LOGIN][SUCCESS]', {
+              identityMethod,
+              customerId: customerIdValue?.substring(0, 15) + '...'
+            })
+          } else {
+            console.error('[CHECKOUT][AUTO_LOGIN][FAILED]', {
+              identityMethod,
+              error: result?.error,
+              status: result?.status
+            })
+          }
+        } else {
+          console.warn('[CHECKOUT][AUTO_LOGIN][SKIPPED]', {
+            reason: 'no_identifier',
+            identityMethod
+          })
         }
-
-      } catch (sessionError) {
-
-
+      } catch (sessionError: any) {
+        console.error('[CHECKOUT][AUTO_LOGIN][EXCEPTION]', {
+          error: sessionError?.message || String(sessionError),
+          stack: sessionError?.stack
+        })
       }
 
     } catch (e: any) {
@@ -2271,38 +2288,56 @@ export default function CheckoutPage() {
 
               }
 
+
               setPurchaseReady(true)
 
 
 
-              // Update NextAuth session with the customerId to trigger passkey nudge
-
+              // Update NextAuth session with the customerId to trigger automatic login
               try {
-
                 const identifierValue = (identityMethod === 'email')
-
                   ? (em || '').trim().toLowerCase()
-
                   : (phone || '').trim();
 
                 if (identifierValue) {
+                  console.log('[CHECKOUT][MAGIC][AUTO_LOGIN][START]', {
+                    identityMethod,
+                    identifierLength: identifierValue.length,
+                    customerId: customerIdValue?.substring(0, 15) + '...'
+                  })
 
-                  import('next-auth/react').then(({ signIn }) => {
+                  // Use proper async/await instead of Promise chaining
+                  const { signIn } = await import('next-auth/react')
 
-                    signIn('session', { identifier: identifierValue, customerId: String(cj.customerId || ''), redirect: false })
+                  const result = await signIn('session', {
+                    identifier: identifierValue,
+                    customerId: String(cj.customerId || ''),
+                    redirect: false
+                  })
 
-                      .catch((e) => {
-
-
-                      });
-
-                  }).catch(() => { });
-
+                  if (result?.ok) {
+                    console.log('[CHECKOUT][MAGIC][AUTO_LOGIN][SUCCESS]', {
+                      identityMethod,
+                      customerId: customerIdValue?.substring(0, 15) + '...'
+                    })
+                  } else {
+                    console.error('[CHECKOUT][MAGIC][AUTO_LOGIN][FAILED]', {
+                      identityMethod,
+                      error: result?.error,
+                      status: result?.status
+                    })
+                  }
+                } else {
+                  console.warn('[CHECKOUT][MAGIC][AUTO_LOGIN][SKIPPED]', {
+                    reason: 'no_identifier',
+                    identityMethod
+                  })
                 }
-
-              } catch (sessionError) {
-
-
+              } catch (sessionError: any) {
+                console.error('[CHECKOUT][MAGIC][AUTO_LOGIN][EXCEPTION]', {
+                  error: sessionError?.message || String(sessionError),
+                  stack: sessionError?.stack
+                })
               }
 
             } else {
@@ -2459,7 +2494,12 @@ export default function CheckoutPage() {
             const response = await fetch('/api/checkout/customer/associate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ cartId: cart.id, customerId: actualCustomerId }),
+              body: JSON.stringify({
+                cartId: cart.id,
+                customerId: actualCustomerId,
+                email: (purchaseReady && identityMethod === 'email') ? email?.trim().toLowerCase() : undefined,
+                phone: formData.contactNumber || phone || undefined
+              }),
             })
 
             if (!response.ok) {

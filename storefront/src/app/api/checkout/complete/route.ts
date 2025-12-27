@@ -12,6 +12,7 @@ import {
 import { captureMedusaPayment, getPaymentIdFromOrder } from '@/utils/medusaPaymentCapture'
 import { getOrderCartMapping } from '@/lib/cashfreeMapping'
 import { validateCheckoutAuth, extractCustomerInfo } from '@/utils/checkoutAuthValidation'
+import { refreshAuthSession } from '@/lib/auth/sessionManager'
 
 export async function POST(req: NextRequest) {
   console.log('============ COMPLETE API CALLED ============')
@@ -618,6 +619,43 @@ export async function POST(req: NextRequest) {
             orderId: createdOrderId
           })
         } catch { }
+      }
+
+      // CRITICAL: Refresh authentication session after successful order
+      // This extends the session TTL (keep-alive) for multi-order checkout flows
+      // Top 1% Practice: Keep sessions alive on activity to prevent re-authentication
+      try {
+        console.log('[COMPLETE_API][SESSION_REFRESH][start]', {
+          orderId: createdOrderId,
+          hasEmail: !!customerInfo.email,
+          hasPhone: !!customerInfo.phone
+        })
+
+        const refreshed = await refreshAuthSession(
+          customerInfo.email,
+          customerInfo.phone
+        )
+
+        if (refreshed) {
+          console.log('[COMPLETE_API][SESSION_REFRESH][success]', {
+            orderId: createdOrderId,
+            impact: 'Session TTL extended for future orders'
+          })
+        } else {
+          console.warn('[COMPLETE_API][SESSION_REFRESH][not_found]', {
+            orderId: createdOrderId,
+            impact: 'User may need to re-authenticate for next order',
+            hasEmail: !!customerInfo.email,
+            hasPhone: !!customerInfo.phone
+          })
+        }
+      } catch (refreshError: any) {
+        // Non-blocking - order already completed successfully
+        console.error('[COMPLETE_API][SESSION_REFRESH][error]', {
+          orderId: createdOrderId,
+          error: refreshError?.message || String(refreshError),
+          impact: 'User may need to re-authenticate for next order'
+        })
       }
 
       return NextResponse.json({ ok: true, result })
