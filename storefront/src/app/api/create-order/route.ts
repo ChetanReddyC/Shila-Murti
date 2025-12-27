@@ -222,7 +222,7 @@ export async function POST(req: NextRequest) {
     const appOrigin =
       process.env.CASHFREE_RETURN_ORIGIN ||
       process.env.NEXT_PUBLIC_APP_ORIGIN ||
-      'http://127.0.0.1:3000';
+      'http://localhost:3000';
     const publicNotifyUrl = process.env.CASHFREE_NOTIFY_URL;
 
     const payload = {
