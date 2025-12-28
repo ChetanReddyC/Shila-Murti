@@ -11,7 +11,7 @@ import { isValidHandle, generateProductHandle } from '../../../utils/productHand
 import { useCart } from '../../../contexts/CartContext';
 import { medusaApiClient } from '../../../utils/medusaApiClient';
 import styles from './ProductDetailPage.module.css'
-import FeaturesSection from './FeaturesSection';
+
 import ReviewsSection from './ReviewsSection';
 import SimilarProductsSection from './SimilarProductsSection';
 import CartFeedback from '../../../components/CartFeedback/CartFeedback';
@@ -866,8 +866,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     </div>
                   </div>
                 </div>
-
-                <FeaturesSection />
 
                 <SimilarProductsSection current={product} />
                 {/* Reviews moved up */}

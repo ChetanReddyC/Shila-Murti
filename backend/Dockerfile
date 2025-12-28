@@ -17,4 +17,3 @@ RUN printf "%s" "$BACKEND_ENV_FILE_CONTENTS" > .env
 EXPOSE 9000
 
 CMD ["npm", "run", "dev"]
-
