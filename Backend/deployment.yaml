@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: shilamurti-backend-container
-          image: asia-southeast1-docker.pkg.dev/shilamurti/shilamurti/backend:28
+          image: asia-southeast1-docker.pkg.dev/shilamurti/shilamurti/backend:32
           ports:
             - containerPort: 80 
           resources:
