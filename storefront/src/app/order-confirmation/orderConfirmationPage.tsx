@@ -8,6 +8,8 @@ import { useCart } from '../../contexts/CartContext';
 import { medusaApiClient } from '../../utils/medusaApiClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 
+import { getCustomerId as getCustomerIdHybrid } from '../../utils/hybridCustomerStorage';
+
 export default function OrderConfirmationPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function OrderConfirmationPage() {
   const [orderTotals, setOrderTotals] = useState<{ subtotal: number; shipping: number; taxes: number; total: number } | null>(null);
   const [orderAddress, setOrderAddress] = useState<any | null>(null)
   const [orderShippingMethodName, setOrderShippingMethodName] = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Use useEffect to run date calculations and load order/snapshot on the client side
   useEffect(() => {
@@ -145,7 +148,140 @@ export default function OrderConfirmationPage() {
     };
   }, [clearCartSilently]);
 
+  // Download invoice handler
+  const downloadInvoice = async () => {
+    if (!orderId) return;
 
+    // SECURITY: Get customer ID from secure httpOnly cookie via API
+    const result = await getCustomerIdHybrid();
+    if (!result.ok || !result.customerId) {
+      alert('Unable to download invoice: Customer not found');
+      return;
+    }
+
+    setIsDownloading(true);
+
+    // Method 1: Direct iframe download (most reliable, bypasses ad blockers)
+    const tryDirectDownload = () => {
+      try {
+        const url = `/api/account/orders/${orderId}/invoices`;
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+
+        // Remove iframe after download starts
+        setTimeout(() => {
+          try {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }, 2000);
+
+        return true;
+      } catch (e) {
+        console.error('Direct download failed:', e);
+        return false;
+      }
+    };
+
+    // Method 2: Blob download (better UX when it works)
+    const tryBlobDownload = async () => {
+      const response = await fetch(`/api/account/orders/${orderId}/invoices`, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/pdf',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+
+      if (blob.size === 0) {
+        throw new Error('Received empty PDF file');
+      }
+
+      // Use modern API if available
+      if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+        try {
+          // @ts-ignore - trigger save dialog
+          const handle = await window.showSaveFilePicker({
+            suggestedName: `invoice-${orderNumber.replace('#', '')}.pdf`,
+            types: [{
+              description: 'PDF Document',
+              accept: { 'application/pdf': ['.pdf'] }
+            }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return true;
+        } catch (e) {
+          // User cancelled or browser doesn't support, fall through to blob URL
+        }
+      }
+
+      // Fallback: blob URL download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${orderNumber.replace('#', '')}.pdf`;
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+
+      setTimeout(() => {
+        try {
+          a.click();
+        } catch (e) {
+          // If click fails, try opening in new tab
+          window.open(url, '_blank');
+        }
+
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          if (document.body.contains(a)) {
+            document.body.removeChild(a);
+          }
+        }, 150);
+      }, 50);
+
+      return true;
+    };
+
+    let downloadSuccess = false;
+
+    try {
+      // Try blob download first (better UX with save dialog)
+      downloadSuccess = await tryBlobDownload();
+    } catch (error: any) {
+      // Check if it's a fetch error (likely ad blocker or CORS)
+      const errorMessage = error?.message || '';
+      const isFetchError = errorMessage.includes('fetch') ||
+        errorMessage.includes('blocked') ||
+        errorMessage.includes('ERR_BLOCKED') ||
+        error?.name === 'TypeError';
+
+      if (isFetchError) {
+        // Silently fall back to iframe method (expected behavior with ad blockers)
+        downloadSuccess = tryDirectDownload();
+      } else {
+        // Actual server error - show to user
+        console.error('Download failed with server error:', error);
+        alert(`Failed to download invoice: ${errorMessage}. Please try again or contact support.`);
+      }
+    } finally {
+      // Keep loading state a bit longer for iframe downloads
+      setTimeout(() => setIsDownloading(false), downloadSuccess ? 500 : 100);
+    }
+  };
 
   // Add a listener to prevent navigation away from this page
   useEffect(() => {
@@ -327,13 +463,22 @@ export default function OrderConfirmationPage() {
               </div>
             </div>
             <p className={styles.estimatedDelivery}>Estimated Delivery: {deliveryRange}</p>
-            <button
-              className={`${styles.viewButton} ${styles.responsiveButton}`}
-              onClick={() => orderId && router.push(`/account/orders/${orderId}`)}
-              disabled={!orderId}
-            >
-              View Order Details
-            </button>
+            <div className={styles.buttonsContainer}>
+              <button
+                className={styles.downloadButton}
+                onClick={downloadInvoice}
+                disabled={isDownloading || !orderId}
+              >
+                {isDownloading ? 'Downloading...' : 'Download Invoice'}
+              </button>
+              <button
+                className={`${styles.viewButton} ${styles.responsiveButton}`}
+                onClick={() => orderId && router.push(`/account/orders/${orderId}`)}
+                disabled={!orderId}
+              >
+                View Order Details
+              </button>
+            </div>
             <p className={styles.contactInfo}>For any questions, please contact our customer support at support@shilamurthi.com</p>
           </div>
         </div>

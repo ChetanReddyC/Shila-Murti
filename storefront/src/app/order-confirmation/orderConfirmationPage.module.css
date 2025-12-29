@@ -167,13 +167,49 @@
   border-radius: 12px;
   border: none;
   cursor: pointer;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
   display: inline-block;
   text-align: center;
 }
 
 .responsiveButton {
   transition: all 0.3s ease;
+}
+
+.buttonsContainer {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.downloadButton {
+  background-color: transparent;
+  color: #141414;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 0 1rem;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #DBDBDB;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.downloadButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.downloadButton:hover:not(:disabled) {
+  background-color: #FAFAFA;
+  border-color: #000;
 }
 
 .contactInfo {
@@ -242,7 +278,8 @@
   }
 
   .container {
-    padding: 0 1rem;
+    padding: 0 0.5rem;
+    /* Reduced padding to increase content width */
   }
 
   .title {
@@ -340,7 +377,7 @@
     width: 100%;
     padding: 0.875rem 1rem;
     height: auto;
-    margin: 1.5rem auto;
+    margin: 0;
     font-size: 1rem;
   }
 
@@ -422,5 +459,18 @@
 
   .responsiveButton {
     max-width: 100%;
+  }
+
+  /* Stack buttons vertically on mobile */
+  .buttonsContainer {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .downloadButton {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    height: auto;
+    font-size: 1rem;
   }
 }
