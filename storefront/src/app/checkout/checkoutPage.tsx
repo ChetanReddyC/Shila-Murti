@@ -4313,7 +4313,7 @@ export default function CheckoutPage() {
                       {identityError}
                     </div>
                   )}
-                  <div className={styles.formRow}>
+                  <div className={styles.paymentOptions}>
                     <div className={styles.paymentOption}>
                       <input
                         type="radio"
