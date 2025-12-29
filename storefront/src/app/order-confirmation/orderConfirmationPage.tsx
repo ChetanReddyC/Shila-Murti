@@ -31,14 +31,14 @@ export default function OrderConfirmationPage() {
   const [orderTotals, setOrderTotals] = useState<{ subtotal: number; shipping: number; taxes: number; total: number } | null>(null);
   const [orderAddress, setOrderAddress] = useState<any | null>(null)
   const [orderShippingMethodName, setOrderShippingMethodName] = useState<string | null>(null)
-  
+
   // Use useEffect to run date calculations and load order/snapshot on the client side
   useEffect(() => {
     // Clear cart immediately (lock removed - backend guard handles protection)
-    try { void clearCartSilently() } catch (e) {}
+    try { void clearCartSilently() } catch (e) { }
     // Capture cart once at mount to keep UI stable regardless of later cart updates
     setFallbackCart(cart ?? null);
-    
+
     const urlOrderId = searchParams?.get('order_id') ?? null;
 
     // Try to read order result from session as set by checkout
@@ -54,10 +54,10 @@ export default function OrderConfirmationPage() {
             }
           }
         } catch (parseErr) {
-          try { sessionStorage.removeItem('order_result') } catch {}
+          try { sessionStorage.removeItem('order_result') } catch { }
         }
       }
-    } catch {}
+    } catch { }
 
     if (urlOrderId && !orderId) {
       setOrderId(urlOrderId);
@@ -76,7 +76,7 @@ export default function OrderConfirmationPage() {
             sessionStorage.removeItem('order_checkout_snapshot');
           }
         } catch (parseErr) {
-          try { sessionStorage.removeItem('order_checkout_snapshot') } catch {}
+          try { sessionStorage.removeItem('order_checkout_snapshot') } catch { }
         }
       }
     } catch (e) {
@@ -84,11 +84,11 @@ export default function OrderConfirmationPage() {
 
     // Generate random order number
     setOrderNumber(`#${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`);
-    
+
     // Format current date
     const today = new Date();
     setCurrentDate(today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
-    
+
     // Calculate delivery date range
     const deliveryStart = new Date(today);
     deliveryStart.setDate(today.getDate() + 6);
@@ -124,7 +124,7 @@ export default function OrderConfirmationPage() {
           setOrderAddress(shipAddr)
           const methodName: string | null = (order as any)?.shipping_methods?.[0]?.name || null
           setOrderShippingMethodName(methodName)
-        } catch {}
+        } catch { }
       } catch (err) {
       } finally {
         setOrderLoaded(true);
@@ -150,13 +150,13 @@ export default function OrderConfirmationPage() {
   // Add a listener to prevent navigation away from this page
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     // Function to check if we're trying to navigate away to /cart
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       // Set a flag to indicate we're on the order confirmation page
       sessionStorage.setItem('order_confirmation_active', String(Date.now() + 30000));
     };
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -164,14 +164,13 @@ export default function OrderConfirmationPage() {
   }, []);
 
   return (
-    <div className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden" 
-      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}>
-      <div className="layout-container flex h-full grow flex-col">
-        <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
+    <div className={styles.pageWrapper}>
+      <div className={styles.mainLayout}>
+        <div className={styles.contentWrapper}>
           <div className={styles.container}>
             {/* Prevent accidental navigation away due to cart state changes by not rendering any links to /cart here */}
             <h1 className={styles.title}>Thank you for your order!</h1>
-            <p className={styles.description}>Your order has been successfully placed. You will receive an email confirmation shortly with your order details.</p>
+            <p className={styles.description}>Your order has been placed. You will receive an email shortly.</p>
             <h2 className={styles.sectionTitle}>Order Summary</h2>
             <div className={styles.summaryContainer}>
               <div className={styles.summaryItem}>
@@ -218,8 +217,8 @@ export default function OrderConfirmationPage() {
                   {(orderAddress?.first_name || orderAddress?.last_name)
                     ? `${orderAddress?.first_name ?? ''} ${orderAddress?.last_name ?? ''}`.trim()
                     : (snapshot?.data?.customer?.name
-                        ?? (fallbackCart as any)?.shipping_address?.first_name
-                        ?? '—')}
+                      ?? (fallbackCart as any)?.shipping_address?.first_name
+                      ?? '—')}
                 </span>
               </div>
               <div className={styles.summaryItem}>
@@ -236,8 +235,8 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>
                   {orderAddress?.address_1
                     ?? (snapshot?.data?.customer
-                          ? `${snapshot.data.customer.address ?? ''}`.trim() || '—'
-                          : (fallbackCart as any)?.shipping_address?.address_1)
+                      ? `${snapshot.data.customer.address ?? ''}`.trim() || '—'
+                      : (fallbackCart as any)?.shipping_address?.address_1)
                     ?? '—'}
                 </span>
               </div>
@@ -273,12 +272,12 @@ export default function OrderConfirmationPage() {
                 <span className={styles.value}>
                   {orderShippingMethodName
                     ?? (snapshot?.data?.shippingSelection?.method
-                          ? (snapshot.data.shippingSelection.method === 'express'
-                              ? 'Express'
-                              : snapshot.data.shippingSelection.method === 'expedited'
-                                ? 'Expedited'
-                                : 'Standard')
-                          : (fallbackCart as any)?.shipping_methods?.[0]?.name)
+                      ? (snapshot.data.shippingSelection.method === 'express'
+                        ? 'Express'
+                        : snapshot.data.shippingSelection.method === 'expedited'
+                          ? 'Expedited'
+                          : 'Standard')
+                      : (fallbackCart as any)?.shipping_methods?.[0]?.name)
                     ?? '—'}
                 </span>
               </div>
@@ -298,8 +297,8 @@ export default function OrderConfirmationPage() {
                 <span className={styles.paymentValue}>
                   {Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? fallbackCart?.shipping_total ?? 0) > 0
                     ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(
-                        Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? fallbackCart?.shipping_total ?? 0)
-                      )
+                      Number(orderTotals?.shipping ?? snapshot?.data?.totals?.shipping ?? fallbackCart?.shipping_total ?? 0)
+                    )
                     : 'Free'}
                 </span>
               </div>
@@ -328,7 +327,7 @@ export default function OrderConfirmationPage() {
               </div>
             </div>
             <p className={styles.estimatedDelivery}>Estimated Delivery: {deliveryRange}</p>
-            <button 
+            <button
               className={`${styles.viewButton} ${styles.responsiveButton}`}
               onClick={() => orderId && router.push(`/account/orders/${orderId}`)}
               disabled={!orderId}

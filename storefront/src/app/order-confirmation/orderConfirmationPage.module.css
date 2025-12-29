@@ -1,3 +1,35 @@
+.pageWrapper {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  flex-direction: column;
+  background-color: white;
+  overflow-x: hidden;
+  font-family: 'Inter', 'Public Sans', 'Noto Sans', sans-serif;
+  padding-top: 100px;
+}
+
+.mainLayout {
+  display: flex;
+  height: 100%;
+  flex-grow: 1;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.contentWrapper {
+  width: 100%;
+  padding-top: 4rem;
+  /* pt-16 */
+  padding-bottom: 2rem;
+  /* pb-8 */
+  display: flex;
+  justify-content: center;
+}
+
 .container {
   max-width: 1100px;
   margin: 0 auto;
@@ -6,7 +38,7 @@
 }
 
 .title {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 3.3rem;
   font-weight: 700;
   line-height: 1.25;
@@ -15,7 +47,7 @@
 }
 
 .description {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 1rem;
   font-weight: 400;
   line-height: 1.5;
@@ -25,7 +57,7 @@
 }
 
 .sectionTitle {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 1.125rem;
   font-weight: 700;
   line-height: 1.2778;
@@ -53,7 +85,7 @@
 }
 
 .label {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.5;
@@ -62,7 +94,7 @@
 }
 
 .value {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.5;
@@ -77,102 +109,44 @@
   padding: 0.75rem 1rem;
 }
 
-.itemsHeader {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-}
-
-.headerItem {
-  font-family: 'Public Sans';
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #141414;
-  flex: 1;
-}
-
-.headerQuantity {
-  font-family: 'Public Sans';
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #141414;
-  width: 100px;
-  text-align: center;
-}
-
-.headerPrice {
-  font-family: 'Public Sans';
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #141414;
-  width: 100px;
-  text-align: right;
-}
-
-.itemRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid #E5E8EB;
-}
-
 .itemName {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 0.875rem;
   color: #141414;
   flex: 1;
 }
 
-.itemQuantity {
-  font-family: 'Public Sans';
-  font-size: 0.875rem;
-  color: #737373;
-  width: 100px;
-  text-align: center;
+.paymentGrid {
+  display: grid;
+  grid-template-columns: 1fr 3.3fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding: 0 1rem;
 }
 
-.itemPrice {
-  font-family: 'Public Sans';
-  font-size: 0.875rem;
-  color: #737373;
-  width: 100px;
-  text-align: right;
-}
-
-.paymentContainer {
-  margin-bottom: 1rem;
-}
-
-.paymentRow {
-  display: flex;
-  justify-content: space-between;
+.paymentItem {
   padding: 1.25rem 0;
   border-top: 1px solid #E5E8EB;
 }
 
-.totalRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 1.25rem 0;
-  border-top: 1px solid #E5E8EB;
-}
-
-.totalLabel {
-  font-family: 'Public Sans';
+.paymentLabel {
+  font-family: 'Public Sans', sans-serif;
   font-size: 0.875rem;
   font-weight: 400;
   color: #737373;
+  display: block;
+  margin-bottom: 0.25rem;
 }
 
-.totalValue {
-  font-family: 'Public Sans';
+.paymentValue {
+  font-family: 'Public Sans', sans-serif;
   font-size: 0.875rem;
   font-weight: 400;
   color: #141414;
 }
 
 .estimatedDelivery {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 1rem;
   font-weight: 400;
   line-height: 1.5;
@@ -184,7 +158,7 @@
 .viewButton {
   background-color: #000000;
   color: #FAFAFA;
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 0.875rem;
   font-weight: 700;
   line-height: 1.5;
@@ -203,40 +177,11 @@
 }
 
 .contactInfo {
-  font-family: 'Public Sans';
+  font-family: 'Public Sans', sans-serif;
   font-size: 0.875rem;
   margin-bottom: 1rem;
   font-weight: 400;
   color: #737373;
-}
-
-.paymentGrid {
-  display: grid;
-  grid-template-columns: 1fr 3.3fr;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
-  padding: 0 1rem;
-}
-
-.paymentItem {
-  padding: 1.25rem 0;
-  border-top: 1px solid #E5E8EB;
-}
-
-.paymentLabel {
-  font-family: 'Public Sans';
-  font-size: 0.875rem;
-  font-weight: 400;
-  color: #737373;
-  display: block;
-  margin-bottom: 0.25rem;
-}
-
-.paymentValue {
-  font-family: 'Public Sans';
-  font-size: 0.875rem;
-  font-weight: 400;
-  color: #141414;
 }
 
 .responsiveTable {
@@ -245,47 +190,147 @@
 }
 
 /* Responsive styles */
-@media (max-width: 1024px) {
+@media (min-width: 640px) {
+
+  /* sm */
+  .contentWrapper {
+    padding-top: 5rem;
+    /* pt-20 */
+    padding-bottom: 3rem;
+    /* pb-12 */
+  }
+}
+
+@media (min-width: 768px) {
+
+  /* md */
+  .contentWrapper {
+    padding-top: 6rem;
+    /* pt-24 */
+    padding-bottom: 4rem;
+    /* pb-16 */
+  }
+}
+
+@media (min-width: 1024px) {
+
+  /* lg */
   .container {
     max-width: 100%;
   }
-  
+
+  .contentWrapper {
+    padding-top: 7rem;
+    /* pt-28 */
+  }
+
   .paymentGrid {
     grid-template-columns: 1fr 3fr;
   }
 }
 
 @media (max-width: 768px) {
+  .pageWrapper {
+    padding-top: 60px;
+    /* Reduced from 100px for mobile */
+  }
+
+  .contentWrapper {
+    padding-top: 1rem;
+    /* Significantly reduced from 4rem */
+    padding-bottom: 2rem;
+  }
+
   .container {
     padding: 0 1rem;
   }
-  
+
   .title {
-    font-size: 2.5rem;
+    font-size: 2.75rem;
+    /* Increased from 2.25rem */
+    margin-bottom: 0.25rem;
+    line-height: 1.1;
   }
-  
+
+  .description {
+    font-size: 0.85rem;
+    /* Decreased from 0.95rem */
+    margin-bottom: 1.5rem;
+    color: #525252;
+    /* Lighter color for subtext feel */
+    line-height: 1.4;
+    max-width: 85%;
+    /* Wrap text for better visual balance */
+  }
+
   .sectionTitle {
-    font-size: 1.2rem;
+    font-size: 1.25rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #F3F4F6;
+    margin-top: 0.5rem;
   }
-  
+
   .summaryContainer {
     flex-direction: column;
     gap: 0;
+    background: #FAFAFA;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    border: 1px solid #E5E7EB;
+    margin-bottom: 2rem;
   }
-  
-  .summaryItem, .shippingItem {
-    margin-bottom: 0.5rem;
+
+  .summaryItem,
+  .shippingItem {
+    padding: 0.75rem 0;
+    border-top: 1px solid #E5E8EB;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  
+
+  .summaryItem:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  /* Make address/long values stack nicely */
+  .shippingItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .shippingItem .value {
+    text-align: left;
+  }
+
   .paymentGrid {
     grid-template-columns: 1fr;
     gap: 0;
+    background: #FAFAFA;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    border: 1px solid #E5E7EB;
   }
-  
+
   .paymentItem {
-    padding: 1rem 0;
+    padding: 0.75rem 0;
+    border-top: 1px solid #E5E8EB;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  
+
+  .paymentItem:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .paymentLabel {
+    margin-bottom: 0;
+  }
+
   .viewButton {
     width: 100%;
   }
@@ -293,54 +338,89 @@
   .responsiveButton {
     display: block;
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: 0.875rem 1rem;
     height: auto;
-    margin: 0 auto 1.5rem;
-    max-width: 300px;
+    margin: 1.5rem auto;
+    font-size: 1rem;
   }
 
   .responsiveTable {
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.75rem;
+    overflow-x: auto;
+    /* Allow horizontal scrolling if needed */
   }
-  
+
+  .responsiveTable table {
+    width: 100%;
+    min-width: 350px;
+    /* Ensure table doesn't shrink too much */
+    table-layout: fixed;
+    /* Fix layout to respect widths */
+  }
+
+  /* Assign widths to columns for mobile using !important to override cart styles */
+  .responsiveTable th:first-child,
+  .responsiveTable td:first-child {
+    width: 60% !important;
+  }
+
+  .responsiveTable th:nth-child(2),
+  .responsiveTable td:nth-child(2) {
+    width: 15% !important;
+    padding-right: 0.25rem;
+  }
+
+  .responsiveTable th:nth-child(3),
+  .responsiveTable td:nth-child(3) {
+    width: 25% !important;
+    text-align: right;
+  }
+
+  .responsiveTable th:nth-child(2),
+  .responsiveTable td:nth-child(2) {
+    text-align: center;
+  }
+
   .itemName {
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     white-space: normal;
-    word-break: break-word;
+    word-break: normal;
+    overflow-wrap: break-word;
+    display: block;
+    line-height: 1.4;
   }
 }
 
 @media (max-width: 480px) {
   .title {
-    font-size: 2rem;
+    font-size: 2.25rem;
+    /* Increased from 1.75rem */
   }
-  
-  .description {
-    font-size: 0.9rem;
-  }
-  
+
   .sectionTitle {
-    font-size: 1.1rem;
+    font-size: 1.125rem;
   }
-  
-  .label, .value, .paymentLabel, .paymentValue {
-    font-size: 0.8rem;
+
+  .summaryContainer,
+  .paymentGrid {
+    padding: 0.75rem;
   }
-  
-  .estimatedDelivery {
-    font-size: 0.9rem;
+
+  .label,
+  .value,
+  .paymentLabel,
+  .paymentValue {
+    font-size: 0.8125rem;
   }
-  
-  .contactInfo {
-    font-size: 0.8rem;
+
+  .value,
+  .paymentValue {
+    font-weight: 500;
   }
 
   .responsiveButton {
-    font-size: 0.8rem;
     max-width: 100%;
   }
-
-  .responsiveTable table {
-    min-width: 300px;
-  }
-} 
+}
