@@ -204,7 +204,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
 
         <div className="relative z-30 flex w-full items-center">
           <div className={styles.brandContainer}>
-            <h2 className={styles.brand}>Shila Murthi</h2>
+            <h2 className={styles.brand}>Shila Murti</h2>
           </div>
 
           <div className={styles.rightSection}>

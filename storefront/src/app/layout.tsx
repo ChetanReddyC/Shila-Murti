@@ -33,7 +33,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Shila Murthi",
+  title: "Shila Murti",
   description: "Timeless beauty of handcrafted stone idols",
 };
 

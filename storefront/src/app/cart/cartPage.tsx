@@ -91,16 +91,13 @@ export default function CartPage() {
   // Loading state
   if (loading) {
     return (
-      <div
-        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
-        style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
-      >
-        <div className="layout-container flex h-full grow flex-col">
+      <div className={`${styles.pageWrapper} ${styles.pageWrapperWithPadding}`}>
+        <div className={styles.mainLayout}>
           <NetworkStatus />
-          <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
+          <div className={styles.contentWrapper}>
             <div className={styles.container}>
               <h1 className={styles.title}>Shopping Cart</h1>
-              <div className="flex justify-center items-center py-12">
+              <div className={styles.loadingContainer}>
                 <LoadingSpinner
                   size="large"
                   color="primary"
@@ -117,16 +114,13 @@ export default function CartPage() {
   // Error state
   if (error && !cart) {
     return (
-      <div
-        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
-        style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
-      >
-        <div className="layout-container flex h-full grow flex-col">
+      <div className={`${styles.pageWrapper} ${styles.pageWrapperWithPadding}`}>
+        <div className={styles.mainLayout}>
           <NetworkStatus />
-          <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
+          <div className={styles.contentWrapper}>
             <div className={styles.container}>
               <h1 className={styles.title}>Shopping Cart</h1>
-              <div className="flex flex-col justify-center items-center py-12 max-w-md mx-auto">
+              <div className={styles.errorContainer}>
                 <CartFeedback
                   error={error}
                   onRetry={isRetryable ? retryLastOperation : handleRetryRefresh}
@@ -144,19 +138,16 @@ export default function CartPage() {
   // Empty cart state
   if (!cart || !cart.items || cart.items.length === 0) {
     return (
-      <div
-        className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
-        style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif' }}
-      >
-        <div className="layout-container flex h-full grow flex-col">
+      <div className={`${styles.pageWrapper} ${styles.pageWrapperWithPadding}`}>
+        <div className={styles.mainLayout}>
           <NetworkStatus />
-          <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
+          <div className={styles.contentWrapper}>
             <div className={styles.container}>
               <h1 className={styles.title}>Shopping Cart</h1>
 
               {/* Show any cart-level errors */}
               {error && (
-                <div className="mb-6">
+                <div className={styles.errorMargin}>
                   <CartFeedback
                     error={error}
                     onRetry={isRetryable ? retryLastOperation : handleRetryRefresh}
@@ -166,9 +157,9 @@ export default function CartPage() {
                 </div>
               )}
 
-              <div className="flex flex-col justify-center items-center py-12">
-                <div className="text-xl text-gray-600 mb-4">Your cart is empty</div>
-                <p className="text-gray-500 mb-6">Add some beautiful stone idols to get started!</p>
+              <div className={styles.emptyCartContainer}>
+                <div className={styles.emptyCartMessage}>Your cart is empty</div>
+                <p className={styles.emptyCartSubtext}>Add some beautiful stone idols to get started!</p>
                 <Link href="/products">
                   <button className={styles.continueShoppingButton}>
                     Continue Shopping
@@ -187,14 +178,11 @@ export default function CartPage() {
 
   // Cart with items - display real cart data
   return (
-    <div
-      className="relative flex size-full min-h-screen flex-col bg-white overflow-x-hidden"
-      style={{ fontFamily: '"Inter", "Public Sans", "Noto Sans", sans-serif', paddingTop: '100px' }}
-    >
-      <div className="layout-container flex h-full grow flex-col">
+    <div className={`${styles.pageWrapper} ${styles.pageWrapperWithPadding}`}>
+      <div className={styles.mainLayout}>
         <NetworkStatus />
 
-        <div className="w-full pt-16 sm:pt-20 md:pt-24 lg:pt-28 pb-8 sm:pb-12 md:pb-16">
+        <div className={styles.contentWrapper}>
           <CartErrorBoundary>
             <div className={styles.container}>
               <h1 className={styles.title}>Shopping Cart</h1>
@@ -202,7 +190,7 @@ export default function CartPage() {
               {/* Cart-level feedback */}
               {/* Removed success/error popups for quantity updates */}
               {error && (
-                <div className="mb-6">
+                <div className={styles.errorMargin}>
                   <CartFeedback
                     error={error}
                     onRetry={isRetryable ? retryLastOperation : handleRetryRefresh}
@@ -336,13 +324,13 @@ export default function CartPage() {
 
               {/* Buttons */}
               <div className={styles.buttonsContainer}>
-                <Link href="/products" className="w-full sm:w-auto">
+                <Link href="/products" className={styles.linkWrapper}>
                   <button className={styles.continueShoppingButton}>
                     Continue Shopping
                   </button>
                 </Link>
 
-                <Link href="/checkout" className="w-full sm:w-auto">
+                <Link href="/checkout" className={styles.linkWrapper}>
                   <button className={styles.checkoutButton}>
                     Proceed to Checkout
                   </button>
