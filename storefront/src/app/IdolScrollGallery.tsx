@@ -21,7 +21,7 @@ const IDOLS = [
         id: 2,
         name: "Lord Krishna",
         title: "The Divine Flute",
-        material: "Pure White Marble",
+        material: "Black Granite Stone",
         description: "Capturing the playful yet cosmic nature of the divine cowherd. The flow of the dhoti and the stance creates a rhythm in stone.",
         image: "/images/idols/krishna.png",
         color: "#5D4037", // Unified Earthy Brown
@@ -31,7 +31,7 @@ const IDOLS = [
         id: 3,
         name: "The Guardian",
         title: "Timeless Grace",
-        material: "Sandstone Masterpiece",
+        material: "Black Granite Stone",
         description: "A testament to the chisol's precision. Standing tall through ages, preserving the sanctity of the ancient scriptures.",
         image: "/images/idols/statue.png",
         color: "#5D4037", // Unified Earthy Brown
