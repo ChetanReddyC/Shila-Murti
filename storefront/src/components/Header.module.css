@@ -57,7 +57,7 @@
 }
 
 .profileMenuOpen {
-  min-width: 730px;
+  min-width: 480px;
 }
 
 .navLinksWrapper {
@@ -160,7 +160,7 @@
   }
 
   .profileMenuOpen {
-    min-width: 550px;
+    min-width: 380px;
   }
 
   .navLinksWrapper {
@@ -182,7 +182,7 @@
   }
 
   .profileMenuOpen {
-    min-width: 500px;
+    min-width: 340px;
   }
 
   .navLinksWrapper {
@@ -203,7 +203,10 @@
     display: none;
   }
 
-  .navLinksWrapper,
+  .navLinksWrapper {
+    display: none;
+  }
+
   .profileMenuWrapper {
     display: none;
   }
@@ -215,6 +218,17 @@
   .header {
     padding: 0.5rem 1rem;
     height: 55px;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    overflow: hidden;
+    transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .headerExpanded {
+    height: auto;
+    min-height: 55px;
+    max-height: 400px;
+    padding-bottom: 1.5rem;
   }
 
   .rightSection {
@@ -230,6 +244,68 @@
     padding: 0.5rem;
     width: 34px;
     height: 34px;
+  }
+
+  /* Mobile Profile Menu */
+  .mobileProfileMenu {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    position: relative;
+    z-index: 50;
+  }
+
+  .mobileProfileLink {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #000000;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    background: transparent;
+    transition: all 0.2s ease;
+    text-align: center;
+    display: block;
+    position: relative;
+    z-index: 50;
+  }
+
+  .mobileProfileLink:hover,
+  .mobileProfileLink:active {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .mobileLogoutLink {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #dc2626;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 50;
+    grid-column: 1 / -1;
+    margin-top: 0.25rem;
+  }
+
+  .mobileLogoutLink:hover,
+  .mobileLogoutLink:active {
+    background: rgba(220, 38, 38, 0.08);
+  }
+
+  .mobileDivider {
+    grid-column: 1 / -1;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 0.25rem 0;
   }
 }
 
