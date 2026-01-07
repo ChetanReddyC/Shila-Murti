@@ -14,51 +14,7 @@ interface Review {
   variant?: string;
 }
 
-const mockReviews: Review[] = [
-  {
-    id: 'r1',
-    author: 'Aarav Sharma',
-    rating: 5,
-    date: '2024-11-12',
-    content:
-      'Outstanding craftsmanship and attention to detail. The finish is immaculate and it feels premium. Highly recommended!',
-    variant: 'Standard',
-  },
-  {
-    id: 'r2',
-    author: 'Meera Patel',
-    rating: 4,
-    date: '2024-12-04',
-    content:
-      'Beautiful piece, arrived well-packed. The texture and colors are exactly as shown. Shipping was quick too.',
-    variant: 'Large',
-  },
-  {
-    id: 'r3',
-    author: 'Rohit Verma',
-    rating: 5,
-    date: '2025-01-18',
-    content:
-      'Exceeded expectations. It has a lovely presence and blends perfectly with our decor. Will buy again.',
-  },
-  {
-    id: 'r4',
-    author: 'Priya Singh',
-    rating: 5,
-    date: '2025-01-20',
-    content:
-      'Absolutely love it! The detailing on the idol is intricate and beautiful. It brings such a positive vibe to my home.',
-    variant: 'Standard',
-  },
-  {
-    id: 'r5',
-    author: 'Karan Mehta',
-    rating: 4,
-    date: '2025-01-25',
-    content:
-      'Good quality product. Heavier than I expected, which is nice. Packaging could be slightly better but item was safe.',
-  },
-];
+const mockReviews: Review[] = [];
 
 function Star({ filled }: { filled: boolean }) {
   return (
@@ -149,47 +105,74 @@ const ReviewsSection: React.FC = () => {
             Real experiences from people who bought this product.
           </p>
         </div>
-        <div
-          className={reviewStyles.summaryRow}
-        >
-          <span className={reviewStyles.summaryRating}>{average.toFixed(1)} / 5</span>
-          <div className={reviewStyles.starsContainer} aria-label={`${average} out of 5 stars`}>
-            {[1, 2, 3, 4, 5].map((i) => (<Star key={i} filled={i <= Math.round(average)} />))}
+        {mockReviews.length > 0 && (
+          <div className={reviewStyles.summaryRow}>
+            <span className={reviewStyles.summaryRating}>{average.toFixed(1)} / 5</span>
+            <div className={reviewStyles.starsContainer} aria-label={`${average} out of 5 stars`}>
+              {[1, 2, 3, 4, 5].map((i) => (<Star key={i} filled={i <= Math.round(average)} />))}
+            </div>
+            <span className={reviewStyles.reviewCount}>{mockReviews.length} {mockReviews.length === 1 ? 'review' : 'reviews'}</span>
           </div>
-          <span className={reviewStyles.reviewCount}>{mockReviews.length} {mockReviews.length === 1 ? 'review' : 'reviews'}</span>
-        </div>
+        )}
       </div>
 
       {/* Reviews Stack */}
-      <div
-        ref={gridRef}
-        className={`${reviewStyles.reviewsGrid} ${isExpanded ? reviewStyles.reviewsGridExpanded : ''}`}
-        style={{ height: isExpanded && fixedHeight ? `${fixedHeight}px` : undefined }}
-      >
-        {visibleReviews.map((r, idx) => {
-          return (
-            <article
-              key={r.id}
-              className={reviewStyles.reviewCard}
+      {mockReviews.length === 0 ? (
+        <div className={reviewStyles.emptyStateContainer}>
+          <div className={reviewStyles.emptyStateIconWrapper}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              className={reviewStyles.emptyStateIconSvg}
             >
-              <header className={reviewStyles.cardHeader}>
-                <div className={reviewStyles.authorMeta}>
-                  <h4 className={reviewStyles.authorName}>{r.author}</h4>
-                  <div className={reviewStyles.subMeta}>
-                    <div className={reviewStyles.starsContainer}>
-                      {[1, 2, 3, 4, 5].map((i) => (<Star key={i} filled={i <= r.rating} />))}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
+              />
+            </svg>
+          </div>
+          <h4 className={reviewStyles.emptyStateTitle}>No reviews yet</h4>
+          <p className={reviewStyles.emptyStateText}>
+            This piece is waiting for its first admirer. Be the first to share your thoughts on this art.
+          </p>
+          <button className={reviewStyles.writeReviewBtn}>
+            Write a Review
+          </button>
+        </div>
+      ) : (
+        <div
+          ref={gridRef}
+          className={`${reviewStyles.reviewsGrid} ${isExpanded ? reviewStyles.reviewsGridExpanded : ''}`}
+          style={{ height: isExpanded && fixedHeight ? `${fixedHeight}px` : undefined }}
+        >
+          {visibleReviews.map((r, idx) => {
+            return (
+              <article
+                key={r.id}
+                className={reviewStyles.reviewCard}
+              >
+                <header className={reviewStyles.cardHeader}>
+                  <div className={reviewStyles.authorMeta}>
+                    <h4 className={reviewStyles.authorName}>{r.author}</h4>
+                    <div className={reviewStyles.subMeta}>
+                      <div className={reviewStyles.starsContainer}>
+                        {[1, 2, 3, 4, 5].map((i) => (<Star key={i} filled={i <= r.rating} />))}
+                      </div>
+                      <span className={reviewStyles.dateString}>
+                        • {r.variant ? `${r.variant}, ` : ''}{new Date(r.date).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className={reviewStyles.dateString}>
-                      • {r.variant ? `${r.variant}, ` : ''}{new Date(r.date).toLocaleDateString()}
-                    </span>
                   </div>
-                </div>
-              </header>
-              <p className={reviewStyles.reviewContent}>{r.content}</p>
-            </article>
-          );
-        })}
-      </div>
+                </header>
+                <p className={reviewStyles.reviewContent}>{r.content}</p>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
       {/* Bottom Toggle Button sitting on border */}
       {mockReviews.length > 3 && (

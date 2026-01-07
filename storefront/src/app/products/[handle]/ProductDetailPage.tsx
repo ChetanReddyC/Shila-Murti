@@ -617,7 +617,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   return (
     <div
       className={styles.pageWrapper}
-      style={{ paddingTop: '85px' }}
     >
       <div className={styles.layoutContainer}>
         <NetworkStatus />
@@ -771,9 +770,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     )}
 
                     {/* Reviews next to description */}
-                    <div className="mt-8 mb-4">
-                      <ReviewsSection />
-                    </div>
+
 
                     {/* Spacer for sticky bar */}
                     <div className={styles.mobileSpacer}></div>
@@ -867,6 +864,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   </div>
                 </div>
 
+                <ReviewsSection />
                 <SimilarProductsSection current={product} />
                 {/* Reviews moved up */}
 
