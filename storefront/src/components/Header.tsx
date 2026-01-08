@@ -115,7 +115,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const protectionActive = hydrated ? (isOrderConfirmationActive() || isOrderConfirmationProtectionActive()) : false;
   const preventCartNavigation = hydrated ? (isOnOrderConfirmation || protectionActive) : false;
   const totalItems = preventCartNavigation ? 0 : getTotalItems();
-  const shouldShowBadge = hasVisitedCart && !isOnCartPage && totalItems > lastSeenCount;
+  const shouldShowBadge = !isOnCartPage && totalItems > 0;
 
   const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
@@ -218,9 +218,9 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         </div>
 
         <div className="relative z-30 flex w-full items-center">
-          <div className={styles.brandContainer}>
+          <a href="/" className={styles.brandContainer}>
             <h2 className={styles.brand}>Shila Murti</h2>
-          </div>
+          </a>
 
           <div className={styles.rightSection}>
             <nav className={`${styles.navContainer} ${isProfileMenuOpen ? styles.profileMenuOpen : ''}`}>
