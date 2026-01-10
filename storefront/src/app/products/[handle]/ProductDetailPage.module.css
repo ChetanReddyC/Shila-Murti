@@ -1,17 +1,19 @@
 .productDetails {
-    background: #f2f2f23f;
-    background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0));
-    padding: 1rem;
-    /* tighter card padding */
-    border-radius: 1.9rem;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    border: 5px solid #ffffff;
-    transition: box-shadow 0.3s ease;
+    /* Premium Mild & Sleek Border Style (Matches Reviews Empty State) */
+    background: linear-gradient(180deg, rgba(250, 250, 250, 0.6) 0%, rgba(255, 255, 255, 0.2) 100%);
+    border: 1px solid rgba(229, 232, 235, 0.6);
+    border-radius: 24px;
+    /* Soft rounding */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    /* Very subtle lift */
+
+    padding: 1.5rem;
+    /* Slightly more padding for the new cleaner look */
     max-width: 960px;
     margin-top: 0.25rem;
-    /* reduce top margin */
-    margin-bottom: 1rem;
-    /* reduce bottom margin */
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
 }
 
 /* Collapsible description styles */
@@ -129,30 +131,20 @@
 
 /* Apply the exact same border + subtle gradient/shadow to the image container */
 .imageContainerBorder {
-    background: #f2f2f23f;
-    background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0));
-    border-radius: 1.9rem;
-    /* match productDetails */
-    /* ~30% more intensity than current, still smooth and even */
-    box-shadow:
-        0 3px 6px rgba(0, 0, 0, 0.12),
-        0 9px 25px rgba(0, 0, 0, 0.13),
-        0 18px 48px rgba(0, 0, 0, 0.10);
-    border: 5px solid #ffffff;
+    /* Premium Mild & Sleek Border Style */
+    background: linear-gradient(180deg, rgba(250, 250, 250, 0.6) 0%, rgba(255, 255, 255, 0.2) 100%);
+    border: 1px solid rgba(229, 232, 235, 0.6);
+    border-radius: 24px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    /* No heavy white border anymore, just the sleek line */
     transition: box-shadow 280ms ease;
+    overflow: hidden;
+    /* Ensure image fits radius */
 }
 
-.imageContainerBorder:hover {
-    /* hover remains soft but proportionally stronger */
-    box-shadow:
-        0 5px 9px rgba(0, 0, 0, 0.14),
-        0 12px 32px rgba(0, 0, 0, 0.15),
-        0 20px 56px rgba(0, 0, 0, 0.11);
-}
+/* Hover effect removed as requested */
 
-.productDetails:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
+
 
 .detailsContainer {
     display: flex;
@@ -340,11 +332,10 @@
 
 @media (min-width: 1024px) {
     .mainSection {
-        padding-top: 3rem;
-        /* lg:py-12 */
+        padding-top: 1rem;
+        /* minimal spacing */
         padding-bottom: 3rem;
         padding-left: 6rem;
-        /* lg:px-24 */
         padding-right: 6rem;
     }
 }
@@ -576,8 +567,11 @@
 
 @media (min-width: 1024px) {
     .breadcrumbNav {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-top: 6.5rem;
+        /* Slightly reduced to fix "weird" void, while keeping clearance */
+        padding-bottom: 0.5rem;
+        /* Reduced significantly to hug the image container */
+        margin-top: 0;
     }
 }
 
@@ -630,7 +624,8 @@
         grid-template-columns: repeat(2, 1fr);
         gap: 4rem;
         /* gap-16 */
-        padding-top: 2rem;
+        padding-top: 0;
+        /* Removed spacing to pull image closer to breadcrumbs */
         padding-bottom: 0;
     }
 }
@@ -848,15 +843,24 @@
         position: static !important;
         display: flex !important;
         flex-direction: column !important;
-        gap: 2rem !important;
-        padding-top: 2rem !important;
-        border-top: 2px solid #e0e0e0 !important;
-        padding: 0 !important;
-        background: transparent !important;
-        box-shadow: none !important;
+        /* Tightened gap for a more "fitted" look */
+        gap: 1rem !important;
+
+        /* Sleek styling matches ProductDetails */
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.6) 0%, rgba(255, 255, 255, 0.2) 100%) !important;
+        border: 1px solid rgba(229, 232, 235, 0.6) !important;
+        border-radius: 20px !important;
+        /* Slightly tighter radius for better fit */
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02) !important;
+        padding: 0.75rem !important;
+        /* Reduced padding significantly */
+
         width: auto !important;
         animation: none !important;
         backdrop-filter: none !important;
+        margin-bottom: 2rem;
+        margin-top: 1.5rem;
+        /* Move to bottom slightly */
     }
 }
 
@@ -895,16 +899,26 @@
 
 @media (min-width: 1024px) {
     .quantitySelector {
-        border-width: 2px;
-        border-radius: 1rem;
-        /* rounded-2xl */
-        height: auto;
+        height: 33px;
+        /* Match View All height */
+        border-radius: 12px;
+        /* Match View All radius */
+        border: 1px solid #e5e7eb;
+        background-color: #f2f2f2;
+        /* Match View All background */
+        box-shadow: none;
+        /* View All has no initial shadow */
+        opacity: 1;
+        width: fit-content;
+        /* Ensure it wraps content tightly */
     }
 }
 
 .quantityBtn {
-    padding: 0.75rem 0.5rem;
-    /* Reduced horizontal padding */
+    padding: 0;
+    height: 100%;
+    width: 24px;
+    /* Narrower button width */
     background: transparent;
     transition: background-color 0.15s;
     border: none;
@@ -912,6 +926,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #141414;
 }
 
 .quantityBtn:hover:not(:disabled) {
@@ -924,13 +939,14 @@
 }
 
 .quantityValue {
-    padding: 0.75rem 0.25rem;
-    /* Reduced padding */
-    min-width: 2rem;
-    /* Reduced min-width */
+    padding: 0;
+    width: 24px;
+    /* Fixed compact width for number */
     text-align: center;
-    font-size: 1.125rem;
+    font-size: 0.95rem;
     font-weight: 600;
+    color: #141414;
+    line-height: 1;
 }
 
 @media (min-width: 1024px) {
@@ -988,12 +1004,11 @@
 
 @media (min-width: 1024px) {
     .addToCartBtn {
-        height: 4rem;
-        /* h-16 */
+        /* Slightly reduce height for better proportion inside container */
+        height: 3.5rem;
+        /* h-14 */
         border-radius: 1rem;
-        /* rounded-2xl */
-        font-size: 1.125rem;
-        /* text-lg */
+        font-size: 1.05rem;
     }
 }
 
@@ -1021,8 +1036,9 @@
 
 @media (min-width: 1024px) {
     .wishlistBtn {
-        height: 4rem;
-        width: 4rem;
+        height: 3.5rem;
+        /* Match addToCartBtn height */
+        width: 3.5rem;
         border-radius: 1rem;
     }
 }

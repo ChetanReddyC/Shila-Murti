@@ -1,11 +1,6 @@
 .section {
-  /*
-     Re-applying negative margin as per user request to significantly overlap
-     or tighten constraints beyond standard flow.
-     This pulls the section up -4.5rem.
-  */
-  margin-top: -4.5rem;
-  padding-top: 0;
+  margin-top: 0;
+  padding-top: 2rem;
   border-top: none;
   padding-bottom: .5rem;
   position: relative;
@@ -14,7 +9,7 @@
 
 @media (min-width: 768px) {
   .section {
-    margin-top: -3rem;
+    margin-top: 0;
     padding-bottom: 0;
   }
 }

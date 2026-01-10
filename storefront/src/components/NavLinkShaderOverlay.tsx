@@ -214,7 +214,7 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
   const [canvasRect, setCanvasRect] = useState<CanvasRect | null>(null);
   const [webglSupported, setWebglSupported] = useState<boolean>(true);
   const devicePixelRatioRef = useRef<number>(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
-  
+
   const programRef = useRef<{
     program: WebGLProgram;
     attribs: { a_pos: number };
@@ -237,7 +237,7 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
 
   const positionCanvasOverLink = useCallback((linkElement: HTMLElement) => {
     const linkRect = linkElement.getBoundingClientRect();
-    
+
     // Store base link rect for explosion calculations
     baseLinkRectRef.current = {
       left: linkRect.left,
@@ -245,10 +245,10 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
       width: linkRect.width,
       height: 16
     };
-    
+
     // Update React state
     setCanvasRect(baseLinkRectRef.current);
-    
+
     // ALSO immediately apply via inline styles to avoid async delay
     const canvas = canvasRef.current;
     if (canvas) {
@@ -264,7 +264,7 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
       // Cancel any ongoing explosion FIRST
       explosionTimeRef.current = 0;
       isExplodingRef.current = false;
-      
+
       // Clear inline styles BEFORE repositioning (critical!)
       const canvas = canvasRef.current;
       if (canvas) {
@@ -273,7 +273,7 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
         canvas.style.width = '';
         canvas.style.height = '';
       }
-      
+
       // Now position canvas for new link
       positionCanvasOverLink(linkElement);
       setActive(true);
@@ -320,11 +320,11 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const positions = new Float32Array([
         -1, -1,
-         1, -1,
-        -1,  1,
-        -1,  1,
-         1, -1,
-         1,  1,
+        1, -1,
+        -1, 1,
+        -1, 1,
+        1, -1,
+        1, 1,
       ]);
       gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
 
@@ -332,22 +332,22 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
       const vs = gl.createShader(gl.VERTEX_SHADER);
       const fs = gl.createShader(gl.FRAGMENT_SHADER);
       if (!vs || !fs) return;
-      
+
       gl.shaderSource(vs, vsSource);
       gl.compileShader(vs);
       if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) return;
-      
+
       gl.shaderSource(fs, fsSource);
       gl.compileShader(fs);
       if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) return;
 
       const program = gl.createProgram();
       if (!program) return;
-      
+
       gl.attachShader(program, vs);
       gl.attachShader(program, fs);
       gl.linkProgram(program);
-      
+
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
 
       programRef.current = {
@@ -379,7 +379,7 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
       programRef.current = null;
       positionBufferRef.current = null;
     };
-    
+
     const handleContextRestored = () => {
       initWebGL();
     };
@@ -449,25 +449,25 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
     const EASING = 0.12;
     const PROGRESS_SPEED = 3.0;
     const EPS = 0.001;
-    
+
     let lastFrameTime = performance.now();
 
     const render = () => {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       const deltaTime = (now - lastFrameTime) * 0.001; // Delta in seconds
       lastFrameTime = now;
-      
+
       const elapsedSeconds = (now - startTimeRef.current) / 1000;
 
       // === EXPLOSION STATE MACHINE ===
       if (isExplodingRef.current) {
         // Update explosion time
         explosionTimeRef.current += deltaTime;
-        
+
         // Keep intensity at 1 during explosion (shader handles the fade)
         intensityRef.current = 1.0;
         progressRef.current = 1.0; // Keep full progress during explosion
-        
+
         // EXPAND CANVAS DYNAMICALLY during explosion for visible effect
         // Update directly via ref to avoid React re-render jitter
         if (baseLinkRectRef.current && canvas) {
@@ -475,29 +475,29 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
           // Expand to 3x width and 5x height (80px tall)
           const expandFactor = 1.0 + explosionProgress * 2.0; // 1x -> 3x
           const heightExpandFactor = 1.0 + explosionProgress * 4.0; // 16px -> 80px
-          
+
           const baseRect = baseLinkRectRef.current;
           const expandedWidth = baseRect.width * expandFactor;
           const expandedHeight = baseRect.height * heightExpandFactor;
-          
+
           // Center expansion around original position
           const leftOffset = (expandedWidth - baseRect.width) / 2;
           const topOffset = (expandedHeight - baseRect.height) / 2;
-          
+
           // Update canvas style directly (no React state = no jitter)
           canvas.style.left = `${Math.round(baseRect.left - leftOffset)}px`;
           canvas.style.top = `${Math.round(baseRect.top - topOffset)}px`;
           canvas.style.width = `${Math.round(expandedWidth)}px`;
           canvas.style.height = `${Math.round(expandedHeight)}px`;
         }
-        
+
         // Explosion completes after 1.5 seconds (longer for dramatic effect)
         if (explosionTimeRef.current >= 1.5) {
           isExplodingRef.current = false;
           explosionTimeRef.current = 0;
           progressRef.current = 0;
           intensityRef.current = 0;
-          
+
           // Clear inline styles before restoring via React state
           if (canvas) {
             canvas.style.left = '';
@@ -505,7 +505,7 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
             canvas.style.width = '';
             canvas.style.height = '';
           }
-          
+
           // Restore original canvas size via state (end of animation, one-time update is fine)
           if (baseLinkRectRef.current) {
             setCanvasRect(baseLinkRectRef.current);
@@ -539,19 +539,19 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
       if ((intensityRef.current > EPS || isExplodingRef.current) && programRef.current) {
         const bundle = programRef.current;
         gl.useProgram(bundle.program);
-        
+
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBufferRef.current);
         if (bundle.attribs.a_pos >= 0) {
           gl.enableVertexAttribArray(bundle.attribs.a_pos);
           gl.vertexAttribPointer(bundle.attribs.a_pos, 2, gl.FLOAT, false, 0, 0);
         }
-        
+
         if (bundle.uniforms.u_res) gl.uniform2f(bundle.uniforms.u_res, canvasWidth, canvasHeight);
         if (bundle.uniforms.u_time) gl.uniform1f(bundle.uniforms.u_time, elapsedSeconds);
         if (bundle.uniforms.u_intensity) gl.uniform1f(bundle.uniforms.u_intensity, intensityRef.current);
         if (bundle.uniforms.u_progress) gl.uniform1f(bundle.uniforms.u_progress, progressRef.current);
         if (bundle.uniforms.u_explosion_time) gl.uniform1f(bundle.uniforms.u_explosion_time, explosionTimeRef.current);
-        
+
         gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
 
@@ -575,24 +575,25 @@ const NavLinkShaderOverlay = forwardRef<NavLinkShaderOverlayAPI, {}>((props, ref
       }
     };
   }, [active, canvasRect]);
-  
+
 
 
   const style: React.CSSProperties = canvasRect
     ? {
-        position: 'fixed',
-        left: `${Math.round(canvasRect.left)}px`,
-        top: `${Math.round(canvasRect.top)}px`,
-        width: `${Math.round(canvasRect.width)}px`,
-        height: `${Math.round(canvasRect.height)}px`,
-        pointerEvents: 'none',
-        zIndex: 100,
-        opacity: 1,
-      }
+      position: 'fixed',
+      left: `${Math.round(canvasRect.left)}px`,
+      top: `${Math.round(canvasRect.top)}px`,
+      width: `${Math.round(canvasRect.width)}px`,
+      height: `${Math.round(canvasRect.height)}px`,
+      pointerEvents: 'none',
+      zIndex: 2000,
+      opacity: 1,
+      filter: 'blur(2px)',
+    }
     : { opacity: 0, pointerEvents: 'none' };
 
   return (
-    <div ref={rootRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 100 }}>
+    <div ref={rootRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 2000 }}>
       {webglSupported && (
         <canvas ref={canvasRef} style={style} />
       )}

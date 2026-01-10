@@ -27,11 +27,34 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const [toggleCount, setToggleCount] = useState<number>(0);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState<boolean>(false);
   const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState<boolean>(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const navLinkShaderRef = useRef<NavLinkShaderOverlayAPI | null>(null);
+
+  // Sync header expanded state with menu open state (with delay for closing)
+  useEffect(() => {
+    if (isMobile && isProfileMenuOpen) {
+      setIsHeaderExpanded(true);
+    } else if (!isProfileMenuOpen && isHeaderExpanded) {
+      // Delay the collapse to allow exit animation to complete
+      const timer = setTimeout(() => {
+        setIsHeaderExpanded(false);
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isMobile, isProfileMenuOpen, isHeaderExpanded]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setHydrated(true);
+
+    // Check if mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
 
     try {
       const visited = window.sessionStorage.getItem('hasVisitedCart') === 'true';
@@ -56,6 +79,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
     return () => {
       window.removeEventListener('popstate', onPopState);
       window.removeEventListener('next-router-navigation', onNextNav as EventListener);
+      window.removeEventListener('resize', checkMobile);
     };
   }, []);
 
@@ -91,7 +115,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const protectionActive = hydrated ? (isOrderConfirmationActive() || isOrderConfirmationProtectionActive()) : false;
   const preventCartNavigation = hydrated ? (isOnOrderConfirmation || protectionActive) : false;
   const totalItems = preventCartNavigation ? 0 : getTotalItems();
-  const shouldShowBadge = hasVisitedCart && !isOnCartPage && totalItems > lastSeenCount;
+  const shouldShowBadge = !isOnCartPage && totalItems > 0;
 
   const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
@@ -141,24 +165,15 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         onConfirm={handleLogoutConfirm}
       />
       <motion.header
-        className={styles.header}
-        animate={isProfileMenuOpen ? "stretch" : "shrink"}
-        variants={{
-          shrink: {
-            scaleX: [1, 0.98, 1],
-            transition: {
-              duration: 1,
-              ease: [0.25, 0.8, 0.5, 1],
-              times: [0, 0.5, 1]
-            }
-          },
-          stretch: {
-            scaleX: [1, 1.020, 1],
-            transition: {
-              duration: 1,
-              ease: [0.25, 0.8, 0.5, 1],
-              times: [0, 0.5, 1]
-            }
+        className={`${styles.header} ${isMobile && isHeaderExpanded ? styles.headerExpanded : ''}`}
+        animate={{
+          scaleX: isProfileMenuOpen ? [1, 1.020, 1] : [1, 0.98, 1]
+        }}
+        transition={{
+          scaleX: {
+            duration: 1,
+            ease: [0.25, 0.8, 0.5, 1],
+            times: [0, 0.5, 1]
           }
         }}
       >
@@ -203,9 +218,9 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         </div>
 
         <div className="relative z-30 flex w-full items-center">
-          <div className={styles.brandContainer}>
+          <a href="/" className={styles.brandContainer}>
             <h2 className={styles.brand}>Shila Murti</h2>
-          </div>
+          </a>
 
           <div className={styles.rightSection}>
             <nav className={`${styles.navContainer} ${isProfileMenuOpen ? styles.profileMenuOpen : ''}`}>
@@ -315,8 +330,6 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
                       { label: 'Account Details', href: '/account?tab=Account Details' },
                       { label: 'Order History', href: '/account?tab=Order History' },
                       { label: 'Wishlist', href: '/account?tab=Wishlist' },
-                      { label: 'Address Book', href: '/account?tab=Address Book' },
-                      { label: 'Payment Methods', href: '/account?tab=Payment Methods' },
                       { label: 'Security', href: '/account?tab=Security' },
                     ].map((link) => (
                       <motion.a
@@ -486,6 +499,133 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
             </div>
           </div>
         </div>
+
+        {/* Mobile Profile Menu */}
+        <AnimatePresence mode="wait">
+          {isMobile && isProfileMenuOpen && (
+            <motion.div
+              className={styles.mobileProfileMenu}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{
+                opacity: 1,
+                height: 'auto',
+                transition: {
+                  height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+                  opacity: { duration: 0.25, delay: 0.1 }
+                }
+              }}
+              exit={{
+                opacity: 0,
+                height: 0,
+                transition: {
+                  height: { duration: 0.3, ease: [0.4, 0, 1, 1], delay: 0.1 },
+                  opacity: { duration: 0.2 }
+                }
+              }}
+            >
+              {/* Main Navigation Links */}
+              {[
+                { label: 'Home', href: '/' },
+                { label: 'Shop', href: '/products' },
+                { label: 'About', href: '#' },
+                { label: 'Contact', href: '/contact' },
+              ].map((link, index) => (
+                <motion.a
+                  key={link.label}
+                  className={styles.mobileProfileLink}
+                  href={link.href}
+                  onClick={() => setIsProfileMenuOpen(false)}
+                  initial={{ opacity: 0 }}
+                  animate={{
+                    opacity: 1,
+                    transition: {
+                      duration: 0.25,
+                      delay: 0.1 + index * 0.03,
+                      ease: 'easeOut'
+                    }
+                  }}
+                  exit={{
+                    opacity: 0,
+                    transition: {
+                      duration: 0.15,
+                      ease: 'easeIn'
+                    }
+                  }}
+                >
+                  {link.label}
+                </motion.a>
+              ))}
+
+              {/* Divider */}
+              <motion.div
+                className={styles.mobileDivider}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.2 } }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
+              />
+
+              {/* Account Links */}
+              {[
+                { label: 'Account Details', href: '/account?tab=Account Details' },
+                { label: 'Order History', href: '/account?tab=Order History' },
+                { label: 'Wishlist', href: '/account?tab=Wishlist' },
+                { label: 'Security', href: '/account?tab=Security' },
+              ].map((link, index) => (
+                <motion.a
+                  key={link.label}
+                  className={styles.mobileProfileLink}
+                  href={link.href}
+                  onClick={() => setIsProfileMenuOpen(false)}
+                  initial={{ opacity: 0 }}
+                  animate={{
+                    opacity: 1,
+                    transition: {
+                      duration: 0.25,
+                      delay: 0.25 + index * 0.03,
+                      ease: 'easeOut'
+                    }
+                  }}
+                  exit={{
+                    opacity: 0,
+                    transition: {
+                      duration: 0.15,
+                      ease: 'easeIn'
+                    }
+                  }}
+                >
+                  {link.label}
+                </motion.a>
+              ))}
+              {hydrated && session?.user && (
+                <motion.button
+                  className={styles.mobileLogoutLink}
+                  initial={{ opacity: 0 }}
+                  animate={{
+                    opacity: 1,
+                    transition: {
+                      duration: 0.25,
+                      delay: 0.4,
+                      ease: 'easeOut'
+                    }
+                  }}
+                  exit={{
+                    opacity: 0,
+                    transition: {
+                      duration: 0.15,
+                      ease: 'easeIn'
+                    }
+                  }}
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    setShowLogoutConfirmModal(true);
+                  }}
+                >
+                  Logout
+                </motion.button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.header>
       <NavLinkShaderOverlay ref={navLinkShaderRef} />
     </>
