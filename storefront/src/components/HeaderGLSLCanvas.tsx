@@ -122,7 +122,7 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
   const interactionTimeRef = useRef<number>(0);
   const directionRef = useRef<number>(1); // 1 = right, -1 = left
   const lastStateRef = useRef<boolean>(false);
-  
+
   // Track interaction changes and reset timer
   useEffect(() => {
     if (isProfileMenuOpen !== lastStateRef.current) {
@@ -131,7 +131,7 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
       lastStateRef.current = isProfileMenuOpen;
     }
   }, [isProfileMenuOpen]);
-  
+
   // Canvas WebGL setup and rendering
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -139,40 +139,40 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
 
     const contextManager = getWebGLContextManager();
     const contextId = 'header-glsl-canvas';
-    
+
     const gl = contextManager.getContext(contextId, canvas, {
-      alpha: true, 
+      alpha: true,
       premultipliedAlpha: false,
       preserveDrawingBuffer: false,
       antialias: false,
       depth: false,
       stencil: false
     });
-    
+
     if (!gl) {
       console.warn('[HeaderGLSLCanvas] Failed to get WebGL context');
       return;
     }
-    
+
     // Mark context as actively used
     contextManager.touchContext(contextId);
-    
+
     // Handle context loss gracefully
     const handleContextLost = (e: Event) => {
       e.preventDefault();
       console.warn('[HeaderGLSLCanvas] WebGL context lost');
     };
-    
+
     const handleContextRestored = () => {
       console.log('[HeaderGLSLCanvas] WebGL context restored');
     };
-    
+
     canvas.addEventListener('webglcontextlost', handleContextLost);
     canvas.addEventListener('webglcontextrestored', handleContextRestored);
-    
+
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    
+
     // Set canvas size based on viewport
     const updateCanvasSize = () => {
       const viewportWidth = window.innerWidth;
@@ -181,10 +181,10 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
       canvas.height = 65;
       console.log('Canvas size set:', canvas.width, 'x', canvas.height);
     };
-    
+
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
-    
+
     // Also update on mount after a short delay
     setTimeout(() => {
       updateCanvasSize();
@@ -239,12 +239,12 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
       const now = performance.now();
       const deltaTime = (now - lastFrameTime) * 0.001;
       lastFrameTime = now;
-      
+
       // Update interaction time (capped at 4 seconds for fade out)
       if (interactionTimeRef.current < 4.0) {
         interactionTimeRef.current += deltaTime;
       }
-      
+
       gl.uniform1f(uTime, (now - start) * 0.001);
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform1f(uInteractionTime, interactionTimeRef.current);
@@ -261,7 +261,7 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
       window.removeEventListener('resize', updateCanvasSize);
       canvas.removeEventListener('webglcontextlost', handleContextLost);
       canvas.removeEventListener('webglcontextrestored', handleContextRestored);
-      
+
       // Clean up WebGL resources
       if (gl && !gl.isContextLost()) {
         gl.deleteProgram(prog);
@@ -269,7 +269,7 @@ const HeaderGLSLCanvas = ({ isProfileMenuOpen }: HeaderGLSLCanvasProps) => {
         gl.deleteShader(fs);
         gl.deleteBuffer(buf);
       }
-      
+
       // Note: We no longer force context loss - context manager handles lifecycle
       // This allows context reuse and prevents hitting browser limits
     };

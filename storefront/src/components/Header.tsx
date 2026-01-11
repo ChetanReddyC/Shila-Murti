@@ -28,22 +28,8 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState<boolean>(false);
   const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [isHeaderExpanded, setIsHeaderExpanded] = useState<boolean>(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const navLinkShaderRef = useRef<NavLinkShaderOverlayAPI | null>(null);
-
-  // Sync header expanded state with menu open state (with delay for closing)
-  useEffect(() => {
-    if (isMobile && isProfileMenuOpen) {
-      setIsHeaderExpanded(true);
-    } else if (!isProfileMenuOpen && isHeaderExpanded) {
-      // Delay the collapse to allow exit animation to complete
-      const timer = setTimeout(() => {
-        setIsHeaderExpanded(false);
-      }, 350);
-      return () => clearTimeout(timer);
-    }
-  }, [isMobile, isProfileMenuOpen, isHeaderExpanded]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -165,17 +151,32 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
         onConfirm={handleLogoutConfirm}
       />
       <motion.header
-        className={`${styles.header} ${isMobile && isHeaderExpanded ? styles.headerExpanded : ''}`}
-        animate={{
-          scaleX: isProfileMenuOpen ? [1, 1.020, 1] : [1, 0.98, 1]
-        }}
+        className={`${styles.header} ${isMobile && isProfileMenuOpen ? styles.headerExpanded : ''}`}
+        animate={
+          isMobile
+            ? {
+              // Mobile: Subtle vertical stretch + horizontal wiggle for natural elastic feel
+              scaleY: isProfileMenuOpen ? [1, 1.015, 1.005, 1] : [1, 0.995, 1],
+              scaleX: isProfileMenuOpen ? [1, 1.008, 1] : [1, 0.997, 1]
+            }
+            : {
+              // Desktop: Original horizontal wiggle
+              scaleX: isProfileMenuOpen ? [1, 1.020, 1] : [1, 0.98, 1]
+            }
+        }
         transition={{
           scaleX: {
             duration: 1,
-            ease: [0.25, 0.8, 0.5, 1],
-            times: [0, 0.5, 1]
+            ease: [0.22, 1, 0.36, 1],
+            times: isMobile ? [0, 0.4, 1] : [0, 0.5, 1]
+          },
+          scaleY: {
+            duration: 1,
+            ease: [0.22, 1, 0.36, 1],
+            times: [0, 0.3, 0.6, 1]
           }
         }}
+        style={{ transformOrigin: 'top center' }}
       >
         <svg style={{ display: 'none' }}>
           <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
@@ -214,7 +215,8 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           className="absolute inset-0 z-20 overflow-hidden"
           style={{ boxShadow: 'inset 2px 2px 1px 0 rgba(255, 255, 255, 0), inset -1px -1px 1px 1px rgba(255, 255, 255, 0)' }}
         >
-          <HeaderGLSLCanvas isProfileMenuOpen={isProfileMenuOpen} />
+          {/* Only render shader on desktop - mobile skips this for performance */}
+          {!isMobile && <HeaderGLSLCanvas isProfileMenuOpen={isProfileMenuOpen} />}
         </div>
 
         <div className="relative z-30 flex w-full items-center">
@@ -500,132 +502,58 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           </div>
         </div>
 
-        {/* Mobile Profile Menu */}
-        <AnimatePresence mode="wait">
-          {isMobile && isProfileMenuOpen && (
-            <motion.div
-              className={styles.mobileProfileMenu}
-              initial={{ opacity: 0, height: 0 }}
-              animate={{
-                opacity: 1,
-                height: 'auto',
-                transition: {
-                  height: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-                  opacity: { duration: 0.25, delay: 0.1 }
-                }
-              }}
-              exit={{
-                opacity: 0,
-                height: 0,
-                transition: {
-                  height: { duration: 0.3, ease: [0.4, 0, 1, 1], delay: 0.1 },
-                  opacity: { duration: 0.2 }
-                }
-              }}
-            >
-              {/* Main Navigation Links */}
-              {[
-                { label: 'Home', href: '/' },
-                { label: 'Shop', href: '/products' },
-                { label: 'About', href: '#' },
-                { label: 'Contact', href: '/contact' },
-              ].map((link, index) => (
-                <motion.a
-                  key={link.label}
-                  className={styles.mobileProfileLink}
-                  href={link.href}
-                  onClick={() => setIsProfileMenuOpen(false)}
-                  initial={{ opacity: 0 }}
-                  animate={{
-                    opacity: 1,
-                    transition: {
-                      duration: 0.25,
-                      delay: 0.1 + index * 0.03,
-                      ease: 'easeOut'
-                    }
-                  }}
-                  exit={{
-                    opacity: 0,
-                    transition: {
-                      duration: 0.15,
-                      ease: 'easeIn'
-                    }
-                  }}
-                >
-                  {link.label}
-                </motion.a>
-              ))}
+        {/* Mobile Profile Menu - Always rendered on mobile, clip-path controls visibility */}
+        {isMobile && (
+          <div className={styles.mobileProfileMenu}>
+            {/* Main Navigation Links */}
+            {[
+              { label: 'Home', href: '/' },
+              { label: 'Shop', href: '/products' },
+              { label: 'About', href: '#' },
+              { label: 'Contact', href: '/contact' },
+            ].map((link) => (
+              <a
+                key={link.label}
+                className={styles.mobileProfileLink}
+                href={link.href}
+                onClick={() => setIsProfileMenuOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
 
-              {/* Divider */}
-              <motion.div
-                className={styles.mobileDivider}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.2 } }}
-                exit={{ opacity: 0, transition: { duration: 0.1 } }}
-              />
+            {/* Divider */}
+            <div className={styles.mobileDivider} />
 
-              {/* Account Links */}
-              {[
-                { label: 'Account Details', href: '/account?tab=Account Details' },
-                { label: 'Order History', href: '/account?tab=Order History' },
-                { label: 'Wishlist', href: '/account?tab=Wishlist' },
-                { label: 'Security', href: '/account?tab=Security' },
-              ].map((link, index) => (
-                <motion.a
-                  key={link.label}
-                  className={styles.mobileProfileLink}
-                  href={link.href}
-                  onClick={() => setIsProfileMenuOpen(false)}
-                  initial={{ opacity: 0 }}
-                  animate={{
-                    opacity: 1,
-                    transition: {
-                      duration: 0.25,
-                      delay: 0.25 + index * 0.03,
-                      ease: 'easeOut'
-                    }
-                  }}
-                  exit={{
-                    opacity: 0,
-                    transition: {
-                      duration: 0.15,
-                      ease: 'easeIn'
-                    }
-                  }}
-                >
-                  {link.label}
-                </motion.a>
-              ))}
-              {hydrated && session?.user && (
-                <motion.button
-                  className={styles.mobileLogoutLink}
-                  initial={{ opacity: 0 }}
-                  animate={{
-                    opacity: 1,
-                    transition: {
-                      duration: 0.25,
-                      delay: 0.4,
-                      ease: 'easeOut'
-                    }
-                  }}
-                  exit={{
-                    opacity: 0,
-                    transition: {
-                      duration: 0.15,
-                      ease: 'easeIn'
-                    }
-                  }}
-                  onClick={() => {
-                    setIsProfileMenuOpen(false);
-                    setShowLogoutConfirmModal(true);
-                  }}
-                >
-                  Logout
-                </motion.button>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {/* Account Links */}
+            {[
+              { label: 'Account Details', href: '/account?tab=Account Details' },
+              { label: 'Order History', href: '/account?tab=Order History' },
+              { label: 'Wishlist', href: '/account?tab=Wishlist' },
+              { label: 'Security', href: '/account?tab=Security' },
+            ].map((link) => (
+              <a
+                key={link.label}
+                className={styles.mobileProfileLink}
+                href={link.href}
+                onClick={() => setIsProfileMenuOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
+            {hydrated && session?.user && (
+              <button
+                className={styles.mobileLogoutLink}
+                onClick={() => {
+                  setIsProfileMenuOpen(false);
+                  setShowLogoutConfirmModal(true);
+                }}
+              >
+                Logout
+              </button>
+            )}
+          </div>
+        )}
       </motion.header>
       <NavLinkShaderOverlay ref={navLinkShaderRef} />
     </>
