@@ -502,71 +502,58 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
           </div>
         </div>
 
-        {/* Mobile Profile Menu - Simple container animation only */}
-        <AnimatePresence>
-          {isMobile && isProfileMenuOpen && (
-            <motion.div
-              className={styles.mobileProfileMenu}
-              initial={{ opacity: 0 }}
-              animate={{
-                opacity: 1,
-                transition: { duration: 1, ease: [0.22, 1, 0.36, 1] }
-              }}
-              exit={{
-                opacity: 0,
-                transition: { duration: 1, ease: [0.22, 1, 0.36, 1] }
-              }}
-            >
-              {/* Main Navigation Links */}
-              {[
-                { label: 'Home', href: '/' },
-                { label: 'Shop', href: '/products' },
-                { label: 'About', href: '#' },
-                { label: 'Contact', href: '/contact' },
-              ].map((link) => (
-                <a
-                  key={link.label}
-                  className={styles.mobileProfileLink}
-                  href={link.href}
-                  onClick={() => setIsProfileMenuOpen(false)}
-                >
-                  {link.label}
-                </a>
-              ))}
+        {/* Mobile Profile Menu - Always rendered on mobile, clip-path controls visibility */}
+        {isMobile && (
+          <div className={styles.mobileProfileMenu}>
+            {/* Main Navigation Links */}
+            {[
+              { label: 'Home', href: '/' },
+              { label: 'Shop', href: '/products' },
+              { label: 'About', href: '#' },
+              { label: 'Contact', href: '/contact' },
+            ].map((link) => (
+              <a
+                key={link.label}
+                className={styles.mobileProfileLink}
+                href={link.href}
+                onClick={() => setIsProfileMenuOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
 
-              {/* Divider */}
-              <div className={styles.mobileDivider} />
+            {/* Divider */}
+            <div className={styles.mobileDivider} />
 
-              {/* Account Links */}
-              {[
-                { label: 'Account Details', href: '/account?tab=Account Details' },
-                { label: 'Order History', href: '/account?tab=Order History' },
-                { label: 'Wishlist', href: '/account?tab=Wishlist' },
-                { label: 'Security', href: '/account?tab=Security' },
-              ].map((link) => (
-                <a
-                  key={link.label}
-                  className={styles.mobileProfileLink}
-                  href={link.href}
-                  onClick={() => setIsProfileMenuOpen(false)}
-                >
-                  {link.label}
-                </a>
-              ))}
-              {hydrated && session?.user && (
-                <button
-                  className={styles.mobileLogoutLink}
-                  onClick={() => {
-                    setIsProfileMenuOpen(false);
-                    setShowLogoutConfirmModal(true);
-                  }}
-                >
-                  Logout
-                </button>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {/* Account Links */}
+            {[
+              { label: 'Account Details', href: '/account?tab=Account Details' },
+              { label: 'Order History', href: '/account?tab=Order History' },
+              { label: 'Wishlist', href: '/account?tab=Wishlist' },
+              { label: 'Security', href: '/account?tab=Security' },
+            ].map((link) => (
+              <a
+                key={link.label}
+                className={styles.mobileProfileLink}
+                href={link.href}
+                onClick={() => setIsProfileMenuOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
+            {hydrated && session?.user && (
+              <button
+                className={styles.mobileLogoutLink}
+                onClick={() => {
+                  setIsProfileMenuOpen(false);
+                  setShowLogoutConfirmModal(true);
+                }}
+              >
+                Logout
+              </button>
+            )}
+          </div>
+        )}
       </motion.header>
       <NavLinkShaderOverlay ref={navLinkShaderRef} />
     </>

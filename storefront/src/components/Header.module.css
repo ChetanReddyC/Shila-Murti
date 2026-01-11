@@ -217,18 +217,37 @@
 
   .header {
     padding: 0.5rem 1rem;
+    /* Use max-height for animatable values */
     height: auto;
     max-height: 55px;
     flex-wrap: wrap;
     align-content: flex-start;
+    /* Keep overflow hidden - border stays visible */
     overflow: hidden;
-    /* Smooth 1 second animation */
-    transition: max-height 1s cubic-bezier(0.4, 0, 0.2, 1), padding 1s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Reduce backdrop-filter for performance */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    /* CSS containment for performance */
+    contain: layout style;
+    /* Smooth 1 second max-height animation + delayed shadow reappearance */
+    transition:
+      max-height 1s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.3s ease 1s;
+    /* 1s delay - shadow appears after collapse completes */
   }
 
   .headerExpanded {
-    max-height: 400px;
-    padding-bottom: 1.5rem;
+    /* Expanded max-height - closer to actual content for symmetric animation */
+    max-height: 280px;
+    /* Reduce blur during animation for performance */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    /* Remove shadow immediately when expanding (no delay) */
+    box-shadow: none;
+    transition:
+      max-height 1s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.1s ease 0s;
+    /* 0s delay - shadow disappears immediately */
   }
 
   .rightSection {
@@ -246,17 +265,38 @@
     height: 34px;
   }
 
-  /* Mobile Profile Menu - Simple and fast */
+  /* Mobile Profile Menu - GPU accelerated animation */
   .mobileProfileMenu {
     width: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
-    padding-top: 0.75rem;
-    margin-top: 0.5rem;
+    /* Collapsed: no padding/margin */
+    padding-top: 0;
+    margin-top: 0;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     position: relative;
     z-index: 50;
+    /* GPU hints */
+    contain: content;
+    /* Hidden when collapsed */
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition:
+      max-height 1s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.5s ease,
+      padding-top 1s cubic-bezier(0.22, 1, 0.36, 1),
+      margin-top 1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* When header is expanded, reveal the menu */
+  .headerExpanded .mobileProfileMenu {
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    /* Closer to actual content height for symmetric animation */
+    max-height: 220px;
+    opacity: 1;
   }
 
   .mobileProfileLink {
