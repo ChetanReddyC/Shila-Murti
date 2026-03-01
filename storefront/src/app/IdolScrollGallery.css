@@ -21,6 +21,10 @@
     /* Hide the overflow x */
     display: flex;
     align-items: center;
+    cursor: grab;
+    touch-action: pan-y pinch-zoom;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .idol-horizontal-track {
