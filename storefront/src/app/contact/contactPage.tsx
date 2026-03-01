@@ -11,6 +11,9 @@ export default function ContactPage() {
     message: ''
   });
 
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -19,10 +22,40 @@ export default function ContactPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission here
-    // You can add your form submission logic here
+    setStatus('loading');
+    setErrorMessage('');
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Something went wrong');
+      }
+
+      setStatus('success');
+      setFormData({
+        name: '',
+        email: '',
+        subject: '',
+        message: ''
+      });
+
+      // Reset success message after 5 seconds
+      setTimeout(() => setStatus('idle'), 5000);
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to send message');
+    }
   };
 
   return (
@@ -44,7 +77,7 @@ export default function ContactPage() {
                         <h1 className={styles.contactTitle}>Contact Us</h1>
                       </div>
                     </div>
-                    
+
                     <form onSubmit={handleSubmit} className={styles.contactForm}>
                       <div className={styles.formGroup}>
                         <div className={styles.inputGroup}>
@@ -61,6 +94,7 @@ export default function ContactPage() {
                               placeholder="Your Name"
                               className={styles.input}
                               required
+                              disabled={status === 'loading'}
                             />
                           </div>
                         </div>
@@ -81,6 +115,7 @@ export default function ContactPage() {
                               placeholder="Your Email"
                               className={styles.input}
                               required
+                              disabled={status === 'loading'}
                             />
                           </div>
                         </div>
@@ -101,6 +136,7 @@ export default function ContactPage() {
                               placeholder="Subject"
                               className={styles.input}
                               required
+                              disabled={status === 'loading'}
                             />
                           </div>
                         </div>
@@ -121,16 +157,35 @@ export default function ContactPage() {
                               className={styles.textarea}
                               rows={6}
                               required
+                              disabled={status === 'loading'}
                             />
                           </div>
                         </div>
                       </div>
 
+                      {status === 'success' && (
+                        <div className="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50" role="alert">
+                          <span className="font-medium">Success!</span> Your message has been sent successfully.
+                        </div>
+                      )}
+
+                      {status === 'error' && (
+                        <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
+                          <span className="font-medium">Error!</span> {errorMessage}
+                        </div>
+                      )}
+
                       <div className={styles.submitContainer}>
                         <div className={styles.submitButtonContainer}>
-                          <button type="submit" className={styles.submitButton}>
+                          <button
+                            type="submit"
+                            className={`${styles.submitButton} ${status === 'loading' ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            disabled={status === 'loading'}
+                          >
                             <div className={styles.submitButtonContent}>
-                              <span className={styles.submitButtonText}>Submit</span>
+                              <span className={styles.submitButtonText}>
+                                {status === 'loading' ? 'Sending...' : 'Submit'}
+                              </span>
                             </div>
                           </button>
                         </div>
@@ -141,17 +196,17 @@ export default function ContactPage() {
                       <div className={styles.contactInfoHeader}>
                         <h2 className={styles.contactInfoTitle}>Contact Information</h2>
                       </div>
-                      
+
                       <div className={styles.contactInfoItem}>
-                        <p className={styles.contactInfoText}>Email: support@shilamurthi.com</p>
+                        <p className={styles.contactInfoText}>Email: support@shilamurti.com</p>
                       </div>
-                      
+
                       <div className={styles.contactInfoItem}>
-                        <p className={styles.contactInfoText}>Phone: (555) 123-4567</p>
+                        <p className={styles.contactInfoText}>Phone: +91 7013134891</p>
                       </div>
-                      
+
                       <div className={styles.contactInfoItem}>
-                        <p className={styles.contactInfoText}>Address: 123 Stone Street, Murthi City, 12345</p>
+                        <p className={styles.contactInfoText}>Address: Krishnapuram 8th road, Tadipatri, Anantapuramu, Andhra Pradesh, 515411 </p>
                       </div>
                     </div>
                   </div>

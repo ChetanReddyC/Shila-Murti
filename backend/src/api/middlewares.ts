@@ -66,12 +66,12 @@ async function authGuard(
 
     const claims = await verifyAccessToken(token, req.scope)
 
-    // Attach identity to request context for downstream usage
-    ;(req as any).customer_id = claims.sub
-    ;(req as any).auth = { customer_id: claims.sub, claims }
+      // Attach identity to request context for downstream usage
+      ; (req as any).customer_id = claims.sub
+      ; (req as any).auth = { customer_id: claims.sub, claims }
     try {
       console.log('[authGuard] token valid', { sub: claims.sub, mfaComplete: claims.mfaComplete, purpose: claims.purpose })
-    } catch {}
+    } catch { }
 
     if (claims.mfaComplete === false) {
       return res.status(403).json({ message: "MFA required" })
@@ -105,6 +105,12 @@ export default defineMiddlewares({
     {
       // Enforce elevated session (mfaComplete=true) on address book endpoints
       matcher: "/store/addresses*",
+      middlewares: [authGuard],
+    },
+    {
+      // Only authenticated customers can submit or edit reviews; GET is public
+      matcher: "/store/custom/reviews*",
+      method: ["POST", "PUT"],
       middlewares: [authGuard],
     },
     {

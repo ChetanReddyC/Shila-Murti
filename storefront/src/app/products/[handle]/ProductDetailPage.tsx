@@ -864,7 +864,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   </div>
                 </div>
 
-                <ReviewsSection />
+                <ReviewsSection productId={state.product?.id || ''} />
                 <SimilarProductsSection current={product} />
                 {/* Reviews moved up */}
 
