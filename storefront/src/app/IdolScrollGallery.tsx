@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import ContinuousSmokeShader from '../components/ContinuousSmokeShader';
 import ComingSoonPopup from '../components/ComingSoonPopup';
@@ -160,6 +160,7 @@ const IdolCard = ({ item, onInquire }: { item: typeof IDOLS[0], onInquire: () =>
 
 export default function IdolScrollGallery({ containerRef }: { containerRef: React.RefObject<HTMLElement> }) {
     const sectionRef = useRef<HTMLElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
     const [isPopupOpen, setIsPopupOpen] = React.useState(false);
 
     const { scrollYProgress } = useScroll({
@@ -171,14 +172,124 @@ export default function IdolScrollGallery({ containerRef }: { containerRef: Reac
     // Horizontal Scroll Logic
     // We map vertical scroll (0 to 1) to horizontal translateX.
     // 3 items => We need to scroll 2 full viewport widths to show all 3.
-    // x range: ["0%", "-200vw"] (if we use flex row with 100vw items)
     const x = useTransform(scrollYProgress, [0, 1], ["0%", "-200vw"]);
-    const springX = useSpring(x, { stiffness: 100, damping: 30, mass: 0.5 }); // Smooth out the scroll
+    const springX = useSpring(x, { stiffness: 100, damping: 30, mass: 0.5 });
+
+    // Horizontal swipe/drag → vertical scroll conversion
+    // Converts left/right swipe gestures into vertical scroll of the container,
+    // which the existing scroll→transform pipeline picks up automatically.
+    useEffect(() => {
+        const wrapper = wrapperRef.current;
+        const container = containerRef.current;
+        const section = sectionRef.current;
+        if (!wrapper || !container || !section) return;
+
+        const DIRECTION_LOCK_THRESHOLD = 10; // px before locking direction
+
+        // Ratio: how many vertical scroll pixels per horizontal swipe pixel
+        const getScrollMultiplier = () => {
+            const scrollRange = section.offsetHeight - window.innerHeight;
+            const trackRange = 2 * window.innerWidth; // 200vw
+            return scrollRange / trackRange;
+        };
+
+        // --- Touch handling (mobile) ---
+        let touchState: {
+            startX: number;
+            startY: number;
+            startScrollTop: number;
+            locked: 'horizontal' | 'vertical' | null;
+        } | null = null;
+
+        const onTouchStart = (e: TouchEvent) => {
+            touchState = {
+                startX: e.touches[0].clientX,
+                startY: e.touches[0].clientY,
+                startScrollTop: container.scrollTop,
+                locked: null
+            };
+        };
+
+        const onTouchMove = (e: TouchEvent) => {
+            if (!touchState) return;
+            const dx = e.touches[0].clientX - touchState.startX;
+            const dy = e.touches[0].clientY - touchState.startY;
+
+            // Lock direction after threshold
+            if (!touchState.locked) {
+                if (Math.abs(dx) + Math.abs(dy) < DIRECTION_LOCK_THRESHOLD) return;
+                touchState.locked = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+            }
+
+            if (touchState.locked === 'horizontal') {
+                e.preventDefault();
+                // Swipe left (negative dx) → scroll down → next slide
+                container.scrollTop = touchState.startScrollTop - dx * getScrollMultiplier();
+            }
+            // Vertical swipes pass through to browser (existing scroll behavior)
+        };
+
+        const onTouchEnd = () => { touchState = null; };
+
+        // --- Mouse drag (desktop) ---
+        let mouseState: {
+            startX: number;
+            startScrollTop: number;
+        } | null = null;
+
+        const onMouseDown = (e: MouseEvent) => {
+            if ((e.target as HTMLElement).closest('button, a, input')) return;
+            mouseState = {
+                startX: e.clientX,
+                startScrollTop: container.scrollTop
+            };
+            wrapper.style.cursor = 'grabbing';
+            e.preventDefault();
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!mouseState) return;
+            const dx = e.clientX - mouseState.startX;
+            if (Math.abs(dx) > 5) {
+                container.scrollTop = mouseState.startScrollTop - dx * getScrollMultiplier();
+            }
+        };
+
+        const onMouseUp = () => {
+            mouseState = null;
+            wrapper.style.cursor = '';
+        };
+
+        // --- Horizontal wheel/trackpad (desktop) ---
+        const onWheel = (e: WheelEvent) => {
+            if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 1) {
+                e.preventDefault();
+                container.scrollTop += e.deltaX * getScrollMultiplier();
+            }
+        };
+
+        wrapper.addEventListener('touchstart', onTouchStart, { passive: true });
+        wrapper.addEventListener('touchmove', onTouchMove, { passive: false });
+        wrapper.addEventListener('touchend', onTouchEnd);
+        wrapper.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        wrapper.addEventListener('wheel', onWheel, { passive: false });
+
+        return () => {
+            wrapper.removeEventListener('touchstart', onTouchStart);
+            wrapper.removeEventListener('touchmove', onTouchMove);
+            wrapper.removeEventListener('touchend', onTouchEnd);
+            wrapper.removeEventListener('mousedown', onMouseDown);
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            wrapper.removeEventListener('wheel', onWheel);
+        };
+    }, [containerRef]);
 
     return (
         <section ref={sectionRef} className="idol-scroll-section">
-            <div className="idol-sticky-wrapper">
-                {/* Horizontal Track */}
+            <div ref={wrapperRef} className="idol-sticky-wrapper">
                 <motion.div
                     className="idol-horizontal-track"
                     style={{ x: springX }}
