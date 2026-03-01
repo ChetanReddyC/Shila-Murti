@@ -20,33 +20,33 @@ const fetchOrderDataStep = createStep(
 
       // Fetch complete order data with all relations
       const orderData = await remoteQuery({
-      entryPoint: "order",
-      fields: [
-        "id",
-        "display_id",
-        "status",
-        "created_at",
-        "currency_code",
-        "email",
-        "subtotal",
-        "shipping_total",
-        "tax_total",
-        "total",
-        "discount_total",
-        "items.*",
-        "items.variant.*",
-        "items.variant.product.*",
-        "shipping_address.*",
-        "billing_address.*",
-        "shipping_methods.*",
-        "payment_collections.*",
-        "payment_collections.payments.*",
-        "customer.*",
-      ],
-      variables: {
-        filters: { id: order_id },
-      },
-    })
+        entryPoint: "order",
+        fields: [
+          "id",
+          "display_id",
+          "status",
+          "created_at",
+          "currency_code",
+          "email",
+          "subtotal",
+          "shipping_total",
+          "tax_total",
+          "total",
+          "discount_total",
+          "items.*",
+          "items.variant.*",
+          "items.variant.product.*",
+          "shipping_address.*",
+          "billing_address.*",
+          "shipping_methods.*",
+          "payment_collections.*",
+          "payment_collections.payments.*",
+          "customer.*",
+        ],
+        variables: {
+          filters: { id: order_id },
+        },
+      })
 
       if (!orderData || orderData.length === 0) {
         throw new Error(`Order with ID ${order_id} not found`)
@@ -122,7 +122,7 @@ const generatePdfStep = createStep(
         doc.fontSize(12).font("Helvetica-Bold").text("Project Shilamurthi", 400, 50, { align: "right" })
         doc.fontSize(10).font("Helvetica").text("Your Store Address", 400, 68, { align: "right" })
         doc.text("City, State, ZIP", 400, 82, { align: "right" })
-        doc.text("Email: support@shilamurthi.com", 400, 96, { align: "right" })
+        doc.text("Email: support@shilamurti.com", 400, 96, { align: "right" })
 
         // Line separator
         doc.moveTo(50, 130).lineTo(550, 130).stroke()
@@ -180,7 +180,7 @@ const generatePdfStep = createStep(
 
             // Handle long product names
             const itemText = doc.widthOfString(itemTitle) > 260 ? itemTitle.substring(0, 40) + "..." : itemTitle
-            
+
             doc.text(itemText, 50, yPos, { width: 260 })
             doc.text(quantity.toString(), 320, yPos, { width: 40, align: "center" })
             doc.text(formatCurrency(unitPrice, orderData.currency_code), 380, yPos, { width: 80, align: "right" })
@@ -228,10 +228,10 @@ const generatePdfStep = createStep(
         yPos += 40
         doc.fontSize(10).font("Helvetica-Bold").text("Payment Information:", 50, yPos)
         doc.fontSize(9).font("Helvetica")
-        
+
         const paymentStatus = orderData.payment_collections?.[0]?.status || "pending"
         const paymentMethod = orderData.payment_collections?.[0]?.payments?.[0]?.provider_id || "N/A"
-        
+
         doc.text(`Payment Status: ${paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}`, 50, yPos + 15)
         doc.text(`Payment Method: ${paymentMethod}`, 50, yPos + 28)
 

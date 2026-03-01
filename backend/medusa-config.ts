@@ -137,6 +137,9 @@ module.exports = defineConfig({
   // Google Cloud Storage configuration via S3-compatible API
   modules: [
     {
+      resolve: "./src/modules/review",
+    },
+    {
       resolve: "@medusajs/medusa/file",
       options: {
         providers: [

@@ -10,8 +10,8 @@
     position: relative;
     overflow: hidden;
     background: #ffffff;
-    /* Solid background */
     width: 100%;
+    padding: 0;
 }
 
 .shared-smoke-overlay-wrapper {
@@ -116,7 +116,7 @@
     /* CHANGED from center to stretch so visual col takes full height */
     justify-content: space-between;
     min-height: 110vh;
-    padding: 4rem 0;
+    padding: 1rem 0;
     gap: 4rem;
 }
 
