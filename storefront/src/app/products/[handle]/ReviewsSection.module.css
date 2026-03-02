@@ -160,9 +160,10 @@
 .reviewsGridExpanded {
   /* Height is set dynamically via inline styles */
   overflow-y: auto;
+  scroll-behavior: smooth;
 }
 
-/* Hide scrollbar for cleaner look if desired, or keep minimal */
+/* Minimal scrollbar */
 .reviewsGridExpanded::-webkit-scrollbar {
   width: 4px;
 }
@@ -174,6 +175,12 @@
 .reviewsGridExpanded::-webkit-scrollbar-thumb {
   background-color: #e5e7eb;
   border-radius: 20px;
+}
+
+/* Firefox scrollbar */
+.reviewsGridExpanded {
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
 }
 
 @media (min-width: 768px) {
@@ -340,7 +347,7 @@
 
 @media (min-width: 768px) {
   .bottomToggleWrapper {
-    display: none;
+    margin-top: 2rem;
   }
 }
 

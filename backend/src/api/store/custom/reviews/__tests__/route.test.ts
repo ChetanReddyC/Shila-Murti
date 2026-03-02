@@ -50,6 +50,7 @@ function createReq(overrides: Record<string, any> = {}): any {
 function mockReviewService(overrides: Record<string, any> = {}) {
     return {
         listProductReviews: jest.fn().mockResolvedValue([]),
+        listAndCountProductReviews: jest.fn().mockResolvedValue([[], 0]),
         createProductReviews: jest.fn().mockResolvedValue({ id: "rev_new" }),
         updateProductReviews: jest.fn().mockResolvedValue({ id: "rev_upd" }),
         ...overrides,
@@ -93,11 +94,11 @@ describe("GET /store/custom/reviews", () => {
         expect(res._json.message).toMatch(/product_id/i)
     })
 
-    it("returns reviews for a valid product_id", async () => {
+    it("returns reviews and pagination metadata for a valid product_id", async () => {
         const reviews = [
             { id: "rev_1", product_id: "prod_1", customer_id: "cust_1", author_name: "Alice", rating: 5, content: "Wonderful!" },
         ]
-        const reviewSvc = mockReviewService({ listProductReviews: jest.fn().mockResolvedValue(reviews) })
+        const reviewSvc = mockReviewService({ listAndCountProductReviews: jest.fn().mockResolvedValue([reviews, 1]) })
         const customerSvc = mockCustomerService({
             listCustomers: jest.fn().mockResolvedValue([
                 { id: "cust_1", first_name: "Alice", last_name: "Smith" },
@@ -114,9 +115,13 @@ describe("GET /store/custom/reviews", () => {
         expect(res._status).toBe(200)
         expect(res._json.reviews).toHaveLength(1)
         expect(res._json.reviews[0].account_name).toBe("Alice Smith")
+        expect(res._json.count).toBe(1)
+        expect(res._json.page).toBe(1)
+        expect(res._json.limit).toBe(10)
+        expect(res._json.totalPages).toBe(1)
     })
 
-    it("passes correct filter and ordering to listProductReviews", async () => {
+    it("passes correct filter, ordering, skip, and take to listAndCountProductReviews", async () => {
         const reviewSvc = mockReviewService()
         const req = createReq({
             query: { product_id: "prod_99" },
@@ -126,9 +131,93 @@ describe("GET /store/custom/reviews", () => {
 
         await GET(req, res as any)
 
-        expect(reviewSvc.listProductReviews).toHaveBeenCalledWith(
+        expect(reviewSvc.listAndCountProductReviews).toHaveBeenCalledWith(
             { product_id: "prod_99" },
-            { order: { created_at: "DESC" } },
+            { order: { created_at: "DESC" }, skip: 0, take: 10 },
+        )
+    })
+
+    it("uses page and limit query params to calculate skip/take", async () => {
+        const reviewSvc = mockReviewService()
+        const req = createReq({
+            query: { product_id: "prod_1", page: "3", limit: "5" },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await GET(req, res as any)
+
+        // page=3, limit=5 → skip=(3-1)*5=10, take=5
+        expect(reviewSvc.listAndCountProductReviews).toHaveBeenCalledWith(
+            { product_id: "prod_1" },
+            { order: { created_at: "DESC" }, skip: 10, take: 5 },
+        )
+    })
+
+    it("returns correct page metadata with page=2, limit=10, total=25", async () => {
+        const reviews = Array.from({ length: 10 }, (_, i) => ({ id: `rev_${i}`, customer_id: null }))
+        const reviewSvc = mockReviewService({ listAndCountProductReviews: jest.fn().mockResolvedValue([reviews, 25]) })
+        const req = createReq({
+            query: { product_id: "prod_1", page: "2", limit: "10" },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await GET(req, res as any)
+
+        expect(res._json.count).toBe(25)
+        expect(res._json.page).toBe(2)
+        expect(res._json.limit).toBe(10)
+        expect(res._json.totalPages).toBe(3)
+    })
+
+    it("defaults page to 1 and limit to 10 when params are missing", async () => {
+        const reviewSvc = mockReviewService()
+        const req = createReq({
+            query: { product_id: "prod_1" },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await GET(req, res as any)
+
+        expect(reviewSvc.listAndCountProductReviews).toHaveBeenCalledWith(
+            { product_id: "prod_1" },
+            { order: { created_at: "DESC" }, skip: 0, take: 10 },
+        )
+        expect(res._json.page).toBe(1)
+        expect(res._json.limit).toBe(10)
+    })
+
+    it("clamps limit to max 50", async () => {
+        const reviewSvc = mockReviewService()
+        const req = createReq({
+            query: { product_id: "prod_1", limit: "999" },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await GET(req, res as any)
+
+        expect(reviewSvc.listAndCountProductReviews).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.objectContaining({ take: 50 }),
+        )
+    })
+
+    it("clamps page to minimum 1 when invalid value given", async () => {
+        const reviewSvc = mockReviewService()
+        const req = createReq({
+            query: { product_id: "prod_1", page: "-5" },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await GET(req, res as any)
+
+        expect(reviewSvc.listAndCountProductReviews).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.objectContaining({ skip: 0 }),
         )
     })
 
@@ -146,7 +235,7 @@ describe("GET /store/custom/reviews", () => {
         const req = createReq({
             query: { product_id: "prod_1" },
             scope: scopeResolving({
-                reviewModule: mockReviewService({ listProductReviews: jest.fn().mockResolvedValue(reviews) }),
+                reviewModule: mockReviewService({ listAndCountProductReviews: jest.fn().mockResolvedValue([reviews, 2]) }),
                 customerModule: customerSvc,
             }),
         })
@@ -170,7 +259,7 @@ describe("GET /store/custom/reviews", () => {
         const req = createReq({
             query: { product_id: "prod_1" },
             scope: scopeResolving({
-                reviewModule: mockReviewService({ listProductReviews: jest.fn().mockResolvedValue(reviews) }),
+                reviewModule: mockReviewService({ listAndCountProductReviews: jest.fn().mockResolvedValue([reviews, 1]) }),
                 customerModule: customerSvc,
             }),
         })
@@ -185,7 +274,7 @@ describe("GET /store/custom/reviews", () => {
         const reviews = [
             { id: "rev_1", product_id: "prod_1", customer_id: null, author_name: "Anon", rating: 3, content: "Ok" },
         ]
-        const reviewSvc = mockReviewService({ listProductReviews: jest.fn().mockResolvedValue(reviews) })
+        const reviewSvc = mockReviewService({ listAndCountProductReviews: jest.fn().mockResolvedValue([reviews, 1]) })
         const req = createReq({
             query: { product_id: "prod_1" },
             scope: scopeResolving({ reviewModule: reviewSvc }),
@@ -205,7 +294,7 @@ describe("GET /store/custom/reviews", () => {
         const req = createReq({
             query: { product_id: "prod_1" },
             scope: scopeResolving({
-                reviewModule: mockReviewService({ listProductReviews: jest.fn().mockResolvedValue(reviews) }),
+                reviewModule: mockReviewService({ listAndCountProductReviews: jest.fn().mockResolvedValue([reviews, 1]) }),
                 customerModule: { listCustomers: jest.fn().mockRejectedValue(new Error("DB down")) },
             }),
         })
@@ -215,15 +304,14 @@ describe("GET /store/custom/reviews", () => {
 
         expect(res._status).toBe(200)
         expect(res._json.reviews).toHaveLength(1)
-        // account_name was never added because enrichment threw
         expect(res._json.reviews[0].account_name).toBeUndefined()
     })
 
-    it("returns 500 when listProductReviews throws", async () => {
+    it("returns 500 when listAndCountProductReviews throws", async () => {
         const req = createReq({
             query: { product_id: "prod_1" },
             scope: scopeResolving({
-                reviewModule: { listProductReviews: jest.fn().mockRejectedValue(new Error("DB error")) },
+                reviewModule: { listAndCountProductReviews: jest.fn().mockRejectedValue(new Error("DB error")) },
             }),
         })
         const res = createRes()
@@ -247,7 +335,7 @@ describe("GET /store/custom/reviews", () => {
         const req = createReq({
             query: { product_id: "prod_1" },
             scope: scopeResolving({
-                reviewModule: mockReviewService({ listProductReviews: jest.fn().mockResolvedValue(reviews) }),
+                reviewModule: mockReviewService({ listAndCountProductReviews: jest.fn().mockResolvedValue([reviews, 2]) }),
                 customerModule: customerSvc,
             }),
         })
@@ -255,7 +343,6 @@ describe("GET /store/custom/reviews", () => {
 
         await GET(req, res as any)
 
-        // listCustomers should receive deduplicated IDs
         const calledIds = customerSvc.listCustomers.mock.calls[0][0].id
         expect(calledIds).toEqual(["cust_dup"])
     })
@@ -453,7 +540,8 @@ describe("POST /store/custom/reviews", () => {
         const payload = reviewSvc.createProductReviews.mock.calls[0][0]
         expect(payload.product_id).toBe("prod_1")
         expect(payload.author_name).toBe("Evil User")
-        expect(payload.content).toBe("alert('xss')Great product!")
+        // sanitize-html strips <script> tags AND their content (stricter than regex)
+        expect(payload.content).toBe("Great product!")
         expect(payload.product_id).not.toContain("<")
         expect(payload.author_name).not.toContain("<")
         expect(payload.content).not.toContain("<")
@@ -589,6 +677,121 @@ describe("POST /store/custom/reviews", () => {
             product_id: "prod_dup",
             customer_id: "cust_p17",
         })
+    })
+
+    // ── New: unique constraint violation (race condition catch) ────
+
+    it("returns 409 when DB throws a PostgreSQL unique constraint violation (code 23505)", async () => {
+        const uniqueViolationError = Object.assign(new Error("duplicate key"), { code: "23505" })
+        const reviewSvc = mockReviewService({
+            listProductReviews: jest.fn().mockResolvedValue([]),
+            createProductReviews: jest.fn().mockRejectedValue(uniqueViolationError),
+        })
+        const req = createReq({
+            customer_id: "cust_race",
+            body: { product_id: "prod_1", author_name: "John", content: "Good", rating: 5 },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await POST(req, res as any)
+
+        expect(res.status).toHaveBeenCalledWith(409)
+        expect(res._json.message).toMatch(/already reviewed/i)
+    })
+
+    it("returns 409 when DB error detail mentions 'already exists' (constraint violation variant)", async () => {
+        const uniqueViolationError = Object.assign(new Error("unique violation"), {
+            detail: "Key (product_id, customer_id)=(prod_1, cust_race2) already exists.",
+        })
+        const reviewSvc = mockReviewService({
+            listProductReviews: jest.fn().mockResolvedValue([]),
+            createProductReviews: jest.fn().mockRejectedValue(uniqueViolationError),
+        })
+        const req = createReq({
+            customer_id: "cust_race2",
+            body: { product_id: "prod_1", author_name: "John", content: "Good", rating: 5 },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await POST(req, res as any)
+
+        expect(res.status).toHaveBeenCalledWith(409)
+        expect(res._json.message).toMatch(/already reviewed/i)
+    })
+
+    it("returns 500 (not 409) when createProductReviews throws a non-unique error", async () => {
+        const otherError = Object.assign(new Error("DB write error"), { code: "42000" })
+        const reviewSvc = mockReviewService({
+            listProductReviews: jest.fn().mockResolvedValue([]),
+            createProductReviews: jest.fn().mockRejectedValue(otherError),
+        })
+        const req = createReq({
+            customer_id: "cust_p16b",
+            body: { product_id: "prod_1", author_name: "John", content: "Good", rating: 5 },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await POST(req, res as any)
+
+        expect(res.status).toHaveBeenCalledWith(500)
+        expect(res._json.message).toMatch(/failed/i)
+    })
+
+    // ── New: sanitize-html bypass tests (stronger than regex) ─────
+
+    it("strips HTML entities that bypass regex but sanitize-html catches", async () => {
+        const reviewSvc = mockReviewService({
+            listProductReviews: jest.fn().mockResolvedValue([]),
+            createProductReviews: jest.fn().mockResolvedValue({ id: "rev_entity" }),
+        })
+        const req = createReq({
+            customer_id: "cust_entity",
+            body: {
+                product_id: "prod_1",
+                author_name: "John",
+                content: "Great &#60;script&#62;alert(1)&#60;/script&#62; product!",
+                rating: 5,
+            },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await POST(req, res as any)
+
+        const payload = reviewSvc.createProductReviews.mock.calls[0][0]
+        // sanitize-html decodes entities and strips the resulting tags
+        expect(payload.content).not.toContain("<script>")
+        expect(payload.content).not.toContain("&#60;")
+    })
+
+    it("strips malformed tags that slip past naive regex", async () => {
+        const reviewSvc = mockReviewService({
+            listProductReviews: jest.fn().mockResolvedValue([]),
+            createProductReviews: jest.fn().mockResolvedValue({ id: "rev_malformed" }),
+        })
+        const req = createReq({
+            customer_id: "cust_malformed",
+            body: {
+                product_id: "prod_1",
+                author_name: "John",
+                // malformed tag with text after — sanitize-html strips the tag, keeps the text
+                content: "Good product! <img src=x onerror=alert(1)>",
+                rating: 5,
+            },
+            scope: scopeResolving({ reviewModule: reviewSvc }),
+        })
+        const res = createRes()
+
+        await POST(req, res as any)
+
+        expect(res.status).toHaveBeenCalledWith(201)
+        const payload = reviewSvc.createProductReviews.mock.calls[0][0]
+        expect(payload.content).not.toContain("onerror")
+        expect(payload.content).not.toContain("<img")
+        expect(payload.content).toContain("Good product!")
     })
 })
 
@@ -852,7 +1055,8 @@ describe("PUT /store/custom/reviews", () => {
         await PUT(req, res as any)
 
         const arg = reviewSvc.updateProductReviews.mock.calls[0][0]
-        expect(arg.content).toBe("Bold text alert(1)")
+        // sanitize-html strips <script> tags AND their content
+        expect(arg.content).toBe("Bold text")
         expect(arg.content).not.toContain("<")
     })
 
