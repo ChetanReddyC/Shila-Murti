@@ -1,5 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
+import sanitizeHtml from "sanitize-html"
 import ReviewModuleService from "../../../../modules/review/service"
 import { REVIEW_MODULE } from "../../../../modules/review"
 
@@ -29,7 +30,7 @@ function isRateLimited(customerId: string): boolean {
 // Sanitisation helpers — strip HTML tags and enforce length limits.
 // ────────────────────────────────────────────────────────────────
 function stripHtml(input: string): string {
-    return input.replace(/<[^>]*>/g, "")
+    return sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} })
 }
 
 function sanitiseString(raw: unknown, maxLength: number): string | null {
@@ -40,9 +41,9 @@ function sanitiseString(raw: unknown, maxLength: number): string | null {
 }
 
 // ────────────────────────────────────────────────────────────────
-// GET /store/custom/reviews?product_id=prod_xxx
+// GET /store/custom/reviews?product_id=prod_xxx&page=1&limit=10
 // Public — no auth needed.
-// Returns all reviews for the given product, newest first,
+// Returns paginated reviews for the given product, newest first,
 // enriched with the customer's full account name.
 // ────────────────────────────────────────────────────────────────
 export async function GET(
@@ -56,12 +57,17 @@ export async function GET(
         return
     }
 
+    // Parse pagination params with sane defaults
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1)
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 10))
+    const skip = (page - 1) * limit
+
     try {
         const reviewService: ReviewModuleService = req.scope.resolve(REVIEW_MODULE)
 
-        const reviews = await reviewService.listProductReviews(
+        const [reviews, count] = await reviewService.listAndCountProductReviews(
             { product_id: productId },
-            { order: { created_at: "DESC" } }
+            { order: { created_at: "DESC" }, skip, take: limit }
         )
 
         // Enrich reviews with customer full name from Medusa customer records
@@ -86,10 +92,11 @@ export async function GET(
             }
         } catch (err: any) {
             console.warn("[Reviews][GET] Could not enrich with customer names:", err?.message)
-            // Continue with reviews without account_name — non-critical
         }
 
-        res.json({ reviews: enrichedReviews })
+        const totalPages = Math.ceil(count / limit)
+
+        res.json({ reviews: enrichedReviews, count, page, limit, totalPages })
     } catch (error: any) {
         console.error("[Reviews][GET] Error fetching reviews:", error?.message)
         res.status(500).json({ message: "Failed to fetch reviews" })
@@ -148,7 +155,7 @@ export async function POST(
     try {
         const reviewService: ReviewModuleService = req.scope.resolve(REVIEW_MODULE)
 
-        // Enforce one review per customer per product
+        // Enforce one review per customer per product (application-level fast path)
         const existing = await reviewService.listProductReviews({
             product_id: sanitisedProductId,
             customer_id: customerId,
@@ -159,13 +166,25 @@ export async function POST(
             return
         }
 
-        const created = await reviewService.createProductReviews({
-            product_id: sanitisedProductId,
-            customer_id: customerId,
-            author_name: sanitisedAuthorName,
-            rating: parsedRating,
-            content: sanitisedContent,
-        })
+        let created
+        try {
+            created = await reviewService.createProductReviews({
+                product_id: sanitisedProductId,
+                customer_id: customerId,
+                author_name: sanitisedAuthorName,
+                rating: parsedRating,
+                content: sanitisedContent,
+            })
+        } catch (insertError: any) {
+            // Catch unique constraint violation (PostgreSQL error code 23505)
+            // Handles the race condition where two concurrent requests
+            // both pass the SELECT check above
+            if (insertError?.code === "23505" || insertError?.detail?.includes("already exists")) {
+                res.status(409).json({ message: "You have already reviewed this product" })
+                return
+            }
+            throw insertError
+        }
 
         res.status(201).json({ review: created })
     } catch (error: any) {

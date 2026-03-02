@@ -38,6 +38,10 @@ export interface SubmitReviewPayload {
 
 export interface ReviewsResponse {
     reviews: Review[]
+    count: number
+    page: number
+    limit: number
+    totalPages: number
 }
 
 export interface ReviewResponse {
@@ -53,14 +57,21 @@ export interface ReviewError {
 // ── API Functions ──
 
 /**
- * Fetch all reviews for a product (public, no auth needed).
+ * Fetch paginated reviews for a product (public, no auth needed).
  */
-export async function fetchReviews(productId: string): Promise<Review[]> {
-    const res = await fetch(`/api/reviews?product_id=${encodeURIComponent(productId)}`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        credentials: 'include',
-    })
+export async function fetchReviews(
+    productId: string,
+    page: number = 1,
+    limit: number = 10
+): Promise<ReviewsResponse> {
+    const res = await fetch(
+        `/api/reviews?product_id=${encodeURIComponent(productId)}&page=${page}&limit=${limit}`,
+        {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'include',
+        }
+    )
 
     if (!res.ok) {
         const errData = await res.json().catch(() => ({ message: 'Failed to fetch reviews' }))
@@ -68,7 +79,7 @@ export async function fetchReviews(productId: string): Promise<Review[]> {
     }
 
     const data: ReviewsResponse = await res.json()
-    return data.reviews || []
+    return data
 }
 
 /**

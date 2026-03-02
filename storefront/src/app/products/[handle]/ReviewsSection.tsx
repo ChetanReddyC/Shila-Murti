@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './ProductDetailPage.module.css';
 import reviewStyles from './ReviewsSection.module.css';
 import { useSession } from 'next-auth/react';
@@ -69,6 +69,11 @@ function StarPicker({
 }
 
 // ────────────────────────────────────────────────────────────────
+// Constants
+// ────────────────────────────────────────────────────────────────
+const REVIEWS_PER_PAGE = 10;
+
+// ────────────────────────────────────────────────────────────────
 // Main component
 // ────────────────────────────────────────────────────────────────
 
@@ -85,7 +90,17 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
+
+  // ── Pagination state ──
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // ── Grid ref + locked height (fits ~5 reviews, scrollable internally) ──
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [gridHeight, setGridHeight] = useState<number | undefined>(undefined);
 
   // ── Write-review form state ──
   const [showForm, setShowForm] = useState(false);
@@ -102,10 +117,6 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
   // ── Edit state ──
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
 
-  // ── Expand/collapse helpers ──
-  const [fixedHeight, setFixedHeight] = useState<number | undefined>(undefined);
-  const gridRef = React.useRef<HTMLDivElement>(null);
-
   // ── Fetch reviews on mount ──
   useEffect(() => {
     if (!productId) return;
@@ -114,9 +125,15 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
     setLoading(true);
     setFetchError(null);
 
-    fetchReviews(productId)
+    fetchReviews(productId, 1, REVIEWS_PER_PAGE)
       .then((data) => {
-        if (!cancelled) setReviews(data);
+        if (!cancelled) {
+          setReviews(data.reviews);
+          setTotalCount(data.count);
+          setTotalPages(data.totalPages);
+          setPage(data.page);
+          setHasMore(data.page < data.totalPages);
+        }
       })
       .catch((err) => {
         if (!cancelled) setFetchError(err.message || 'Failed to load reviews');
@@ -130,6 +147,74 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
     };
   }, [productId]);
 
+  // ── Lock grid height on mobile only (flex-column) so it fits ~3 cards ──
+  useEffect(() => {
+    if (!loading && reviews.length > 0 && !gridHeight && gridRef.current) {
+      // Only lock height on mobile (< 768px matches the CSS breakpoint)
+      if (window.innerWidth >= 768) return;
+
+      requestAnimationFrame(() => {
+        const grid = gridRef.current;
+        if (!grid) return;
+        const children = Array.from(grid.children) as HTMLElement[];
+        const limit = Math.min(children.length, 3);
+        if (limit === 0) return;
+
+        const style = getComputedStyle(grid);
+        const gap = parseFloat(style.gap) || parseFloat(style.rowGap) || 0;
+
+        let height = 0;
+        for (let i = 0; i < limit; i++) {
+          height += children[i].offsetHeight;
+          if (i < limit - 1) height += gap;
+        }
+        height += parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+        setGridHeight(height);
+      });
+    }
+  }, [loading, reviews.length, gridHeight]);
+
+  // ── Load more handler ──
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    const prevCount = reviews.length;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const data = await fetchReviews(productId, nextPage, REVIEWS_PER_PAGE);
+      setReviews((prev) => [...prev, ...data.reviews]);
+      setPage(data.page);
+      setTotalCount(data.count);
+      setTotalPages(data.totalPages);
+      setHasMore(data.page < data.totalPages);
+
+      // Smooth scroll to the first newly loaded review
+      requestAnimationFrame(() => {
+        const grid = gridRef.current;
+        if (grid) {
+          const firstNewItem = grid.children[prevCount] as HTMLElement;
+          if (firstNewItem) {
+            if (gridHeight) {
+              // Mobile: scroll inside the locked-height grid
+              grid.scrollTo({
+                top: firstNewItem.offsetTop - parseFloat(getComputedStyle(grid).paddingTop),
+                behavior: 'smooth',
+              });
+            } else {
+              // Desktop: scroll the page to the new review
+              firstNewItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        }
+      });
+    } catch (err: any) {
+      console.error('[ReviewsSection] Load more failed:', err?.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [productId, page, loadingMore, hasMore, reviews.length]);
+
   // ── Computed values ──
   const average =
     reviews.length > 0
@@ -138,42 +223,14 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
       ) / 10
       : 0;
 
-  const visibleReviews = isExpanded ? reviews : reviews.slice(0, 3);
-
-  // ── Expand/collapse scroll ──
-  useEffect(() => {
-    if (isExpanded && gridRef.current) {
-      const grid = gridRef.current;
-      const firstNewItem = grid.children[3] as HTMLElement;
-      if (firstNewItem) {
-        requestAnimationFrame(() => {
-          grid.scrollTo({ top: firstNewItem.offsetTop - 12, behavior: 'smooth' });
-        });
-      }
-    }
-  }, [isExpanded]);
-
-  const toggleExpand = useCallback(() => {
-    if (!isExpanded) {
-      if (gridRef.current) setFixedHeight(gridRef.current.offsetHeight);
-      setIsExpanded(true);
-    } else {
-      setIsExpanded(false);
-      setFixedHeight(undefined);
-      if (gridRef.current) gridRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [isExpanded]);
-
   // ── "Write a Review" click handler (auth-gated) ──
   const handleWriteReviewClick = useCallback(() => {
     if (sessionStatus === 'authenticated' && customerId) {
-      // User is logged in — open the form directly
       setShowForm(true);
       setSubmitError(null);
       setSubmitSuccess(false);
       setEditingReviewId(null);
     } else {
-      // Not logged in — show login modal
       setShowLoginModal(true);
     }
   }, [sessionStatus, customerId]);
@@ -181,7 +238,6 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
   // ── Login modal success → open form ──
   const handleLoginSuccess = useCallback(() => {
     setShowLoginModal(false);
-    // After login, open the review form
     setShowForm(true);
     setSubmitError(null);
     setSubmitSuccess(false);
@@ -214,7 +270,6 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      // Client-side validation
       if (!authorName.trim()) {
         setSubmitError('Please enter your name');
         return;
@@ -241,7 +296,6 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
             content: content.trim(),
           });
 
-          // Update review in place
           setReviews((prev) =>
             prev.map((r) => (r.id === editingReviewId ? { ...r, ...updatedReview } : r))
           );
@@ -254,20 +308,18 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
             content: content.trim(),
           });
 
-          // Optimistic update — prepend review to the list
           setReviews((prev) => [newReview, ...prev]);
+          setTotalCount((prev) => prev + 1);
         }
 
         setSubmitSuccess(true);
 
-        // Reset form after a short delay
         setTimeout(() => {
           closeForm();
           setSubmitSuccess(false);
         }, 2000);
       } catch (err: any) {
         if (err instanceof ReviewAuthError) {
-          // Session expired mid-flow — show login modal
           setShowLoginModal(true);
         } else {
           setSubmitError(err.message || 'Failed to submit review');
@@ -334,7 +386,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
               ))}
             </div>
             <span className={reviewStyles.reviewCount}>
-              {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+              {totalCount} {totalCount === 1 ? 'review' : 'reviews'}
             </span>
           </div>
         )}
@@ -406,7 +458,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
 
               {/* Error message */}
               {submitError && (
-                <div className={reviewStyles.formError}>
+                <div className={reviewStyles.formError} role="alert">
                   {submitError}
                 </div>
               )}
@@ -478,10 +530,10 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
 
           <div
             ref={gridRef}
-            className={`${reviewStyles.reviewsGrid} ${isExpanded ? reviewStyles.reviewsGridExpanded : ''}`}
-            style={{ height: isExpanded && fixedHeight ? `${fixedHeight}px` : undefined }}
+            className={`${reviewStyles.reviewsGrid} ${gridHeight ? reviewStyles.reviewsGridExpanded : ''}`}
+            style={gridHeight ? { height: gridHeight } : undefined}
           >
-            {visibleReviews.map((r) => (
+            {reviews.map((r) => (
               <article key={r.id} className={reviewStyles.reviewCard}>
                 <header className={reviewStyles.cardHeader}>
                   <div className={reviewStyles.authorMeta}>
@@ -494,7 +546,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
                       )}
                     </div>
                     <div className={reviewStyles.subMeta}>
-                      <div className={reviewStyles.starsContainer}>
+                      <div className={reviewStyles.starsContainer} aria-label={`Rating: ${r.rating} out of 5 stars`}>
                         {[1, 2, 3, 4, 5].map((i) => (
                           <Star key={i} filled={i <= r.rating} />
                         ))}
@@ -523,16 +575,20 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
               </article>
             ))}
           </div>
-        </>
-      )}
 
-      {/* Toggle button */}
-      {reviews.length > 3 && (
-        <div className={reviewStyles.bottomToggleWrapper}>
-          <button onClick={toggleExpand} className={reviewStyles.controlBtn}>
-            {isExpanded ? 'Show Less' : `Show ${reviews.length - 3} More`}
-          </button>
-        </div>
+          {/* Load More button */}
+          {hasMore && (
+            <div className={reviewStyles.bottomToggleWrapper}>
+              <button
+                onClick={loadMore}
+                className={reviewStyles.controlBtn}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Loading...' : `Load More (${totalCount - reviews.length} remaining)`}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       <div id="write-review" className={reviewStyles.srOnly} aria-hidden="true" />

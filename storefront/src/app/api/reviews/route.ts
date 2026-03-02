@@ -47,9 +47,13 @@ export async function GET(req: NextRequest) {
         )
     }
 
+    // Forward pagination params
+    const page = url.searchParams.get('page') || '1'
+    const limit = url.searchParams.get('limit') || '10'
+
     try {
         const baseUrl = getStoreBaseUrl()
-        const endpoint = `${baseUrl}/store/custom/reviews?product_id=${encodeURIComponent(productId)}`
+        const endpoint = `${baseUrl}/store/custom/reviews?product_id=${encodeURIComponent(productId)}&page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`
         const apiKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
 
         const res = await fetch(endpoint, {
