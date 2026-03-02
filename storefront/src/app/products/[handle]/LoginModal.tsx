@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { signIn } from 'next-auth/react';
 import { usePasskey, PublicKeyRequestOptionsJSON } from '@/hooks/usePasskey';
 import { setCustomerId as setCustomerIdHybrid } from '../../../utils/hybridCustomerStorage';
+import LoadingScreen from '@/components/LoadingScreen';
 import modalStyles from './LoginModal.module.css';
 
 interface LoginModalProps {
@@ -68,6 +69,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
     const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const autoSubmitTimerRef = useRef<any>(null);
 
+    // Loading screen state
+    const [showLoadingScreen, setShowLoadingScreen] = useState(false);
+
     // Magic link state
     const [magicSending, setMagicSending] = useState(false);
     const magicPollTimerRef = useRef<any>(null);
@@ -89,6 +93,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
             setOtpSending(false);
             setOtpVerifying(false);
             setMagicSending(false);
+            setShowLoadingScreen(false);
             setConditionalUIActive(false);
             conditionalUIStartedRef.current = false;
             if (magicPollTimerRef.current) clearInterval(magicPollTimerRef.current);
@@ -158,6 +163,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
 
                 if (data) {
                     console.log('[LoginModal ConditionalUI] Passkey selected from autofill!');
+                    setShowLoadingScreen(true);
                     setStatus('Authenticating with passkey...');
 
                     // Verify the passkey
@@ -172,6 +178,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
                     });
 
                     if (!verifyRes.ok) {
+                        setShowLoadingScreen(false);
                         setError('Passkey authentication failed');
                         return;
                     }
@@ -243,7 +250,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
     // ── Step 1: Continue with identifier ──
     const handleContinue = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
-        setStatus('Checking sign-in options…');
         setError('');
 
         const val = identifier.trim();
@@ -251,6 +257,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
             setError('Please enter your phone number or email');
             return;
         }
+
+        setShowLoadingScreen(true);
+        setStatus('Checking sign-in options…');
 
         const id: Identifier = isEmail ? { email: val } : { phone: val };
 
@@ -316,6 +325,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
             console.error('[LoginModal] Error checking passkey:', err);
         }
 
+        setShowLoadingScreen(false);
         setStatus('');
 
         // ── Fall back to OTP / magic link ──
@@ -450,6 +460,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
 
     // ── Complete auth: ensure customer + signIn ──
     const completeAuth = async (identifierValue: string, type: 'phone' | 'email', hasPasskey: boolean) => {
+        setShowLoadingScreen(true);
         setStatus('Signing you in…');
         try {
             const payload = type === 'email' ? { email: identifierValue } : { phone: identifierValue };
@@ -491,6 +502,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
                 throw new Error(signInResult?.error || 'Failed to create session');
             }
         } catch (err: any) {
+            setShowLoadingScreen(false);
             setError(err?.message || 'Sign in failed');
             setOtpVerifying(false);
         }
@@ -506,6 +518,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
     if (!open) return null;
 
     return (
+        <>
+        <LoadingScreen
+            show={showLoadingScreen}
+            duration={1200}
+            imagesFolder="/loading-animations"
+            shaderEffect="smoke"
+        />
         <div className={modalStyles.overlay} onClick={onClose}>
             <div className={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
                 {/* Close button */}
@@ -631,6 +650,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose, onSuccess }) => 
                 )}
             </div>
         </div>
+        </>
     );
 };
 
