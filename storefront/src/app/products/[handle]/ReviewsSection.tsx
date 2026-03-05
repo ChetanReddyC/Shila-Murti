@@ -519,15 +519,6 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
         </div>
       ) : (
         <>
-          {/* Write review button when reviews exist */}
-          {!showForm && (
-            <div className={reviewStyles.writeReviewBtnWrapper}>
-              <button className={reviewStyles.writeReviewBtn} onClick={handleWriteReviewClick}>
-                Write a Review
-              </button>
-            </div>
-          )}
-
           <div
             ref={gridRef}
             className={`${reviewStyles.reviewsGrid} ${gridHeight ? reviewStyles.reviewsGridExpanded : ''}`}
@@ -585,6 +576,14 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
                 disabled={loadingMore}
               >
                 {loadingMore ? 'Loading...' : `Load More (${totalCount - reviews.length} remaining)`}
+              </button>
+            </div>
+          )}
+          {/* Write review button when reviews exist */}
+          {!showForm && (
+            <div className={reviewStyles.writeReviewBtnWrapper}>
+              <button className={reviewStyles.writeReviewBtn} onClick={handleWriteReviewClick}>
+                Write a Review
               </button>
             </div>
           )}
