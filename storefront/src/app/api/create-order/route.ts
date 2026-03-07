@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { kvGet } from '@/lib/kv';
 import { storeOrderCartMapping } from '@/lib/cashfreeMapping';
+import { randomUUID } from 'crypto';
 
 interface CustomerDetails {
   id?: string;
@@ -12,7 +13,7 @@ interface CustomerDetails {
 }
 
 interface CreateOrderRequest {
-  orderId: string;
+  orderId?: string; // Ignored — server generates order ID (H2 fix)
   orderAmount: number;
   customer?: CustomerDetails;
   cartId?: string;
@@ -49,9 +50,7 @@ async function validateCheckoutAuth(
       const customerIdCookie = req.cookies.get('customer_id')?.value;
 
       if (customerIdCookie) {
-        console.log('[CREATE_ORDER][cookie_auth_success]', {
-          customerId: customerIdCookie.substring(0, 15) + '...',
-        });
+        console.log('[CREATE_ORDER][cookie_auth_success]');
         return {
           authenticated: true,
           customerId: customerIdCookie,
@@ -69,14 +68,11 @@ async function validateCheckoutAuth(
       console.log('[CREATE_ORDER][session_check]', {
         hasSession: !!session,
         hasCustomerId: !!(session as any)?.customerId,
-        customerId: (session as any)?.customerId,
       });
 
       if (session) {
         // Session exists and is valid (already validated by NextAuth)
-        console.log('[CREATE_ORDER][session_auth_success]', {
-          customerId: (session as any).customerId || customer?.id,
-        });
+        console.log('[CREATE_ORDER][session_auth_success]');
         return {
           authenticated: true,
           customerId: (session as any).customerId || customer?.id,
@@ -96,7 +92,7 @@ async function validateCheckoutAuth(
           const otpMarker = await kvGet(`otp:ok:${phoneKey}`);
 
           if (otpMarker) {
-            console.log('[CREATE_ORDER][otp_auth_success]', { phoneKey });
+            console.log('[CREATE_ORDER][otp_auth_success]');
             return {
               authenticated: true,
               customerId: customer?.id,
@@ -125,7 +121,7 @@ async function validateCheckoutAuth(
           ]);
 
           if (generalMarker || stateMarker) {
-            console.log('[CREATE_ORDER][magic_link_auth_success]', { email });
+            console.log('[CREATE_ORDER][magic_link_auth_success]');
             return {
               authenticated: true,
               customerId: customer?.id,
@@ -142,8 +138,6 @@ async function validateCheckoutAuth(
     console.log('[CREATE_ORDER][auth_check_debug]', {
       hasPhone: !!customer?.phone,
       hasEmail: !!customer?.email,
-      phoneKey: customer?.phone ? normalizePhoneDigits(customer.phone) : null,
-      emailKey: customer?.email ? normalizeEmail(customer.email) : null,
     });
 
     // No valid authentication found
@@ -162,16 +156,32 @@ async function validateCheckoutAuth(
 }
 
 export async function POST(req: NextRequest) {
+  // H1: CSRF protection — validate Origin for browser requests
+  const internalSecret = req.headers.get('x-internal-call')
+  if (internalSecret && internalSecret === process.env.INTERNAL_API_SECRET) {
+    // Server-to-server call (e.g., webhook) — skip CSRF check
+  } else {
+    const origin = req.headers.get('origin')
+    const expectedOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'
+    if (origin && origin !== expectedOrigin) {
+      return NextResponse.json({ error: 'CSRF validation failed' }, { status: 403 })
+    }
+  }
+
   try {
     const body: CreateOrderRequest = await req.json();
-    const { orderId, orderAmount, customer = {}, cartId } = body;
+    const { orderAmount: clientAmount, customer = {}, cartId } = body;
 
-    if (!orderId || !orderAmount) {
+    if (!cartId) {
       return NextResponse.json(
-        { error: 'orderId and orderAmount required' },
+        { error: 'cartId required' },
         { status: 400 }
       );
     }
+
+    // SECURITY FIX H2: Generate order ID server-side with crypto.randomUUID()
+    // Never trust client-generated order IDs (predictable, spoofable, collision-prone)
+    const orderId = `order_${randomUUID().replace(/-/g, '')}`;
 
     // CRITICAL SECURITY: Validate checkout authentication before creating payment
     const authResult = await validateCheckoutAuth(req, customer, cartId);
@@ -200,6 +210,66 @@ export async function POST(req: NextRequest) {
       method: authResult.method,
     });
 
+    // SECURITY FIX C1: Fetch cart total from Medusa (server-authoritative amount)
+    // Never trust client-supplied orderAmount — derive it from the cart on the server
+    const medusaBaseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000';
+    const medusaPublishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
+
+    let serverAmount: number;
+    try {
+      const cartResponse = await fetch(
+        `${medusaBaseUrl}/store/carts/${cartId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-publishable-api-key': medusaPublishableKey || '',
+          },
+        }
+      );
+
+      if (!cartResponse.ok) {
+        console.error('[CREATE_ORDER][cart_fetch_failed]', { cartId, status: cartResponse.status });
+        return NextResponse.json(
+          { error: 'cart_fetch_failed', message: 'Could not verify cart total. Please try again.' },
+          { status: 502 }
+        );
+      }
+
+      const cartData = await cartResponse.json();
+      const cartTotal = cartData?.cart?.total; // Medusa v2 stores INR in rupees (not paise)
+
+      if (typeof cartTotal !== 'number' || cartTotal <= 0) {
+        console.error('[CREATE_ORDER][invalid_cart_total]', { cartId, cartTotal });
+        return NextResponse.json(
+          { error: 'invalid_cart', message: 'Cart total is invalid or zero.' },
+          { status: 400 }
+        );
+      }
+
+      // Medusa v2 already stores amounts in base currency (rupees for INR)
+      // Cashfree also expects rupees — no conversion needed
+      serverAmount = Number(cartTotal.toFixed(2));
+
+      // Sanity check: log if client amount differs significantly (potential manipulation attempt)
+      if (typeof clientAmount === 'number' && Math.abs(clientAmount - serverAmount) > 0.01) {
+        console.warn('[CREATE_ORDER][amount_mismatch_detected]', {
+          orderId,
+          cartId,
+          clientAmount,
+          serverAmount,
+          diff: Math.abs(clientAmount - serverAmount),
+        });
+      }
+    } catch (fetchError) {
+      console.error('[CREATE_ORDER][cart_fetch_error]', { cartId, error: String(fetchError) });
+      // FAIL CLOSED: Do not proceed if we cannot verify the amount
+      return NextResponse.json(
+        { error: 'cart_verification_failed', message: 'Could not verify cart total. Please try again.' },
+        { status: 502 }
+      );
+    }
+
     const CF_BASE =
       process.env.CASHFREE_ENV === 'production'
         ? 'https://api.cashfree.com/pg'
@@ -227,28 +297,40 @@ export async function POST(req: NextRequest) {
 
     const payload = {
       order_id: String(orderId),
-      order_amount: Number(orderAmount),
+      order_amount: serverAmount,
       order_currency: 'INR',
       customer_details: {
         customer_id: safeCustomerId,
         customer_name: customer.name || 'Guest',
-        customer_email: customer.email || '',
-        customer_phone: digitsPhone || '',
+        customer_email: customer.email || 'noreply@shilamurthi.com',
+        customer_phone: digitsPhone || '9999999999',
       },
       order_meta: {
-        return_url: `${appOrigin}/return?order_id=${encodeURIComponent(orderId)}${cartId ? `&cart_id=${encodeURIComponent(cartId)}` : ''
-          }`,
+        // SECURITY FIX C7: Do NOT include cart_id in return URL
+        // Cart ID is resolved server-side from HMAC-signed mapping
+        return_url: `${appOrigin}/return?order_id=${encodeURIComponent(orderId)}`,
         ...(publicNotifyUrl ? { notify_url: publicNotifyUrl } : {}),
       },
     };
+
+    // SECURITY FIX M11: Fail fast if Cashfree credentials are missing
+    const cfClientId = process.env.CASHFREE_CLIENT_ID
+    const cfClientSecret = process.env.CASHFREE_CLIENT_SECRET
+    if (!cfClientId || !cfClientSecret) {
+      console.error('[CREATE_ORDER][missing_credentials] CASHFREE_CLIENT_ID or CASHFREE_CLIENT_SECRET not configured')
+      return NextResponse.json(
+        { error: 'payment_service_unavailable', message: 'Payment service is not configured. Please contact support.' },
+        { status: 503 }
+      )
+    }
 
     const response = await fetch(`${CF_BASE}/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-version': process.env.CASHFREE_API_VERSION || '',
-        'x-client-id': process.env.CASHFREE_CLIENT_ID || '',
-        'x-client-secret': process.env.CASHFREE_CLIENT_SECRET || '',
+        'x-api-version': process.env.CASHFREE_API_VERSION || '2023-08-01',
+        'x-client-id': cfClientId,
+        'x-client-secret': cfClientSecret,
       },
       body: JSON.stringify(payload),
     });
@@ -264,7 +346,7 @@ export async function POST(req: NextRequest) {
     // SECURITY FIX: Store secure order-cart mapping with cryptographic binding
     if (orderId && cartId) {
       try {
-        await storeOrderCartMapping(String(orderId), String(cartId), Number(orderAmount), 'INR', {
+        await storeOrderCartMapping(String(orderId), String(cartId), serverAmount, 'INR', {
           id: customer?.id,
           email: customer?.email,
           phone: customer?.phone,
@@ -279,7 +361,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[CREATE_ORDER][error]', err);
     return NextResponse.json(
-      { error: 'server error', details: String(err) },
+      { error: 'server error', message: 'An unexpected error occurred. Please try again.' },
       { status: 500 }
     );
   }

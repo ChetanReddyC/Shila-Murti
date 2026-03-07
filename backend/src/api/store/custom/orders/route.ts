@@ -47,10 +47,14 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const filters: any = { customer_id: customerId }
     
     if (searchQuery) {
+      // SECURITY FIX C10: Sanitize search input — escape SQL LIKE wildcards and limit length
+      const sanitized = searchQuery
+        .substring(0, 100) // Limit length
+        .replace(/[%_\\]/g, '\\$&') // Escape LIKE wildcards
       filters.$or = [
-        { display_id: { $ilike: `%${searchQuery}%` } },
-        { status: { $ilike: `%${searchQuery}%` } },
-        { fulfillment_status: { $ilike: `%${searchQuery}%` } }
+        { display_id: { $ilike: `%${sanitized}%` } },
+        { status: { $ilike: `%${sanitized}%` } },
+        { fulfillment_status: { $ilike: `%${sanitized}%` } }
       ]
     }
 

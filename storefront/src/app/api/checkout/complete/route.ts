@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { medusaApiClient } from '@/utils/medusaApiClient'
 import { kvGet } from '@/lib/kv'
-import { captureCashfreePayment } from '@/utils/cashfreeCapture'
 import {
   acquireCompletionLock,
-  markCompletionSuccess,
   validateCashfreeOrder,
   releaseCompletionLock,
   generateIdempotencyKey,
 } from '@/utils/orderCompletionGuard'
-import { captureMedusaPayment, getPaymentIdFromOrder } from '@/utils/medusaPaymentCapture'
 import { getOrderCartMapping } from '@/lib/cashfreeMapping'
 import { validateCheckoutAuth, extractCustomerInfo } from '@/utils/checkoutAuthValidation'
 import { refreshAuthSession } from '@/lib/auth/sessionManager'
+import { completeCartFromPayment } from '@/utils/completeCartFromPayment'
 
 export async function POST(req: NextRequest) {
-  console.log('============ COMPLETE API CALLED ============')
-  console.log('============ COMPLETE API CALLED ============')
+  // H1: CSRF protection — validate Origin for browser requests
+  const internalSecret = req.headers.get('x-internal-call')
+  if (internalSecret && internalSecret === process.env.INTERNAL_API_SECRET) {
+    // Server-to-server call (e.g., webhook) — skip CSRF check
+  } else {
+    const origin = req.headers.get('origin')
+    const expectedOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'
+    if (origin && origin !== expectedOrigin) {
+      return NextResponse.json({ error: 'CSRF validation failed' }, { status: 403 })
+    }
+  }
+
   console.log('============ COMPLETE API CALLED ============')
   try {
     const { searchParams } = new URL(req.url)
@@ -28,13 +36,12 @@ export async function POST(req: NextRequest) {
     // Generate idempotency key for this completion attempt (best practice for financial transactions)
     const idempotencyKey = cartId ? generateIdempotencyKey(cartId, orderId) : undefined
 
-    console.log('============ CART ID:', cartId, 'ORDER ID:', orderId, 'CUSTOMER ID:', customerId, '============')
+    console.log('============ CART ID:', cartId, 'ORDER ID:', orderId, '============')
 
     // DEBUG: Log received parameters without sensitive payloads
     console.log('[COMPLETE_API][START]', {
       cartId,
       orderId,
-      customerId,
       customerIdPresent: Boolean(customerId),
       bodyKeys: Object.keys(body || {})
     })
@@ -88,7 +95,6 @@ export async function POST(req: NextRequest) {
       cartId,
       orderId,
       method: authResult.method,
-      customerId: authResult.customerId
     })
 
     // CRITICAL FIX: Use authenticated customerId for cart association
@@ -96,7 +102,6 @@ export async function POST(req: NextRequest) {
 
     console.log('[COMPLETE_API][BEFORE_ASSOCIATE]', {
       cartId,
-      authenticatedCustomerId,
       willAttemptAssociation: !!(cartId && authenticatedCustomerId)
     })
 
@@ -130,7 +135,6 @@ export async function POST(req: NextRequest) {
           // Only sync if we have customer name data from shipping address
           if (first_name && phone) {
             console.log('[COMPLETE_API][PRE_COMPLETION_SYNC]', {
-              customerId: authenticatedCustomerId,
               hasName: !!first_name,
               hasPhone: !!phone
             })
@@ -197,7 +201,7 @@ export async function POST(req: NextRequest) {
 
     // Best-effort: if we have both cartId and customerId, try to associate before completing
     if (cartId && authenticatedCustomerId) {
-      console.log('[COMPLETE_API][ASSOCIATING_CUSTOMER]', { cartId, customerId: authenticatedCustomerId })
+      console.log('[COMPLETE_API][ASSOCIATING_CUSTOMER]', { cartId })
       try {
         const origin = new URL(req.url).origin
         const cookieHeader = req.headers.get('cookie') || ''
@@ -210,7 +214,7 @@ export async function POST(req: NextRequest) {
           },
           body: JSON.stringify({ cartId, customerId: authenticatedCustomerId })
         })
-        console.log('[COMPLETE_API][ASSOCIATE_STATUS]', { status: assoc.status, customerId: authenticatedCustomerId })
+        console.log('[COMPLETE_API][ASSOCIATE_STATUS]', { status: assoc.status })
       } catch (e: any) {
         console.log('[COMPLETE_API][ASSOCIATE_ERROR]', { error: e?.message || String(e) })
       }
@@ -218,26 +222,31 @@ export async function POST(req: NextRequest) {
       console.log('[COMPLETE_API][SKIPPING_ASSOCIATION]', {
         reason: !cartId ? 'no_cartId' : 'no_customerId',
         cartId,
-        authenticatedCustomerId
       })
     }
-    if (orderId && !cartId) {
-      // SECURITY FIX: Resolve cartId from secure mapping service
+    // SECURITY FIX C6: Resolve cartId from secure mapping if not provided
+    // Eliminates the legacy handleComplete bypass that skipped all security checks
+    let resolvedCartId = cartId
+    if (orderId && !resolvedCartId) {
       try {
         const mapping = await getOrderCartMapping(orderId)
         if (mapping) {
-          return await handleComplete(mapping.cartId, orderId)
+          resolvedCartId = mapping.cartId
+          console.log('[COMPLETE_API][cartId_resolved_from_mapping]', { orderId, cartId: resolvedCartId })
         }
       } catch (err) {
         console.error('[COMPLETE_API][mapping_resolve_error]')
       }
     }
-    if (!cartId) return NextResponse.json({ error: 'cartId required' }, { status: 400 })
+    if (!resolvedCartId) return NextResponse.json({ error: 'cartId required' }, { status: 400 })
+
+    // From here on, use resolvedCartId as the authoritative cart ID
+    const finalCartId = resolvedCartId
 
     // SECURITY FIX: Acquire atomic distributed lock to prevent race conditions
-    const lockResult = await acquireCompletionLock(cartId, orderId, idempotencyKey)
+    const lockResult = await acquireCompletionLock(finalCartId, orderId, idempotencyKey)
     if (!lockResult.allowed) {
-      try { console.warn('[COMPLETE_API][blocked]', { cartId, orderId, reason: lockResult.reason }) } catch { }
+      try { console.warn('[COMPLETE_API][blocked]', { cartId: finalCartId, orderId, reason: lockResult.reason }) } catch { }
 
       // If already completed, return the existing order (idempotency)
       if (lockResult.existingOrderId) {
@@ -277,7 +286,7 @@ export async function POST(req: NextRequest) {
           }, { status: 403 })
         }
 
-        if (mapping.cartId !== cartId) {
+        if (mapping.cartId !== finalCartId) {
           console.error('[COMPLETE_API][security_violation] Cart ID mismatch')
           return NextResponse.json({
             error: 'invalid_order',
@@ -295,15 +304,74 @@ export async function POST(req: NextRequest) {
           }, { status: 400 })
         }
         try { console.log('[COMPLETE_API][validation_success]', { orderId, status: validation.status, amount: validation.amount }) } catch { }
+
+        // SECURITY FIX C2: Verify paid amount matches cart total before completing
+        // This prevents payment bypass where attacker pays INR 1 for a full-price order
+        if (validation.amount !== undefined) {
+          try {
+            const amountCheckBaseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
+            const amountCheckKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+
+            const amountCheckCartRes = await fetch(
+              `${amountCheckBaseUrl}/store/carts/${finalCartId}`,
+              {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-publishable-api-key': amountCheckKey || '',
+                },
+              }
+            )
+
+            if (amountCheckCartRes.ok) {
+              const amountCheckCartData = await amountCheckCartRes.json()
+              const cartTotalRupees = amountCheckCartData?.cart?.total // Medusa v2 stores INR in rupees
+
+              if (typeof cartTotalRupees === 'number' && cartTotalRupees > 0) {
+                const paidAmount = validation.amount // Cashfree returns in rupees
+                const amountDiff = Math.abs(paidAmount - cartTotalRupees)
+
+                if (amountDiff > 0.01) { // 1 paisa tolerance for floating-point rounding
+                  console.error('[COMPLETE_API][amount_mismatch_violation]', {
+                    orderId,
+                    cartId: finalCartId,
+                    paidAmount,
+                    cartTotalRupees,
+                    diff: amountDiff,
+                  })
+                  return NextResponse.json({
+                    error: 'amount_mismatch',
+                    message: 'The paid amount does not match the cart total. This order cannot be completed.',
+                  }, { status: 400 })
+                }
+
+                console.log('[COMPLETE_API][amount_verified]', { orderId, cartId: finalCartId, paidAmount, cartTotalRupees })
+              }
+            } else {
+              // Cart fetch failed — fail closed
+              console.error('[COMPLETE_API][amount_check_cart_fetch_failed]', { cartId: finalCartId, status: amountCheckCartRes.status })
+              return NextResponse.json({
+                error: 'amount_verification_failed',
+                message: 'Could not verify payment amount. Please contact support.',
+              }, { status: 502 })
+            }
+          } catch (amountCheckError) {
+            console.error('[COMPLETE_API][amount_check_error]', { cartId: finalCartId, orderId, error: String(amountCheckError) })
+            return NextResponse.json({
+              error: 'amount_verification_failed',
+              message: 'Amount verification failed. Please contact support.',
+            }, { status: 502 })
+          }
+        }
       }
 
       // Double-check: Verify cart hasn't been completed by another request
-      const doubleCheckKey = `order:completed:${cartId}`
+      const doubleCheckKey = `order:completed:${finalCartId}`
       const existingCompletion = await kvGet<any>(doubleCheckKey)
 
       if (existingCompletion?.status === 'completed') {
         console.warn('[COMPLETE_API][race_condition_detected]', {
-          cartId,
+          cartId: finalCartId,
           existingOrderId: existingCompletion.orderId,
           message: 'Cart was completed by another request despite lock'
         })
@@ -326,230 +394,29 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Complete cart inline so we can trigger post-completion sync
-      // Use atomic workflow if enabled (Issue #5 fix)
-      const useAtomicWorkflow = process.env.NEXT_PUBLIC_USE_ATOMIC_CHECKOUT === 'true'
-      let result: any
+      // Complete cart, mark success, store metadata, and auto-capture via shared utility
+      const completionResult = await completeCartFromPayment({
+        cartId: finalCartId,
+        cashfreeOrderId: orderId,
+        customerId: authenticatedCustomerId,
+        idempotencyKey,
+      })
 
-      if (useAtomicWorkflow && authenticatedCustomerId) {
-        console.log('[COMPLETE_API][atomic_workflow_start]', {
-          cartId,
-          customerId: authenticatedCustomerId
+      if (!completionResult.success) {
+        console.error('[COMPLETE_API][completion_failed]', {
+          cartId: finalCartId,
+          orderId,
+          error: completionResult.error,
         })
-
-        result = await medusaApiClient.completeCartAtomic(
-          cartId,
-          authenticatedCustomerId
+        return NextResponse.json(
+          { ok: false, error: completionResult.error || 'complete_failed' },
+          { status: 400 }
         )
-
-        console.log('[COMPLETE_API][atomic_workflow_success]', {
-          cartId,
-          orderId: result?.order?.id
-        })
-      } else {
-        console.log('[COMPLETE_API][legacy_complete]', {
-          cartId,
-          useAtomicWorkflow,
-          hasCustomerId: !!authenticatedCustomerId
-        })
-
-        result = await medusaApiClient.completeCart(cartId)
-      }
-      try { console.log('[COMPLETE_API][complete][response]', { cartId, hasOrder: Boolean((result as any)?.order), hasCart: Boolean((result as any)?.cart) }) } catch { }
-
-      const createdOrder = (result as any)?.order
-      const createdOrderId = createdOrder?.id as string | undefined
-
-      // Debug: Log full order structure to find payment ID location
-      try {
-        const paymentCollections = createdOrder?.payment_collections || []
-        const firstPaymentCollection = paymentCollections[0]
-        const payments = firstPaymentCollection?.payments || []
-        const firstPayment = payments[0]
-
-        console.log('[COMPLETE_API][order_structure]', {
-          orderId: createdOrderId,
-          hasPayment: 'payment' in (createdOrder || {}),
-          hasPayments: 'payments' in (createdOrder || {}),
-          hasPaymentId: 'payment_id' in (createdOrder || {}),
-          hasPaymentCollection: 'payment_collection' in (createdOrder || {}),
-          hasPaymentCollections: Array.isArray(paymentCollections) && paymentCollections.length > 0,
-          paymentCollectionsCount: paymentCollections.length,
-          paymentsCount: payments.length,
-          extractedPaymentId: firstPayment?.id,
-          orderKeys: Object.keys(createdOrder || {})
-        })
-      } catch { }
-
-      // Mark completion as successful to prevent duplicates
-      if (createdOrderId) {
-        await markCompletionSuccess(cartId, createdOrderId, idempotencyKey)
-        try { console.log('[COMPLETE_API][marked_success]', { cartId, orderId: createdOrderId, idempotencyKey }) } catch { }
       }
 
-      // Store Cashfree order ID in Medusa order metadata for future refunds
-      if (createdOrderId && orderId) {
-        console.log('[COMPLETE_API][metadata_storage_attempt]', {
-          createdOrderId,
-          cashfreeOrderId: orderId
-        })
-
-        try {
-          const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
-          const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-
-          const metadataUpdateResponse = await fetch(
-            `${baseUrl}/store/custom/orders/${createdOrderId}/metadata`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-publishable-api-key': publishableKey || '',
-                'x-internal-call': process.env.INTERNAL_API_SECRET || '',
-              },
-              body: JSON.stringify({
-                cashfree_order_id: orderId,
-              })
-            }
-          )
-
-          if (metadataUpdateResponse.ok) {
-            console.log('[COMPLETE_API][metadata_stored]', {
-              medusaOrderId: createdOrderId,
-              cashfreeOrderId: orderId
-            })
-          } else {
-            const errorText = await metadataUpdateResponse.text().catch(() => '')
-            console.error('[COMPLETE_API][metadata_store_failed]', {
-              medusaOrderId: createdOrderId,
-              cashfreeOrderId: orderId,
-              status: metadataUpdateResponse.status,
-              error: errorText
-            })
-          }
-        } catch (metadataError: any) {
-          console.error('[COMPLETE_API][metadata_store_exception]', {
-            medusaOrderId: createdOrderId,
-            cashfreeOrderId: orderId,
-            error: metadataError?.message || String(metadataError)
-          })
-        }
-      }
-
-      // Auto-capture payment after successful order creation
-      // Try Cashfree capture first (if enabled), then fallback to Medusa capture
-      if (orderId && createdOrder && createdOrderId) {
-        const autoCaptureEnabled = process.env.CASHFREE_AUTO_CAPTURE === 'true'
-        let capturedViaCashfree = false
-
-        // Attempt 1: Cashfree API capture (only if feature enabled)
-        if (autoCaptureEnabled) {
-          try {
-            const orderTotal = createdOrder?.total
-            if (orderTotal) {
-              const captureResult = await captureCashfreePayment(orderId, orderTotal / 100)
-              try { console.log('[COMPLETE_API][cashfree_capture]', { orderId, success: captureResult.success }) } catch { }
-
-              if (captureResult.success) {
-                capturedViaCashfree = true
-              } else {
-                const isNotEnabled =
-                  captureResult.error?.includes('not enabled') ||
-                  captureResult.data?.message?.includes('not enabled') ||
-                  captureResult.data?.code === 'request_invalid'
-
-                if (isNotEnabled) {
-                  try {
-                    console.info('[COMPLETE_API][cashfree_capture][not_enabled]', {
-                      message: 'Preauthorization not enabled. Payment auto-settled by Cashfree. Will capture in Medusa.',
-                      orderId
-                    })
-                  } catch { }
-                } else {
-                  try { console.warn('[COMPLETE_API][cashfree_capture][failed]', { orderId, error: captureResult.error }) } catch { }
-                }
-              }
-            }
-          } catch (captureError: any) {
-            try { console.error('[COMPLETE_API][cashfree_capture][exception]', { orderId, error: captureError?.message || String(captureError) }) } catch { }
-          }
-        }
-
-        // Attempt 2: Medusa payment capture (fallback when Cashfree already settled)
-        if (!capturedViaCashfree) {
-          try {
-            // Extract payment ID directly from the already-expanded order
-            // (completeCart now requests expanded payment_collections.payments)
-            let paymentId: string | undefined = createdOrder?.payment_collections?.[0]?.payments?.[0]?.id
-
-            // Fallback: If payment ID wasn't in the completed order, fetch it separately
-            if (!paymentId) {
-              console.warn('[COMPLETE_API][fallback_payment_fetch]', {
-                orderId: createdOrderId,
-                reason: 'Payment ID not in completed order response'
-              })
-
-              const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
-              const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-
-              try {
-                const orderResponse = await fetch(
-                  `${baseUrl}/store/orders/${createdOrderId}?fields=*payment_collections.payments`,
-                  {
-                    method: 'GET',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'x-publishable-api-key': publishableKey || ''
-                    }
-                  }
-                )
-
-                if (orderResponse.ok) {
-                  const orderData = await orderResponse.json()
-                  const order = orderData?.order
-                  paymentId = order?.payment_collections?.[0]?.payments?.[0]?.id
-                } else {
-                  console.error('[COMPLETE_API][order_fetch_failed]', {
-                    orderId: createdOrderId,
-                    status: orderResponse.status
-                  })
-                }
-              } catch (fetchError: any) {
-                console.error('[COMPLETE_API][order_fetch_exception]', {
-                  orderId: createdOrderId,
-                  error: fetchError?.message || String(fetchError)
-                })
-              }
-            } else {
-              console.log('[COMPLETE_API][payment_id_from_order]', {
-                orderId: createdOrderId,
-                paymentId
-              })
-            }
-
-            if (paymentId) {
-              const medusaCaptureResult = await captureMedusaPayment(paymentId, createdOrderId)
-
-              if (!medusaCaptureResult.success) {
-                console.error('[COMPLETE_API][medusa_capture][failed]', {
-                  orderId: createdOrderId,
-                  paymentId,
-                  error: medusaCaptureResult.error
-                })
-              }
-            } else {
-              console.warn('[COMPLETE_API][medusa_capture][no_payment_id]', {
-                orderId: createdOrderId
-              })
-            }
-          } catch (medusaCaptureError: any) {
-            console.error('[COMPLETE_API][medusa_capture][exception]', {
-              orderId: createdOrderId,
-              error: medusaCaptureError?.message || String(medusaCaptureError)
-            })
-          }
-        }
-      }
+      const createdOrder = completionResult.order
+      const createdOrderId = completionResult.orderId
+      const result = { order: createdOrder }
 
       // If we have a customer and an order, attempt a post-completion sync using order shipping address
       // SKIP if we already synced before completion
@@ -561,7 +428,6 @@ export async function POST(req: NextRequest) {
           if (isRealCustomer) {
             try {
               console.log('[COMPLETE_API][sync][skipped_authenticated]', {
-                customerId: authenticatedCustomerId,
                 orderId: createdOrderId,
                 reason: 'Real authenticated customer - no sync needed'
               })
@@ -595,7 +461,7 @@ export async function POST(req: NextRequest) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   customerId: authenticatedCustomerId,
-                  cartId,
+                  cartId: finalCartId,
                   orderId: createdOrderId,
                   formData,
                   orderCreated: true,
@@ -662,7 +528,7 @@ export async function POST(req: NextRequest) {
 
     } catch (e: any) {
       console.error('[COMPLETE_API][error]', {
-        cartId,
+        cartId: finalCartId,
         orderId,
         error: e?.message || String(e)
       })
@@ -676,75 +542,6 @@ export async function POST(req: NextRequest) {
       error: e?.message || String(e)
     })
     return NextResponse.json({ error: 'server_error', message: e?.message || String(e) }, { status: 500 })
-  }
-}
-
-async function handleComplete(cartId: string, cashfreeOrderId?: string) {
-  // Legacy helper retained for compatibility
-  try {
-    const result = await medusaApiClient.completeCart(cartId)
-    const createdOrder = (result as any)?.order
-    const createdOrderId = createdOrder?.id as string | undefined
-
-    console.log('[COMPLETE_API][handleComplete]', {
-      cartId,
-      createdOrderId,
-      cashfreeOrderId,
-      hasOrder: Boolean(createdOrder)
-    })
-
-    // Store Cashfree order ID in metadata if provided
-    if (createdOrderId && cashfreeOrderId) {
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
-        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-
-        console.log('[COMPLETE_API][handleComplete_metadata_attempt]', {
-          createdOrderId,
-          cashfreeOrderId
-        })
-
-        const metadataUpdateResponse = await fetch(
-          `${baseUrl}/store/custom/orders/${createdOrderId}/metadata`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-publishable-api-key': publishableKey || '',
-              'x-internal-call': process.env.INTERNAL_API_SECRET || '',
-            },
-            body: JSON.stringify({
-              cashfree_order_id: cashfreeOrderId,
-            })
-          }
-        )
-
-        if (metadataUpdateResponse.ok) {
-          console.log('[COMPLETE_API][handleComplete_metadata_stored]', {
-            medusaOrderId: createdOrderId,
-            cashfreeOrderId
-          })
-        } else {
-          const errorText = await metadataUpdateResponse.text().catch(() => '')
-          console.error('[COMPLETE_API][handleComplete_metadata_failed]', {
-            medusaOrderId: createdOrderId,
-            cashfreeOrderId,
-            status: metadataUpdateResponse.status,
-            error: errorText
-          })
-        }
-      } catch (metadataError: any) {
-        console.error('[COMPLETE_API][handleComplete_metadata_exception]', {
-          medusaOrderId: createdOrderId,
-          cashfreeOrderId,
-          error: metadataError?.message || String(metadataError)
-        })
-      }
-    }
-
-    return NextResponse.json({ ok: true, result })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'complete_failed' }, { status: 400 })
   }
 }
 

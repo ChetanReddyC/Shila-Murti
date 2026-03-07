@@ -6,9 +6,8 @@ import PaymentProcessingScreen from '../components/PaymentProcessingScreen';
 
 export default function ReturnPage() {
   const router = useRouter();
-  const { order_id, orderId, cart_id } = router.query;
+  const { order_id, orderId } = router.query;
   const orderIdParam = order_id || orderId;
-  const cartIdParam = cart_id;
 
   const [status, setStatus] = useState('checking');
   const [orderData, setOrderData] = useState(null);
@@ -29,69 +28,20 @@ export default function ReturnPage() {
             customerId = sess?.customerId || (sess?.user && sess.user.customerId) || null;
           } catch { }
 
-          let mappedCartId = cartIdParam;
-
-          if (!mappedCartId && window.__orderCartMap && orderIdParam) {
-            mappedCartId = window.__orderCartMap[orderIdParam];
-          }
-
-          if (!mappedCartId && orderIdParam) {
-            try {
-              const stored = sessionStorage.getItem(`cashfree:${orderIdParam}:cartId`);
-              if (stored) mappedCartId = stored;
-            } catch { }
-          }
-
-          if (!mappedCartId && orderIdParam) {
-            try {
-              const stored = localStorage.getItem(`cashfree:${orderIdParam}:cartId`);
-              if (stored) mappedCartId = stored;
-            } catch { }
-          }
-
-          console.log('[RETURN_PAGE] Cart ID resolution:', {
-            cartIdParam,
-            mappedCartId,
-            orderIdParam,
-            hasWindowMap: !!(window.__orderCartMap && window.__orderCartMap[orderIdParam])
-          });
-
-          console.log('[RETURN_PAGE] About to call complete API with:', {
-            mappedCartId,
-            orderIdParam,
-            customerId,
-            hasCustomerId: !!customerId
-          });
-
-          let completeRes;
+          // SECURITY FIX C7: Cart ID is resolved SERVER-SIDE from HMAC-signed mapping
+          // Never trust client-side storage (sessionStorage/localStorage) for cart ID
+          // The /api/checkout/complete route resolves cartId securely via getOrderCartMapping(orderId)
           const payload = {
             ...(orderIdParam ? { orderId: orderIdParam } : {}),
             ...(customerId ? { customerId } : {}),
           };
 
-          if (mappedCartId) {
-            completeRes = await fetch(`/api/checkout/complete?cartId=${encodeURIComponent(String(mappedCartId))}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-          } else {
-            console.warn('[RETURN_PAGE] No cartId found, trying API with orderId only');
-            completeRes = await fetch(`/api/checkout/complete`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-          }
-          const completeJson = await completeRes.json().catch(() => ({}))
-
-          console.log('[RETURN_PAGE] Complete API response:', {
-            ok: completeRes.ok,
-            status: completeRes.status,
-            hasOrder: !!completeJson?.result?.order,
-            hasError: !!completeJson?.error,
-            completeJson
+          const completeRes = await fetch(`/api/checkout/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
           });
+          const completeJson = await completeRes.json().catch(() => ({}));
 
           if (!completeRes.ok) {
             console.error('[RETURN_PAGE] Order completion failed:', completeJson);
@@ -129,10 +79,38 @@ export default function ReturnPage() {
         setStatus('not_paid');
       }
     })();
-  }, [router.isReady, orderIdParam, router, cartIdParam]);
+  }, [router.isReady, orderIdParam, router]);
 
   if (!orderIdParam) {
     return <div>Order ID missing in URL</div>;
+  }
+
+  // FIX L13: Show appropriate UI based on payment status instead of always showing processing screen
+  if (status === 'not_paid') {
+    return (
+      <>
+        <Head><title>Payment Failed - Shila Murti</title></Head>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'Inter, sans-serif', padding: '20px', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '16px' }}>Payment Not Completed</h2>
+          <p style={{ marginBottom: '24px', color: '#666' }}>Your payment was not successful. Please try again.</p>
+          <a href="/checkout" style={{ padding: '12px 32px', background: '#000', color: '#fff', textDecoration: 'none', borderRadius: '4px' }}>Return to Checkout</a>
+        </div>
+      </>
+    );
+  }
+
+  if (status === 'completion_failed') {
+    return (
+      <>
+        <Head><title>Order Issue - Shila Murti</title></Head>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'Inter, sans-serif', padding: '20px', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '16px' }}>Order Processing Issue</h2>
+          <p style={{ marginBottom: '8px', color: '#666' }}>Your payment was received but we encountered an issue completing your order.</p>
+          <p style={{ marginBottom: '24px', color: '#666' }}>Please contact support — your payment is safe.</p>
+          <a href="/order-confirmation" style={{ padding: '12px 32px', background: '#000', color: '#fff', textDecoration: 'none', borderRadius: '4px' }}>Check Order Status</a>
+        </div>
+      </>
+    );
   }
 
   return (

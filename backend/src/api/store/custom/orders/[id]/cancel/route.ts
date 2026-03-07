@@ -2,7 +2,9 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
 import { extractBearerToken, verifyAccessToken } from "../../../../../../utils/jwt"
 import { cancelCustomerOrderWorkflow } from "../../../../../../workflows/cancel-order"
-import type { ILockingModule } from "@medusajs/framework/types"
+import type { ILockingModule, IOrderModuleService } from "@medusajs/framework/types"
+
+const redact = (id: string) => id ? '...' + id.slice(-8) : 'N/A'
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
@@ -32,10 +34,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     try {
       await lockingService.acquire(lockKey, { expire: lockTimeout })
       lockAcquired = true
-      console.log('[ORDER_CANCEL][lock_acquired]', { orderId, lockKey })
+      console.log('[ORDER_CANCEL][lock_acquired]', { orderId: redact(orderId), lockKey })
     } catch (lockError) {
       console.warn('[ORDER_CANCEL][lock_failed]', {
-        orderId,
+        orderId: redact(orderId),
         error: String(lockError),
         message: 'Another cancellation request is in progress'
       })
@@ -47,7 +49,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     // Ensure lock is released even if errors occur
     try {
-      const orderModuleService: any = req.scope.resolve(Modules.ORDER)
+      const orderModuleService = req.scope.resolve<IOrderModuleService>(Modules.ORDER)
 
       // Retrieve order directly by ID with summary fields
       let order: any
@@ -57,7 +59,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         })
       } catch (error) {
         console.error('[ORDER_CANCEL][retrieve_error]', {
-          orderId,
+          orderId: redact(orderId),
           error: String(error)
         })
         return res.status(404).json({ message: "Order not found" })
@@ -68,7 +70,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       console.log('[ORDER_CANCEL][order_retrieved]', {
-        orderId,
+        orderId: redact(orderId),
         hasTotal: 'total' in order,
         hasSummary: 'summary' in order,
         total: order.total,
@@ -94,9 +96,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       if (order.metadata?.refund_initiated || order.metadata?.refund_id || order.metadata?.cf_refund_id) {
         const existingRefundStatus = order.metadata?.refund_status || 'unknown'
         console.warn('[ORDER_CANCEL][duplicate_refund_blocked]', {
-          orderId,
-          existingRefundId: order.metadata?.refund_id,
-          existingCfRefundId: order.metadata?.cf_refund_id,
+          orderId: redact(orderId),
+          existingRefundId: redact(order.metadata?.refund_id),
+          existingCfRefundId: redact(order.metadata?.cf_refund_id),
           refundStatus: existingRefundStatus
         })
 
@@ -151,7 +153,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       } catch (paymentError) {
         paymentQueryFailed = true
         console.error('[ORDER_CANCEL][payment_fetch_error]', {
-          orderId,
+          orderId: redact(orderId),
           error: String(paymentError)
         })
 
@@ -164,9 +166,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       console.log('[ORDER_CANCEL][metadata_check]', {
-        orderId,
+        orderId: redact(orderId),
         hasCashfreeOrderId: Boolean(cashfreeOrderId),
-        cashfreeOrderId,
+        cashfreeOrderId: cashfreeOrderId ? redact(cashfreeOrderId) : 'N/A',
         paymentStatus: paymentStatus,
         paymentCaptured
       })
@@ -190,7 +192,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
               refund_attempt_at: new Date().toISOString(),
             }
           })
-          console.log('[ORDER_CANCEL][refund_lock_acquired]', { orderId, refundId })
+          console.log('[ORDER_CANCEL][refund_lock_acquired]', { orderId: redact(orderId), refundId: redact(refundId) })
 
           // Get order total from summary (Medusa v2 stores in base currency units)
           // current_order_total is the actual total to charge/refund (9600 = ₹9,600)
@@ -203,7 +205,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
           if (refundAmount <= 0) {
             console.error('[ORDER_CANCEL][invalid_amount]', {
-              orderId,
+              orderId: redact(orderId),
               orderTotal,
               refundAmount,
               summary: order.summary,
@@ -219,7 +221,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
             if (amountDifference > tolerance) {
               console.error('[ORDER_CANCEL][amount_mismatch]', {
-                orderId,
+                orderId: redact(orderId),
                 refundAmount,
                 actualPaymentAmount,
                 difference: amountDifference,
@@ -230,23 +232,23 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             }
 
             console.log('[ORDER_CANCEL][amount_validated]', {
-              orderId,
+              orderId: redact(orderId),
               refundAmount,
               actualPaymentAmount,
               difference: amountDifference
             })
           } else {
             console.warn('[ORDER_CANCEL][amount_validation_skipped]', {
-              orderId,
+              orderId: redact(orderId),
               refundAmount,
               message: 'Could not retrieve payment amount for validation'
             })
           }
 
           console.log('[ORDER_CANCEL][refund_initiate]', {
-            orderId,
-            cashfreeOrderId,
-            refundId,
+            orderId: redact(orderId),
+            cashfreeOrderId: redact(cashfreeOrderId),
+            refundId: redact(refundId),
             refundAmount,
             orderTotal
           })
@@ -256,13 +258,20 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             ? 'https://api.cashfree.com/pg'
             : 'https://sandbox.cashfree.com/pg'
 
+          // SECURITY FIX M11: Fail fast if credentials are missing
+          const cfClientId = process.env.CASHFREE_CLIENT_ID
+          const cfClientSecret = process.env.CASHFREE_CLIENT_SECRET
+          if (!cfClientId || !cfClientSecret) {
+            throw new Error('Payment service credentials not configured')
+          }
+
           const refundResponse = await fetch(`${CF_BASE}/orders/${encodeURIComponent(cashfreeOrderId)}/refunds`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'x-api-version': process.env.CASHFREE_API_VERSION || '2023-08-01',
-              'x-client-id': process.env.CASHFREE_CLIENT_ID || '',
-              'x-client-secret': process.env.CASHFREE_CLIENT_SECRET || '',
+              'x-client-id': cfClientId,
+              'x-client-secret': cfClientSecret,
             },
             body: JSON.stringify({
               refund_id: refundId,
@@ -276,20 +285,24 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
           if (refundResponse.ok) {
             console.log('[ORDER_CANCEL][refund_success]', {
-              orderId,
-              cashfreeOrderId,
-              refundId,
-              cfRefundId: refundData.cf_refund_id,
+              orderId: redact(orderId),
+              cashfreeOrderId: redact(cashfreeOrderId),
+              refundId: redact(refundId),
+              cfRefundId: redact(refundData.cf_refund_id),
               status: refundData.refund_status
             })
 
             refundInitiated = true
 
-            // Update order metadata with refund information
+            // SECURITY FIX H6/M8: Re-fetch metadata before write to prevent stale overwrites
+            // Between the initial read and now, a webhook may have updated metadata
             try {
+              const freshOrder = await orderModuleService.retrieveOrder(orderId, {
+                select: ["id", "metadata"],
+              })
               await orderModuleService.updateOrders(orderId, {
                 metadata: {
-                  ...order.metadata,
+                  ...freshOrder.metadata,
                   refund_id: refundId,
                   cf_refund_id: refundData.cf_refund_id,
                   refund_status: refundData.refund_status || 'processing',
@@ -299,25 +312,28 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
               })
             } catch (metadataError) {
               console.error('[ORDER_CANCEL][metadata_update_error]', {
-                orderId,
+                orderId: redact(orderId),
                 error: String(metadataError)
               })
             }
           } else {
             console.error('[ORDER_CANCEL][refund_failed]', {
-              orderId,
-              cashfreeOrderId,
+              orderId: redact(orderId),
+              cashfreeOrderId: redact(cashfreeOrderId),
               status: refundResponse.status,
               error: refundData
             })
 
             refundError = refundData.message || refundData.error || 'Refund initiation failed'
 
-            // TRANSACTION SAFETY: Clear refund lock and store failure
+            // SECURITY FIX H6/M8: Re-fetch metadata before write
             try {
+              const freshOrder = await orderModuleService.retrieveOrder(orderId, {
+                select: ["id", "metadata"],
+              })
               await orderModuleService.updateOrders(orderId, {
                 metadata: {
-                  ...order.metadata,
+                  ...freshOrder.metadata,
                   refund_initiated: false,
                   refund_error: refundError,
                   refund_failed_at: new Date().toISOString(),
@@ -325,7 +341,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
               })
             } catch (metadataError) {
               console.error('[ORDER_CANCEL][metadata_update_error]', {
-                orderId,
+                orderId: redact(orderId),
                 error: String(metadataError)
               })
             }
@@ -339,18 +355,21 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           }
         } catch (refundException: any) {
           console.error('[ORDER_CANCEL][refund_exception]', {
-            orderId,
-            cashfreeOrderId,
+            orderId: redact(orderId),
+            cashfreeOrderId: cashfreeOrderId ? redact(cashfreeOrderId) : 'N/A',
             error: refundException?.message || String(refundException)
           })
 
           refundError = refundException?.message || 'Refund request exception'
 
-          // TRANSACTION SAFETY: Clear refund lock and store exception
+          // SECURITY FIX H6/M8: Re-fetch metadata before write
           try {
+            const freshOrder = await orderModuleService.retrieveOrder(orderId, {
+              select: ["id", "metadata"],
+            })
             await orderModuleService.updateOrders(orderId, {
               metadata: {
-                ...order.metadata,
+                ...freshOrder.metadata,
                 refund_initiated: false,
                 refund_error: refundError,
                 refund_failed_at: new Date().toISOString(),
@@ -372,7 +391,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         }
       } else if (paymentCaptured && !cashfreeOrderId) {
         console.error('[ORDER_CANCEL][missing_cashfree_id]', {
-          orderId,
+          orderId: redact(orderId),
           message: 'Payment was captured but cashfree_order_id not found in metadata. Cannot process refund.'
         })
 
@@ -446,19 +465,19 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
     } catch (error: any) {
       console.error("[ORDER_CANCEL_ERROR]", error)
+      // SECURITY FIX H8: Do not leak internal error messages to client
       return res.status(500).json({
         message: "Internal Server Error",
-        error: error?.message
       })
     } finally {
       // CRITICAL: Always release the lock
       if (lockAcquired) {
         try {
           await lockingService.release(lockKey)
-          console.log('[ORDER_CANCEL][lock_released]', { orderId, lockKey })
+          console.log('[ORDER_CANCEL][lock_released]', { orderId: redact(orderId), lockKey })
         } catch (releaseError) {
           console.error('[ORDER_CANCEL][lock_release_error]', {
-            orderId,
+            orderId: redact(orderId),
             lockKey,
             error: String(releaseError)
           })
@@ -467,9 +486,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     }
   } catch (error: any) {
     console.error("[ORDER_CANCEL_ERROR]", error)
+    // SECURITY FIX H8: Do not leak internal error messages to client
     return res.status(500).json({
       message: "Internal Server Error",
-      error: error?.message
     })
   }
 }

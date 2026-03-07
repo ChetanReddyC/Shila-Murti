@@ -30,6 +30,14 @@ export async function captureCashfreePayment(
   orderId: string,
   amount: number
 ): Promise<{ success: boolean; data?: CashfreeCaptureResponse; error?: string }> {
+  // SECURITY FIX H10: Validate inputs before calling Cashfree API
+  if (!orderId || typeof orderId !== 'string' || orderId.trim().length === 0) {
+    return { success: false, error: 'Invalid orderId: must be a non-empty string' }
+  }
+  if (typeof amount !== 'number' || amount <= 0 || !isFinite(amount)) {
+    return { success: false, error: `Invalid amount: must be a positive number, got ${amount}` }
+  }
+
   try {
     const CF_BASE = process.env.CASHFREE_ENV === 'production'
       ? 'https://api.cashfree.com/pg'
@@ -37,13 +45,20 @@ export async function captureCashfreePayment(
 
     const url = `${CF_BASE}/orders/${encodeURIComponent(orderId)}/authorization`
 
+    // SECURITY FIX M11: Fail fast if credentials are missing
+    const cfClientId = process.env.CASHFREE_CLIENT_ID
+    const cfClientSecret = process.env.CASHFREE_CLIENT_SECRET
+    if (!cfClientId || !cfClientSecret) {
+      return { success: false, error: 'Payment service credentials not configured' }
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-version': process.env.CASHFREE_API_VERSION || '2023-08-01',
-        'x-client-id': process.env.CASHFREE_CLIENT_ID || '',
-        'x-client-secret': process.env.CASHFREE_CLIENT_SECRET || '',
+        'x-client-id': cfClientId,
+        'x-client-secret': cfClientSecret,
       },
       body: JSON.stringify({
         action: 'CAPTURE',
@@ -102,13 +117,19 @@ export async function getCashfreeOrderStatus(orderId: string): Promise<any> {
 
     const url = `${CF_BASE}/orders/${encodeURIComponent(orderId)}`
 
+    const cfClientId = process.env.CASHFREE_CLIENT_ID
+    const cfClientSecret = process.env.CASHFREE_CLIENT_SECRET
+    if (!cfClientId || !cfClientSecret) {
+      return { success: false, error: 'Payment service credentials not configured' }
+    }
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'x-api-version': process.env.CASHFREE_API_VERSION || '2023-08-01',
-        'x-client-id': process.env.CASHFREE_CLIENT_ID || '',
-        'x-client-secret': process.env.CASHFREE_CLIENT_SECRET || '',
+        'x-client-id': cfClientId,
+        'x-client-secret': cfClientSecret,
       },
     })
 

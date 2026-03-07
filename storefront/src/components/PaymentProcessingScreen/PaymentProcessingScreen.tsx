@@ -27,6 +27,15 @@ export default function PaymentProcessingScreen() {
   
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const textAnimationRef = useRef<number | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+
+  // FIX M1: Add timeout so user isn't trapped indefinitely if payment flow fails silently
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setTimedOut(true);
+    }, 120000); // 2 minutes
+    return () => clearTimeout(timeout);
+  }, []);
 
   // Prevent scrolling when payment processing screen is active (keep scrollbar visible)
   useEffect(() => {
@@ -467,10 +476,27 @@ export default function PaymentProcessingScreen() {
 
     render();
 
+    // WebGL context loss handling
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+    const handleContextRestored = () => {
+      // Context restored — no-op; the effect will re-run on next dependency change
+      // or the 2-minute timeout will redirect the user
+    };
+    canvas.addEventListener('webglcontextlost', handleContextLost);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored);
+
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
     };
   }, [loadedImages]);
 
@@ -709,10 +735,26 @@ export default function PaymentProcessingScreen() {
 
     render();
 
+    // WebGL context loss handling
+    const handleTextContextLost = (e: Event) => {
+      e.preventDefault();
+      if (textAnimationRef.current) {
+        cancelAnimationFrame(textAnimationRef.current);
+        textAnimationRef.current = null;
+      }
+    };
+    const handleTextContextRestored = () => {
+      // No-op — text canvas is non-critical
+    };
+    canvas.addEventListener('webglcontextlost', handleTextContextLost);
+    canvas.addEventListener('webglcontextrestored', handleTextContextRestored);
+
     return () => {
       if (textAnimationRef.current) {
         cancelAnimationFrame(textAnimationRef.current);
       }
+      canvas.removeEventListener('webglcontextlost', handleTextContextLost);
+      canvas.removeEventListener('webglcontextrestored', handleTextContextRestored);
     };
   }, []);
 
@@ -755,8 +797,35 @@ export default function PaymentProcessingScreen() {
             </div>
             
             <div className={styles.bottomText}>
-              <p>Please do not close this window or press the back button.</p>
-              <p>You will be redirected to the order confirmation page shortly.</p>
+              {timedOut ? (
+                <>
+                  <p style={{ color: '#ff9800', fontWeight: 600 }}>
+                    This is taking longer than expected.
+                  </p>
+                  <p>
+                    <button
+                      onClick={() => window.location.href = '/order-confirmation'}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid #fff',
+                        color: '#fff',
+                        padding: '8px 20px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        marginTop: '8px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Check Order Status
+                    </button>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>Please do not close this window or press the back button.</p>
+                  <p>You will be redirected to the order confirmation page shortly.</p>
+                </>
+              )}
             </div>
           </div>
         </div>
