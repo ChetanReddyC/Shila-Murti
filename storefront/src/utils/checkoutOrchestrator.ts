@@ -160,13 +160,13 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
       }
     }
 
-    logs.push({ step: 'validate-customer', details: { customerId: input.customerId, passed: true } })
-    console.log('[CHECKOUT][GATE_1_PASSED]', { cartId, customerId: input.customerId })
+    logs.push({ step: 'validate-customer', details: { hasCustomerId: true, passed: true } })
+    console.log('[CHECKOUT][GATE_1_PASSED]', { cartId })
 
     // 1) Update cart with email and shipping/billing addresses
     currentStep = 'update-cart'
     const updatedCart = await client.updateCart(cartId, cartUpdate)
-    try { console.log('[CHECKOUT][update-cart]', { cartId, email: (cartUpdate as any)?.email, shipping_first_name: (cartUpdate as any)?.shipping_address?.first_name }) } catch { }
+    try { console.log('[CHECKOUT][update-cart]', { cartId }) } catch { }
     logs.push({
       step: 'update-cart', details: {
         cartId: updatedCart.id,
@@ -176,7 +176,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
     // GATE 2: Associate customer with cart (BLOCKING with retries)
     currentStep = 'associate-customer'
-    console.log('[CHECKOUT][GATE_2_START]', { cartId, customerId: input.customerId })
+    console.log('[CHECKOUT][GATE_2_START]', { cartId })
 
     try {
       // ROOT CAUSE FIX: Extract email and phone from available data
@@ -186,11 +186,8 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
       console.log('[CHECKOUT][ASSOCIATE_DATA_EXTRACTED]', {
         cartId,
-        customerId: input.customerId,
         hasEmail: !!email,
         hasPhone: !!phone,
-        emailPrefix: email?.substring(0, 15),
-        phonePrefix: phone?.substring(0, 10)
       })
 
       await retryWithBackoff(
@@ -226,13 +223,12 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         }
       )
 
-      console.log('[CHECKOUT][GATE_2_PASSED]', { cartId, customerId: input.customerId })
+      console.log('[CHECKOUT][GATE_2_PASSED]', { cartId })
       logs.push({ step: 'associate-customer', details: { customerId: input.customerId, success: true, blocking: true } })
     } catch (error: any) {
       const errorMessage = `Failed to link customer to cart after multiple attempts: ${error?.message || String(error)}`
       console.error('[CHECKOUT][GATE_2_FAILED]', {
         cartId,
-        customerId: input.customerId,
         error: error?.message || String(error)
       })
 
@@ -250,18 +246,17 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
     // GATE 3: Verify customer association succeeded (BLOCKING)
     currentStep = 'verify-association'
-    console.log('[CHECKOUT][GATE_3_START]', { cartId, expectedCustomerId: input.customerId })
+    console.log('[CHECKOUT][GATE_3_START]', { cartId })
 
     try {
       const cartAfterAssociation = await client.getCart(cartId)
       const actualCustomerId = (cartAfterAssociation as any).customer_id
 
       if (actualCustomerId !== input.customerId) {
-        const errorMessage = `Cart customer verification failed. Expected: ${input.customerId}, Got: ${actualCustomerId || 'null'}`
+        const errorMessage = `Cart customer verification failed. Customer ID mismatch.`
         console.error('[CHECKOUT][GATE_3_FAILED]', {
           cartId,
-          expectedCustomerId: input.customerId,
-          actualCustomerId: actualCustomerId || 'null'
+          mismatch: true,
         })
 
         return {
@@ -272,7 +267,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
         }
       }
 
-      console.log('[CHECKOUT][GATE_3_PASSED]', { cartId, customerId: actualCustomerId })
+      console.log('[CHECKOUT][GATE_3_PASSED]', { cartId })
       logs.push({
         step: 'verify-association', details: {
           customerId: actualCustomerId,
@@ -480,14 +475,14 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
 
     // GATE 5: Complete the cart (customer already verified and linked)
     currentStep = 'complete-cart'
-    console.log('[CHECKOUT][GATE_5_START]', { cartId, customerId: input.customerId })
+    console.log('[CHECKOUT][GATE_5_START]', { cartId })
 
     // Use atomic workflow if enabled (Issue #5 fix)
     const useAtomicWorkflow = process.env.NEXT_PUBLIC_USE_ATOMIC_CHECKOUT === 'true'
     let completion: CompleteCartResponse
 
     if (useAtomicWorkflow) {
-      console.log('[CHECKOUT][GATE_5][ATOMIC_WORKFLOW]', { cartId, customerId: input.customerId })
+      console.log('[CHECKOUT][GATE_5][ATOMIC_WORKFLOW]', { cartId })
 
       // Call atomic workflow endpoint that provides ACID transaction guarantees
       completion = await client.completeCartAtomic(
@@ -583,7 +578,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
               attempts: parsedResponse.attempts || 1
             }
           })
-          try { console.log('[CHECKOUT][sync][ok]', { customerId: input.customerId, attempts: parsedResponse.attempts || 1 }) } catch { }
+          try { console.log('[CHECKOUT][sync][ok]', { attempts: parsedResponse.attempts || 1 }) } catch { }
         } else {
           // Enhanced error categorization
           const errorType = parsedResponse?.error || 'unknown_error'
@@ -601,7 +596,7 @@ export async function processCheckout(input: CheckoutInput, client: MedusaApiCli
               recoverable: errorType !== 'customer_not_found' && errorType !== 'invalid_request'
             }
           })
-          try { console.log('[CHECKOUT][sync][fail]', { customerId: input.customerId, status: syncResult.status, errorType, errorMessage }) } catch { }
+          try { console.log('[CHECKOUT][sync][fail]', { status: syncResult.status, errorType, errorMessage }) } catch { }
         }
 
       } catch (error: any) {

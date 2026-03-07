@@ -1,7 +1,5 @@
 // pages/api/webhook.js
 import crypto from 'crypto';
-import fetch from 'node-fetch';
-
 // Dynamic imports for ES modules
 const captureCashfreePaymentPromise = import('../../utils/cashfreeCapture.ts').then(m => m.captureCashfreePayment).catch(() => null);
 const preventWebhookReplayPromise = import('../../utils/orderCompletionGuard.ts').then(m => m.preventWebhookReplay).catch(() => null);
@@ -173,21 +171,21 @@ export default async function handler(req, res) {
         }
       }
 
-      // Complete the cart via app route using validated cartId
+      // Complete the cart directly via shared utility (no HTTP self-fetch)
       if (cartId && mappingValid) {
-        const origin = process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000'
         try {
-          const completeResponse = await fetch(`${origin}/api/checkout/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderId, cartId })
+          const completeCartFromPaymentModule = await import('../../utils/completeCartFromPayment.ts');
+          const completeResult = await completeCartFromPaymentModule.completeCartFromPayment({
+            cartId,
+            cashfreeOrderId: orderId,
           });
-          
-          if (!completeResponse.ok) {
-            console.error('[WEBHOOK][complete_error] Status:', completeResponse.status);
+          if (!completeResult.success) {
+            console.error('[WEBHOOK][complete_error]', { error: completeResult.error });
+          } else {
+            console.log('[WEBHOOK][complete_success]', { orderId: completeResult.orderId });
           }
         } catch (e) {
-          console.error('[WEBHOOK][complete_error]');
+          console.error('[WEBHOOK][complete_error]', { error: String(e) });
         }
       } else {
         console.error('[WEBHOOK][completion_skipped] No valid cart mapping');
@@ -196,7 +194,10 @@ export default async function handler(req, res) {
       console.log('[WEBHOOK][ignored]', { orderId, status, reason: 'Not PAID status' });
     }
   } catch (e) {
+    // SECURITY FIX C8: Return 500 on processing errors so Cashfree retries the webhook
+    // Returning 200 on failure causes silent order loss (customer pays but order never completes)
     console.error('[WEBHOOK][error]', { error: String(e) });
+    return res.status(500).json({ ok: false, error: 'Webhook processing failed' });
   }
 
   return res.status(200).json({ ok: true });

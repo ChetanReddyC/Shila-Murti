@@ -12,7 +12,7 @@
  */
 
 import { kvSet, kvGet } from './kv'
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 export interface OrderMapping {
   orderId: string
@@ -64,7 +64,11 @@ function verifyMappingSignature(mapping: OrderMapping): boolean {
       mapping.cartId,
       mapping.amount
     )
-    return mapping.signature === expectedSignature
+    // SECURITY FIX H11: Use timing-safe comparison to prevent byte-by-byte timing attacks
+    const sigBuffer = Buffer.from(mapping.signature, 'utf8')
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8')
+    if (sigBuffer.length !== expectedBuffer.length) return false
+    return timingSafeEqual(sigBuffer, expectedBuffer)
   } catch {
     return false
   }
@@ -263,14 +267,10 @@ async function logMappingAccess(
       metadata
     }
     
-    // Get existing audit log
-    const existingLog = await kvGet<any[]>(auditKey) || []
-    
-    // Append new entry
-    const updatedLog = [...existingLog, auditEntry].slice(-100) // Keep last 100 entries
-    
-    // Store with extended TTL for audit purposes
-    await kvSet(auditKey, updatedLog, AUDIT_TTL_SECONDS)
+    // SECURITY FIX M16: Use unique key per audit entry to avoid race condition
+    // Previous read-modify-write pattern lost entries under concurrent access
+    const entryKey = `${auditKey}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`
+    await kvSet(entryKey, auditEntry, AUDIT_TTL_SECONDS)
   } catch (error) {
     // Audit logging failure shouldn't break main flow - silent fail
   }

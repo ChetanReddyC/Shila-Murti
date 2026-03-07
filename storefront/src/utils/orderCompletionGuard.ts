@@ -37,7 +37,9 @@ const MAX_REQUESTS_PER_MINUTE = 10
  * Generates an idempotency key for cart completion
  */
 export function generateIdempotencyKey(cartId: string, orderId?: string): string {
-  const data = `${cartId}:${orderId || 'manual'}:${Date.now()}`
+  // SECURITY FIX M5: Removed Date.now() — same cart+order must always produce the same key
+  // This ensures true idempotency: retries return the same result instead of creating duplicates
+  const data = `${cartId}:${orderId || 'manual'}`
   return createHash('sha256').update(data).digest('hex').substring(0, 32)
 }
 
@@ -269,8 +271,9 @@ export async function validateCashfreeOrder(orderId: string): Promise<{
     const status = String(data?.order_status || '').toUpperCase()
     const amount = Number(data?.order_amount || 0)
 
-    // Only allow completion if payment is successful
-    const validStatuses = ['PAID', 'ACTIVE'] // ACTIVE for authorized but not captured
+    // SECURITY FIX H3: Only allow completion if payment is actually PAID
+    // ACTIVE means order created but NOT paid — must not be accepted
+    const validStatuses = ['PAID']
     const isValid = validStatuses.includes(status)
 
     return {
@@ -336,17 +339,11 @@ export async function preventWebhookReplay(
  */
 export async function getCartIdFromOrder(orderId: string): Promise<string | null> {
   try {
-    // First check KV mapping
+    // SECURITY FIX H13: Use KV storage only — in-memory map is unreliable in serverless
+    // global.orderCartMap is not shared across serverless invocations/instances
     const kvKey = `cf:order:cart:${orderId}`
     const kvCartId = await kvGet<string>(kvKey)
-    if (kvCartId) return kvCartId
-
-    // Fallback to in-memory map
-    const map: Map<string, string> | undefined = (global as any).orderCartMap
-    const memCartId = map?.get(orderId)
-    if (memCartId) return memCartId
-
-    return null
+    return kvCartId || null
   } catch (error) {
     console.error('[COMPLETION_GUARD][get_cart_id][error]', { orderId, error: String(error) })
     return null

@@ -1,6 +1,9 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
+import type { IOrderModuleService } from "@medusajs/framework/types"
 import { extractBearerToken, verifyAccessToken } from "../../../../../../utils/jwt"
+
+const redact = (id: string) => id ? '...' + id.slice(-8) : 'N/A'
 
 /**
  * Manual Refund Status Check
@@ -27,7 +30,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(400).json({ message: "Order ID required" })
     }
 
-    const orderModuleService: any = req.scope.resolve(Modules.ORDER)
+    const orderModuleService = req.scope.resolve<IOrderModuleService>(Modules.ORDER)
     
     // Get order and verify ownership
     const order = await orderModuleService.retrieveOrder(orderId, {
@@ -58,7 +61,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     const url = `${CF_BASE}/orders/${encodeURIComponent(cashfreeOrderId)}/refunds/${encodeURIComponent(refundId)}`
 
-    console.log('[REFUND_STATUS_CHECK][fetch]', { orderId, cashfreeOrderId, refundId })
+    console.log('[REFUND_STATUS_CHECK][fetch]', { orderId: redact(orderId), cashfreeOrderId: redact(cashfreeOrderId), refundId: redact(refundId) })
 
     const response = await fetch(url, {
       method: 'GET',
@@ -73,7 +76,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       console.error('[REFUND_STATUS_CHECK][error]', {
-        orderId,
+        orderId: redact(orderId),
         status: response.status,
         error: errorData
       })
@@ -86,9 +89,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const refundData = await response.json()
 
     console.log('[REFUND_STATUS_CHECK][success]', {
-      orderId,
+      orderId: redact(orderId),
       refundStatus: refundData.refund_status,
-      cfRefundId: refundData.cf_refund_id
+      cfRefundId: redact(refundData.cf_refund_id)
     })
 
     // Update order metadata with latest status
@@ -120,9 +123,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     })
   } catch (error: any) {
     console.error("[REFUND_STATUS_CHECK_ERROR]", error)
-    return res.status(500).json({ 
+    // SECURITY FIX H8: Do not leak internal error messages to client
+    return res.status(500).json({
       message: "Internal Server Error",
-      error: error?.message
     })
   }
 }

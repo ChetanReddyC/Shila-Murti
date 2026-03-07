@@ -2,6 +2,8 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
 import crypto from "crypto"
 
+const redact = (id: string) => id ? '...' + id.slice(-8) : 'N/A'
+
 /**
  * Cashfree Refund Webhook Handler
  * 
@@ -107,28 +109,38 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(401).json({ message: 'Missing webhook signature headers' })
     }
 
-    // Verify signature (controlled by environment variable)
-    const shouldVerify = process.env.CASHFREE_WEBHOOK_VERIFY === 'true'
+    // SECURITY FIX C5: Signature verification is ON by default
+    // Set CASHFREE_WEBHOOK_VERIFY=false to explicitly disable (sandbox/dev only)
+    const shouldVerify = process.env.CASHFREE_WEBHOOK_VERIFY !== 'false'
     if (shouldVerify) {
       // Reconstruct body (NOTE: May not match original due to JSON formatting)
       const rawBody = JSON.stringify(req.body)
-      
+
       const isValid = verifyCashfreeSignature(rawBody, signature, timestamp)
       if (!isValid) {
         console.error('[CASHFREE_WEBHOOK][invalid_signature]', {
           timestamp,
           bodyLength: rawBody.length,
           signatureReceived: signature.substring(0, 20) + '...',
-          note: 'Signature mismatch may be due to JSON formatting differences'
         })
         return res.status(403).json({ message: 'Invalid webhook signature' })
       }
-      
+
+      // SECURITY FIX H5: Reject stale timestamps to prevent replay attacks (5 min window)
+      const webhookAge = Math.abs(Date.now() - Number(timestamp) * 1000)
+      if (webhookAge > 5 * 60 * 1000) {
+        console.error('[CASHFREE_WEBHOOK][stale_timestamp]', {
+          timestamp,
+          ageMs: webhookAge,
+        })
+        return res.status(403).json({ message: 'Webhook timestamp too old' })
+      }
+
       console.log('[CASHFREE_WEBHOOK][signature_verified]', { timestamp })
     } else {
-      console.log('[CASHFREE_WEBHOOK][signature_skipped]', { 
+      console.warn('[CASHFREE_WEBHOOK][signature_skipped]', {
         timestamp,
-        note: 'Set CASHFREE_WEBHOOK_VERIFY=true to enable signature verification'
+        note: 'CASHFREE_WEBHOOK_VERIFY=false — signature verification disabled'
       })
     }
 
@@ -147,9 +159,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const { refund_id, cf_refund_id, order_id, refund_status, refund_amount, refund_arn, processed_at } = refundData
 
     console.log('[CASHFREE_WEBHOOK][received]', {
-      refund_id,
-      cf_refund_id,
-      order_id,
+      refund_id: redact(refund_id),
+      cf_refund_id: redact(cf_refund_id),
+      order_id: redact(order_id),
       refund_status,
       refund_amount
     })
@@ -159,8 +171,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     if (!medusaOrderId) {
       console.error('[CASHFREE_WEBHOOK][invalid_refund_id]', {
-        refund_id,
-        order_id
+        refund_id: redact(refund_id),
+        order_id: redact(order_id)
       })
       return res.status(400).json({ message: 'Cannot extract Medusa order ID from refund_id' })
     }
@@ -175,7 +187,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       })
 
       if (!order) {
-        console.error('[CASHFREE_WEBHOOK][order_not_found]', { medusaOrderId })
+        console.error('[CASHFREE_WEBHOOK][order_not_found]', { medusaOrderId: redact(medusaOrderId) })
         return res.status(404).json({ message: 'Order not found' })
       }
 
@@ -193,26 +205,24 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       })
 
       console.log('[CASHFREE_WEBHOOK][metadata_updated]', {
-        medusaOrderId,
+        medusaOrderId: redact(medusaOrderId),
         refund_status,
-        cf_refund_id
+        cf_refund_id: redact(cf_refund_id)
       })
 
-      // Acknowledge webhook
+      // Acknowledge webhook — do not leak internal order IDs
       return res.status(200).json({
         success: true,
         message: 'Webhook processed successfully',
-        order_id: medusaOrderId,
-        refund_status
       })
     } catch (orderError: any) {
       console.error('[CASHFREE_WEBHOOK][order_update_error]', {
-        medusaOrderId,
+        medusaOrderId: redact(medusaOrderId),
         error: orderError?.message || String(orderError)
       })
+      // SECURITY FIX H8: Do not leak internal error details
       return res.status(500).json({
-        message: 'Failed to update order',
-        error: orderError?.message
+        message: 'Failed to process webhook',
       })
     }
   } catch (error: any) {
@@ -221,7 +231,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     })
     return res.status(500).json({
       message: 'Webhook processing failed',
-      error: error?.message
     })
   }
 }

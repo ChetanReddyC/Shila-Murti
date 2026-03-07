@@ -85,6 +85,43 @@ async function authGuard(
 
 
 
+// M9: Simple in-memory rate limiter for payment-critical endpoints
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_WINDOW = 60_000 // 1 minute
+const RATE_LIMIT_MAX = 10 // max requests per window per IP
+
+function rateLimit(
+  req: MedusaRequest,
+  res: MedusaResponse,
+  next: MedusaNextFunction
+) {
+  const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+  const key = `${ip}:${req.path}`
+  const now = Date.now()
+
+  const entry = rateLimitStore.get(key)
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
+    return next()
+  }
+
+  entry.count++
+  if (entry.count > RATE_LIMIT_MAX) {
+    res.setHeader("Retry-After", String(Math.ceil((entry.resetAt - now) / 1000)))
+    return res.status(429).json({ message: "Too many requests" })
+  }
+
+  return next()
+}
+
+// Cleanup stale entries every 5 minutes
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, val] of rateLimitStore) {
+    if (now > val.resetAt) rateLimitStore.delete(key)
+  }
+}, 300_000)
+
 export default defineMiddlewares({
   routes: [
     {
@@ -112,6 +149,19 @@ export default defineMiddlewares({
       matcher: "/store/custom/reviews*",
       method: ["POST", "PUT"],
       middlewares: [authGuard],
+    },
+    {
+      // SECURITY FIX C4: Payment capture must require authentication
+      // SECURITY FIX M9: Rate limit payment capture
+      matcher: "/store/payments/*",
+      method: ["POST"],
+      middlewares: [rateLimit, authGuard],
+    },
+    {
+      // SECURITY FIX H7: Custom order routes must require authentication at middleware level
+      // SECURITY FIX M9: Rate limit order cancel/refund
+      matcher: "/store/custom/orders*",
+      middlewares: [rateLimit, authGuard],
     },
     {
       // Validate cart ownership for adding items to cart

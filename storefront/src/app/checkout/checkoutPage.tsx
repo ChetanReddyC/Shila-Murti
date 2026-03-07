@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Script from 'next/script';
 import styles from './checkoutPage.module.css';
 import loginStyles from '../(auth)/login/loginPage.module.css';
@@ -66,20 +66,7 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState('cashfree');
 
-
-
-  // Payment details
-
-  const [paymentDetails, setPaymentDetails] = useState({
-
-    cardNumber: '',
-
-    expiryDate: '',
-
-    cvv: ''
-
-  });
-
+  const [paymentDetails, setPaymentDetails] = useState({ cardNumber: '', expiryDate: '', cvv: '' });
 
 
   // Cashfree SDK state
@@ -189,8 +176,6 @@ export default function CheckoutPage() {
 
           if (data && data.expiresAt && data.expiresAt > Date.now()) {
 
-            setPurchaseReady(Boolean(data.purchaseReady))
-
             setCustomerId(data.customerId || null)
 
             if (typeof data.identityMethod === 'string') setIdentityMethod(data.identityMethod)
@@ -288,8 +273,6 @@ export default function CheckoutPage() {
 
         const blob = {
 
-          purchaseReady,
-
           customerId,
 
           identityMethod,
@@ -312,7 +295,7 @@ export default function CheckoutPage() {
 
     return () => clearTimeout(timer);
 
-  }, [purchaseReady, customerId, identityMethod, phone, email])
+  }, [customerId, identityMethod, phone, email])
 
 
 
@@ -324,7 +307,7 @@ export default function CheckoutPage() {
 
       try {
 
-        const ttlMs = 60 * 60 * 1000 // 1 hour for form data (longer since it's just form fields)
+        const ttlMs = 5 * 60 * 1000 // 5 minutes
 
         const blob = {
 
@@ -1308,7 +1291,7 @@ export default function CheckoutPage() {
 
           const data = JSON.parse(raw)
 
-          if (data && data.expiresAt && data.expiresAt > Date.now() && data.verified) {
+          if (data && data.expiresAt && data.expiresAt > Date.now() && data.verified && data.cartId && data.cartId === cart?.id) {
 
 
 
@@ -1979,7 +1962,7 @@ export default function CheckoutPage() {
 
   // Verify OTP, then checkout-verify
 
-  const verifyOtp = async () => {
+  const verifyOtp = useCallback(async () => {
 
     try {
 
@@ -2160,7 +2143,7 @@ export default function CheckoutPage() {
 
     }
 
-  }
+  }, [otpCode, phone, cart?.id, formData, identityMethod, email])
 
 
 
@@ -2485,7 +2468,7 @@ export default function CheckoutPage() {
         return
       }
 
-      console.log('[CASHFREE] Using customer ID:', actualCustomerId)
+      console.log('[CASHFREE] Customer ID present:', !!actualCustomerId)
 
       // GATE 2: Associate customer with cart (BLOCKING with retries)
       const associateCustomerWithRetry = async (retries = 3): Promise<boolean> => {
@@ -2724,15 +2707,18 @@ export default function CheckoutPage() {
 
         console.error('[CHECKOUT] Price validation error', validationError)
 
-        // Don't block payment on validation errors (fail open)
+        // SECURITY FIX C1: Fail closed — do not proceed if price validation cannot be performed
+        // Server-side create-order also enforces this, but defense-in-depth is correct practice
 
-        // Log for investigation but allow checkout to proceed
+        alert('Unable to verify prices. Please refresh the page and try again.')
+
+        setCashfreeLoading(false)
+
+        return
 
       }
 
 
-
-      const orderId = `order_${Date.now()}`
 
       // Ensure two decimals for INR
 
@@ -2750,6 +2736,8 @@ export default function CheckoutPage() {
 
 
 
+      // SECURITY FIX H2: Order ID is now generated SERVER-SIDE with crypto.randomUUID()
+      // No more predictable client-side Date.now() IDs
       const resp = await fetch('/api/create-order', {
 
         method: 'POST',
@@ -2757,8 +2745,6 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
 
         body: JSON.stringify({
-
-          orderId,
 
           orderAmount,
 
@@ -2781,6 +2767,9 @@ export default function CheckoutPage() {
       })
 
       const data = await resp.json().catch(() => ({}))
+
+      // Use server-generated order ID
+      const orderId = (data as any)?.order_id || (data as any)?.cf_order_id
 
       if (!resp.ok) {
         // Handle authentication errors specifically
@@ -2805,7 +2794,7 @@ export default function CheckoutPage() {
           const firstName = nameParts[0] || 'Customer'
           const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
 
-          console.log('[CASHFREE] Syncing customer profile before payment redirect:', { customerId: actualCustomerId, orderId })
+          console.log('[CASHFREE] Syncing customer profile before payment redirect:', { orderId })
 
           await fetch('/api/checkout/customer/sync', {
             method: 'POST',
@@ -2852,23 +2841,8 @@ export default function CheckoutPage() {
 
 
 
-      // CRITICAL: Store cart ID mapping before redirecting to Cashfree
-
-      // This allows the return page to complete the order
-
-      try {
-
-        sessionStorage.setItem(`cashfree:${orderId}:cartId`, cart.id);
-
-        localStorage.setItem(`cashfree:${orderId}:cartId`, cart.id);
-
-        console.log('[CHECKOUT] Stored cart ID mapping:', { orderId, cartId: cart.id });
-
-      } catch (e) {
-
-        console.error('[CHECKOUT] Failed to store cart ID mapping:', e);
-
-      }
+      // SECURITY FIX C7: Cart ID mapping is stored server-side in HMAC-signed mapping
+      // No more client-side sessionStorage/localStorage (spoofable)
 
 
 

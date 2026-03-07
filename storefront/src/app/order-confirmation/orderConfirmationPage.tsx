@@ -85,8 +85,12 @@ export default function OrderConfirmationPage() {
     } catch (e) {
     }
 
-    // Generate random order number
-    setOrderNumber(`#${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`);
+    // FIX M13: Don't overwrite real order number with random one
+    // Only set placeholder if no real display_id was loaded from session storage above
+    setOrderNumber(prev => prev === '#000000'
+      ? '#------'  // Show placeholder instead of misleading random number
+      : prev
+    );
 
     // Format current date
     const today = new Date();

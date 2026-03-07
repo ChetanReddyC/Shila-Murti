@@ -20,6 +20,7 @@ interface MedusaCaptureResult {
 export async function captureMedusaPayment(paymentId: string, orderId?: string): Promise<MedusaCaptureResult> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
+    const apiSecret = process.env.MEDUSA_API_SECRET
     const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 
     const url = `${baseUrl}/store/payments/capture`
@@ -28,7 +29,9 @@ export async function captureMedusaPayment(paymentId: string, orderId?: string):
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-publishable-api-key': publishableKey || '',
+        ...(apiSecret
+          ? { 'x-api-key': apiSecret }
+          : { 'x-publishable-api-key': publishableKey || '' }),
       },
       body: JSON.stringify({
         payment_id: paymentId,
@@ -77,16 +80,18 @@ export async function captureMedusaPayment(paymentId: string, orderId?: string):
 export async function getPaymentIdFromOrder(orderId: string): Promise<string | null> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
+    const apiSecret = process.env.MEDUSA_API_SECRET
     const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 
-    // Use store API with publishable key instead of admin API
     const url = `${baseUrl}/store/orders/${orderId}?fields=*payment_collections.payments`
 
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'x-publishable-api-key': publishableKey || '',
+        ...(apiSecret
+          ? { 'x-api-key': apiSecret }
+          : { 'x-publishable-api-key': publishableKey || '' }),
       },
     })
 

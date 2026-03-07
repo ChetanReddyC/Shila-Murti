@@ -212,9 +212,10 @@ export async function getCashfreeRefundStatus(
 }
 
 /**
- * Generates a unique, idempotent refund ID
- * Format: refund_{medusaOrderId}_{timestamp}
+ * Generates an idempotent refund ID
+ * SECURITY FIX M6: Removed Date.now() — same order always produces the same refund ID
+ * If Cashfree receives a duplicate refund_id, it returns the existing refund (idempotent)
  */
 export function generateRefundId(medusaOrderId: string): string {
-  return `refund_${medusaOrderId}_${Date.now()}`
+  return `refund_${medusaOrderId}`
 }
