@@ -13,7 +13,7 @@ const allowedOrigins = (process.env.STORE_CORS || "http://localhost:3000,http://
 
 const allowedHeaders = (
   process.env.STORE_ALLOWED_HEADERS ||
-  "Content-Type, Accept, Authorization, X-Requested-With, x-publishable-api-key"
+  "Content-Type, Accept, Authorization, X-Requested-With, x-publishable-api-key, x-internal-call"
 )
 
 async function corsAndDiagnostics(
@@ -59,6 +59,12 @@ async function authGuard(
   next: MedusaNextFunction
 ) {
   try {
+    // Allow internal server-to-server calls (e.g. payment capture from storefront server)
+    const internalSecret = req.headers['x-internal-call'] as string | undefined
+    if (internalSecret && process.env.INTERNAL_API_SECRET && internalSecret === process.env.INTERNAL_API_SECRET) {
+      return next()
+    }
+
     const token = extractBearerToken(req.headers.authorization as string | undefined)
     if (!token) {
       return res.status(401).json({ message: "Missing bearer token" })
