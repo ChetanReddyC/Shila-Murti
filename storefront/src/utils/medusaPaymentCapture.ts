@@ -1,8 +1,8 @@
 /**
  * Medusa Payment Capture Utility
- * 
- * Captures payments in Medusa when Cashfree has already settled them
- * (used when Cashfree preauthorization is not enabled)
+ *
+ * Captures payments in Medusa when Cashfree has already settled them.
+ * Uses the store capture endpoint with INTERNAL_API_SECRET to bypass authGuard.
  */
 
 interface MedusaCaptureResult {
@@ -12,26 +12,30 @@ interface MedusaCaptureResult {
 }
 
 /**
- * Captures a payment in Medusa using backend workflow API
- * @param paymentId - Medusa payment ID
- * @param orderId - Optional Medusa order ID for logging
- * @returns Promise with capture result
+ * Captures a payment in Medusa using the store capture endpoint.
+ * Authenticates via x-internal-call header (bypasses customer JWT requirement).
  */
 export async function captureMedusaPayment(paymentId: string, orderId?: string): Promise<MedusaCaptureResult> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || process.env.MEDUSA_BASE_URL || 'http://localhost:9000'
-    const apiSecret = process.env.MEDUSA_API_SECRET
+    const internalSecret = process.env.INTERNAL_API_SECRET
     const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 
+    if (!internalSecret) {
+      console.error('[MEDUSA_CAPTURE][no_internal_secret]', { paymentId })
+      return { success: false, error: 'INTERNAL_API_SECRET not configured', paymentId }
+    }
+
     const url = `${baseUrl}/store/payments/capture`
+
+    console.log('[MEDUSA_CAPTURE][attempting]', { paymentId, orderId })
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(apiSecret
-          ? { 'x-api-key': apiSecret }
-          : { 'x-publishable-api-key': publishableKey || '' }),
+        'x-publishable-api-key': publishableKey || '',
+        'x-internal-call': internalSecret,
       },
       body: JSON.stringify({
         payment_id: paymentId,
@@ -43,6 +47,7 @@ export async function captureMedusaPayment(paymentId: string, orderId?: string):
       const errorData = await response.json().catch(() => ({}))
       console.error('[MEDUSA_CAPTURE][failed]', {
         paymentId,
+        orderId,
         status: response.status,
         error: errorData,
       })
@@ -54,11 +59,9 @@ export async function captureMedusaPayment(paymentId: string, orderId?: string):
     }
 
     await response.json()
+    console.log('[MEDUSA_CAPTURE][success]', { paymentId, orderId })
 
-    return {
-      success: true,
-      paymentId,
-    }
+    return { success: true, paymentId }
   } catch (error: any) {
     console.error('[MEDUSA_CAPTURE][exception]', {
       paymentId,

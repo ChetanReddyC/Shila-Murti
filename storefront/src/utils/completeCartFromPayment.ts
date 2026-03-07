@@ -164,133 +164,110 @@ async function autoCapturePayment(
   createdOrder: any,
   createdOrderId: string
 ): Promise<void> {
-  const autoCaptureEnabled = process.env.CASHFREE_AUTO_CAPTURE === 'true'
-  let capturedViaCashfree = false
+  // ALWAYS capture in Medusa (this is what changes the admin dashboard status).
+  // Cashfree capture is optional (only needed if preauth is enabled on the merchant account).
+  try {
+    // Step 1: Get the payment ID from the order
+    let paymentId: string | undefined =
+      createdOrder?.payment_collections?.[0]?.payments?.[0]?.id
 
-  // Attempt 1: Cashfree API capture (only if feature enabled)
-  if (autoCaptureEnabled) {
-    try {
-      const orderTotal = createdOrder?.total
-      if (orderTotal) {
-        const captureAmountRupees = Number(orderTotal.toFixed(2)) // Medusa v2 stores INR in rupees
-        const captureResult = await captureCashfreePayment(
-          cashfreeOrderId,
-          captureAmountRupees
+    if (!paymentId) {
+      console.warn('[completeCartFromPayment][payment_id_fetch]', {
+        orderId: createdOrderId,
+        reason: 'Payment ID not in completed order response, fetching separately',
+      })
+
+      const baseUrl =
+        process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL ||
+        process.env.MEDUSA_BASE_URL ||
+        'http://localhost:9000'
+      const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+
+      try {
+        const orderResponse = await fetch(
+          `${baseUrl}/store/orders/${createdOrderId}?fields=*payment_collections.payments`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-publishable-api-key': publishableKey || '',
+            },
+          }
         )
-        console.log('[completeCartFromPayment][cashfree_capture]', {
-          cashfreeOrderId,
-          success: captureResult.success,
-        })
-
-        if (captureResult.success) {
-          capturedViaCashfree = true
+        if (orderResponse.ok) {
+          const orderData = await orderResponse.json()
+          paymentId =
+            orderData?.order?.payment_collections?.[0]?.payments?.[0]?.id
         } else {
-          const isNotEnabled =
-            captureResult.error?.includes('not enabled') ||
-            (captureResult as any).data?.message?.includes('not enabled') ||
-            (captureResult as any).data?.code === 'request_invalid'
-
-          if (isNotEnabled) {
-            console.info(
-              '[completeCartFromPayment][cashfree_capture_not_enabled]',
-              { cashfreeOrderId }
-            )
-          } else {
-            console.warn(
-              '[completeCartFromPayment][cashfree_capture_failed]',
-              { cashfreeOrderId, error: captureResult.error }
-            )
-          }
+          console.error('[completeCartFromPayment][order_fetch_failed]', {
+            orderId: createdOrderId,
+            status: orderResponse.status,
+          })
         }
-      }
-    } catch (captureError: any) {
-      console.error(
-        '[completeCartFromPayment][cashfree_capture_exception]',
-        { cashfreeOrderId, error: captureError?.message || String(captureError) }
-      )
-    }
-  }
-
-  // Attempt 2: Medusa payment capture (fallback when Cashfree already settled)
-  if (!capturedViaCashfree) {
-    try {
-      let paymentId: string | undefined =
-        createdOrder?.payment_collections?.[0]?.payments?.[0]?.id
-
-      if (!paymentId) {
-        console.warn('[completeCartFromPayment][fallback_payment_fetch]', {
+      } catch (fetchError: any) {
+        console.error('[completeCartFromPayment][order_fetch_exception]', {
           orderId: createdOrderId,
-          reason: 'Payment ID not in completed order response',
+          error: fetchError?.message || String(fetchError),
         })
+      }
+    } else {
+      console.log('[completeCartFromPayment][payment_id_from_order]', {
+        orderId: createdOrderId,
+        paymentId,
+      })
+    }
 
-        const baseUrl =
-          process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL ||
-          process.env.MEDUSA_BASE_URL ||
-          'http://localhost:9000'
-        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-
-        try {
-          const orderResponse = await fetch(
-            `${baseUrl}/store/orders/${createdOrderId}?fields=*payment_collections.payments`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-publishable-api-key': publishableKey || '',
-              },
-            }
-          )
-          if (orderResponse.ok) {
-            const orderData = await orderResponse.json()
-            paymentId =
-              orderData?.order?.payment_collections?.[0]?.payments?.[0]?.id
-          } else {
-            console.error(
-              '[completeCartFromPayment][order_fetch_failed]',
-              { orderId: createdOrderId, status: orderResponse.status }
-            )
-          }
-        } catch (fetchError: any) {
-          console.error(
-            '[completeCartFromPayment][order_fetch_exception]',
-            { orderId: createdOrderId, error: fetchError?.message || String(fetchError) }
-          )
-        }
-      } else {
-        console.log('[completeCartFromPayment][payment_id_from_order]', {
+    // Step 2: Capture in Medusa via admin endpoint
+    if (paymentId) {
+      const medusaCaptureResult = await captureMedusaPayment(
+        paymentId,
+        createdOrderId
+      )
+      if (medusaCaptureResult.success) {
+        console.log('[completeCartFromPayment][medusa_capture_success]', {
           orderId: createdOrderId,
           paymentId,
         })
-      }
-
-      if (paymentId) {
-        const medusaCaptureResult = await captureMedusaPayment(
-          paymentId,
-          createdOrderId
-        )
-        if (!medusaCaptureResult.success) {
-          console.error(
-            '[completeCartFromPayment][medusa_capture_failed]',
-            {
-              orderId: createdOrderId,
-              paymentId,
-              error: medusaCaptureResult.error,
-            }
-          )
-        }
       } else {
-        console.warn('[completeCartFromPayment][no_payment_id]', {
+        console.error('[completeCartFromPayment][medusa_capture_failed]', {
           orderId: createdOrderId,
+          paymentId,
+          error: medusaCaptureResult.error,
         })
       }
-    } catch (medusaCaptureError: any) {
-      console.error(
-        '[completeCartFromPayment][medusa_capture_exception]',
-        {
-          orderId: createdOrderId,
-          error: medusaCaptureError?.message || String(medusaCaptureError),
-        }
-      )
+    } else {
+      console.error('[completeCartFromPayment][no_payment_id]', {
+        orderId: createdOrderId,
+      })
     }
+
+    // Step 3: Optionally capture via Cashfree preauth API (if enabled)
+    const autoCaptureEnabled = process.env.CASHFREE_AUTO_CAPTURE === 'true'
+    if (autoCaptureEnabled) {
+      try {
+        const orderTotal = createdOrder?.total
+        if (orderTotal) {
+          const captureAmountRupees = Number(orderTotal.toFixed(2))
+          const captureResult = await captureCashfreePayment(
+            cashfreeOrderId,
+            captureAmountRupees
+          )
+          console.log('[completeCartFromPayment][cashfree_capture]', {
+            cashfreeOrderId,
+            success: captureResult.success,
+          })
+        }
+      } catch (captureError: any) {
+        console.error('[completeCartFromPayment][cashfree_capture_exception]', {
+          cashfreeOrderId,
+          error: captureError?.message || String(captureError),
+        })
+      }
+    }
+  } catch (err: any) {
+    console.error('[completeCartFromPayment][auto_capture_exception]', {
+      orderId: createdOrderId,
+      error: err?.message || String(err),
+    })
   }
 }

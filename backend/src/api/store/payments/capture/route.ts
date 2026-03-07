@@ -19,8 +19,10 @@ export const POST = async (
 
     // SECURITY FIX C4: Auth is now enforced by middleware (authGuard in middlewares.ts)
     // The customer_id is attached by authGuard after JWT verification
+    // Internal server-to-server calls (e.g. auto-capture after payment) bypass customer check
+    const isInternalCall = req.headers['x-internal-call'] === process.env.INTERNAL_API_SECRET
     const customerId = (req as any).customer_id || (req as any).auth?.customer_id
-    if (!customerId) {
+    if (!customerId && !isInternalCall) {
       return res.status(401).json({
         error: 'Authentication required',
       })
@@ -66,49 +68,52 @@ export const POST = async (
 
     // SECURITY FIX M10: Validate that payment_id belongs to the order_id
     // and that the order belongs to the authenticated customer
-    try {
-      const orderModule = req.scope.resolve(Modules.ORDER)
-      const order = await orderModule.retrieveOrder(order_id, {
-        relations: ["payment_collections.payments"],
-      })
+    // Skip full validation for internal server-to-server calls (payment already verified)
+    if (!isInternalCall) {
+      try {
+        const orderModule = req.scope.resolve(Modules.ORDER)
+        const order = await orderModule.retrieveOrder(order_id, {
+          relations: ["payment_collections.payments"],
+        })
 
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found' })
-      }
+        if (!order) {
+          return res.status(404).json({ error: 'Order not found' })
+        }
 
-      // Verify order belongs to authenticated customer
-      if (order.customer_id && order.customer_id !== customerId) {
-        console.error('[BACKEND][STORE_CAPTURE_PAYMENT][ownership_violation]', {
+        // Verify order belongs to authenticated customer
+        if (order.customer_id && order.customer_id !== customerId) {
+          console.error('[BACKEND][STORE_CAPTURE_PAYMENT][ownership_violation]', {
+            payment_id: redact(payment_id),
+            order_id: redact(order_id),
+            orderCustomerId: redact(order.customer_id),
+            requestCustomerId: redact(customerId),
+          })
+          return res.status(403).json({ error: 'Order does not belong to you' })
+        }
+
+        // Verify payment_id belongs to this order
+        const orderPaymentIds = (order.payment_collections || [])
+          .flatMap((pc: any) => (pc.payments || []).map((p: any) => p.id))
+
+        if (orderPaymentIds.length > 0 && !orderPaymentIds.includes(payment_id)) {
+          console.error('[BACKEND][STORE_CAPTURE_PAYMENT][payment_mismatch]', {
+            payment_id: redact(payment_id),
+            order_id: redact(order_id),
+            orderPaymentIds: orderPaymentIds.map(redact),
+          })
+          return res.status(403).json({ error: 'Payment does not belong to this order' })
+        }
+      } catch (validationError: any) {
+        console.error('[BACKEND][STORE_CAPTURE_PAYMENT][validation_error]', {
           payment_id: redact(payment_id),
           order_id: redact(order_id),
-          orderCustomerId: redact(order.customer_id),
-          requestCustomerId: redact(customerId),
+          error: validationError?.message || String(validationError),
         })
-        return res.status(403).json({ error: 'Order does not belong to you' })
-      }
-
-      // Verify payment_id belongs to this order
-      const orderPaymentIds = (order.payment_collections || [])
-        .flatMap((pc: any) => (pc.payments || []).map((p: any) => p.id))
-
-      if (orderPaymentIds.length > 0 && !orderPaymentIds.includes(payment_id)) {
-        console.error('[BACKEND][STORE_CAPTURE_PAYMENT][payment_mismatch]', {
-          payment_id: redact(payment_id),
-          order_id: redact(order_id),
-          orderPaymentIds: orderPaymentIds.map(redact),
+        // Fail closed — if we can't validate ownership, don't capture
+        return res.status(500).json({
+          error: 'Could not validate payment ownership',
         })
-        return res.status(403).json({ error: 'Payment does not belong to this order' })
       }
-    } catch (validationError: any) {
-      console.error('[BACKEND][STORE_CAPTURE_PAYMENT][validation_error]', {
-        payment_id: redact(payment_id),
-        order_id: redact(order_id),
-        error: validationError?.message || String(validationError),
-      })
-      // Fail closed — if we can't validate ownership, don't capture
-      return res.status(500).json({
-        error: 'Could not validate payment ownership',
-      })
     }
 
     // Proceed with capture
