@@ -20,7 +20,7 @@ export default function CheckoutPage() {
 
   const router = useRouter();
 
-  const { cart, loading, refreshCart, loadSpecificCart, clearCart, setOrderConfirmationProtection, clearCartSilently } = useCart();
+  const { cart, loading, refreshCart, loadSpecificCart, clearCart, clearCartSilently } = useCart();
 
   const { authenticate, authenticateConditional, isConditionalMediationAvailable } = usePasskey();
 

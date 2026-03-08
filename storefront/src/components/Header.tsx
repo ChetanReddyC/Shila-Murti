@@ -3,7 +3,6 @@
 import { FC, useEffect, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useCart } from '../contexts/CartContext';
-import { isOrderConfirmationProtectionActive } from '../utils/orderConfirmationProtection';
 import styles from './Header.module.css';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -15,13 +14,12 @@ import LogoutConfirmModal from './LogoutConfirmModal';
 import LoadingScreen from './LoadingScreen';
 
 const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgress = false, progress = 0 }) => {
-  const { getTotalItems, loading: cartLoading, isOrderConfirmationActive } = useCart();
+  const { getTotalItems, loading: cartLoading } = useCart();
   const { data: session } = useSession();
   const [hydrated, setHydrated] = useState(false);
 
   const [hasVisitedCart, setHasVisitedCart] = useState<boolean>(false);
   const [isOnCartPage, setIsOnCartPage] = useState<boolean>(false);
-  const [isOnOrderConfirmation, setIsOnOrderConfirmation] = useState<boolean>(false);
   const [lastSeenCount, setLastSeenCount] = useState<number>(0);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
   const [toggleCount, setToggleCount] = useState<number>(0);
@@ -53,7 +51,6 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
       const path = window.location.pathname || '';
       Promise.resolve().then(() => {
         setIsOnCartPage(path === '/cart' || path.startsWith('/cart/'));
-        setIsOnOrderConfirmation(path.startsWith('/order-confirmation'));
       });
     };
 
@@ -98,9 +95,7 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isProfileMenuOpen]);
 
-  const protectionActive = hydrated ? (isOrderConfirmationActive() || isOrderConfirmationProtectionActive()) : false;
-  const preventCartNavigation = hydrated ? (isOnOrderConfirmation || protectionActive) : false;
-  const totalItems = preventCartNavigation ? 0 : getTotalItems();
+  const totalItems = hydrated ? getTotalItems() : 0;
   const shouldShowBadge = !isOnCartPage && totalItems > 0;
 
   const handleLogoutConfirm = async () => {
@@ -464,16 +459,10 @@ const Header: FC<{ showProgress?: boolean; progress?: number }> = ({ showProgres
               </button>
 
               <a
-                href={preventCartNavigation ? '#' : '/cart'}
-                onClick={(e) => {
-                  if (preventCartNavigation) {
-                    e.preventDefault();
-                    return false;
-                  }
-                }}
-                className={`${styles.iconButton} ${styles.cartButton} ${preventCartNavigation ? styles.cartButtonDisabled : ''}`}
+                href="/cart"
+                className={`${styles.iconButton} ${styles.cartButton}`}
                 aria-label={`Cart (${totalItems} items)`}
-                title={preventCartNavigation ? 'Cart is temporarily disabled after order completion.' : 'Open cart'}
+                title="Open cart"
               >
                 <div className={styles.cartIconContainer}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">

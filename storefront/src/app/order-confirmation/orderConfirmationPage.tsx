@@ -13,8 +13,8 @@ import { getCustomerId as getCustomerIdHybrid } from '../../utils/hybridCustomer
 export default function OrderConfirmationPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  // Use cart context only for protection and silent clearing; capture cart once for fallback display
-  const { clearCartSilently, setOrderConfirmationProtection, cart } = useCart();
+  // Use cart context for silent clearing; capture cart once for fallback display
+  const { clearCartSilently, cart } = useCart();
   const [fallbackCart, setFallbackCart] = useState<any | null>(null);
 
   // Snapshot from checkout (preferred for display)
@@ -287,29 +287,13 @@ export default function OrderConfirmationPage() {
     }
   };
 
-  // Add a listener to prevent navigation away from this page
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Function to check if we're trying to navigate away to /cart
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Set a flag to indicate we're on the order confirmation page
-      sessionStorage.setItem('order_confirmation_active', String(Date.now() + 30000));
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
 
   return (
     <div className={styles.pageWrapper}>
       <div className={styles.mainLayout}>
         <div className={styles.contentWrapper}>
           <div className={styles.container}>
-            {/* Prevent accidental navigation away due to cart state changes by not rendering any links to /cart here */}
-            <h1 className={styles.title}>Thank you for your order!</h1>
+<h1 className={styles.title}>Thank you for your order!</h1>
             <p className={styles.description}>Your order has been placed. You will receive an email shortly.</p>
             <h2 className={styles.sectionTitle}>Order Summary</h2>
             <div className={styles.summaryContainer}>
