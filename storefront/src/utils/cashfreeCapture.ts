@@ -1,6 +1,8 @@
+import 'server-only'
+
 /**
  * Cashfree Payment Capture Utility
- * 
+ *
  * Captures a pre-authorized payment after successful order creation.
  * Uses Cashfree's Preauthorization API to move payment from 'authorized' to 'captured' state.
  */

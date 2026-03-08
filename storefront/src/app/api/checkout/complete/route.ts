@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 import { medusaApiClient } from '@/utils/medusaApiClient'
 import { kvGet } from '@/lib/kv'
 import {
@@ -12,10 +13,15 @@ import { validateCheckoutAuth, extractCustomerInfo } from '@/utils/checkoutAuthV
 import { refreshAuthSession } from '@/lib/auth/sessionManager'
 import { completeCartFromPayment } from '@/utils/completeCartFromPayment'
 
+function safeCompare(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
+
 export async function POST(req: NextRequest) {
   // H1: CSRF protection — validate Origin for browser requests
   const internalSecret = req.headers.get('x-internal-call')
-  if (internalSecret && internalSecret === process.env.INTERNAL_API_SECRET) {
+  if (internalSecret && process.env.INTERNAL_API_SECRET && safeCompare(internalSecret, process.env.INTERNAL_API_SECRET)) {
     // Server-to-server call (e.g., webhook) — skip CSRF check
   } else {
     const origin = req.headers.get('origin')
@@ -532,7 +538,7 @@ export async function POST(req: NextRequest) {
         orderId,
         error: e?.message || String(e)
       })
-      return NextResponse.json({ ok: false, error: e?.message || 'complete_failed' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'complete_failed' }, { status: 400 })
     } finally {
       // SECURITY FIX: Always release lock, even on error
       await releaseCompletionLock(completionLock)
@@ -541,7 +547,7 @@ export async function POST(req: NextRequest) {
     console.error('[COMPLETE_API][outer_error]', {
       error: e?.message || String(e)
     })
-    return NextResponse.json({ error: 'server_error', message: e?.message || String(e) }, { status: 500 })
+    return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
 

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 const captureCashfreePaymentPromise = import('../../utils/cashfreeCapture.ts').then(m => m.captureCashfreePayment).catch(() => null);
 const preventWebhookReplayPromise = import('../../utils/orderCompletionGuard.ts').then(m => m.preventWebhookReplay).catch(() => null);
 const acquireCompletionLockPromise = import('../../utils/orderCompletionGuard.ts').then(m => m.acquireCompletionLock).catch(() => null);
+const releaseCompletionLockPromise = import('../../utils/orderCompletionGuard.ts').then(m => m.releaseCompletionLock).catch(() => null);
 const medusaCapturePromise = import('../../utils/medusaPaymentCapture.ts').catch(() => null);
 
 // SECURITY FIX: Import secure mapping validation
@@ -124,71 +125,85 @@ export default async function handler(req, res) {
       }
 
       // Security: Acquire lock only if mapping is valid
+      let acquiredLock = null;
       if (cartId && mappingValid) {
         try {
           const acquireLock = await acquireCompletionLockPromise;
           if (acquireLock) {
             const lockResult = await acquireLock(cartId, orderId);
             if (!lockResult.allowed) {
-              console.warn('[WEBHOOK][completion_blocked]', { 
-                orderId, 
-                cartId, 
+              console.warn('[WEBHOOK][completion_blocked]', {
+                orderId,
+                cartId,
                 reason: lockResult.reason,
-                existingOrderId: lockResult.existingOrderId 
+                existingOrderId: lockResult.existingOrderId
               });
               // Already completed, return success to prevent retry
               return res.status(200).json({ ok: true, message: 'Already processed' });
             }
+            acquiredLock = lockResult.lock || null;
           }
         } catch (lockErr) {
           console.error('[WEBHOOK][lock_error]', { orderId, cartId, error: String(lockErr) });
         }
       }
 
-      // Attempt to capture payment before completing cart (only if enabled)
-      const autoCaptureEnabled = process.env.CASHFREE_AUTO_CAPTURE === 'true'
-      if (autoCaptureEnabled) {
-        try {
-          const captureFn = await captureCashfreePaymentPromise
-          if (captureFn && orderAmount > 0) {
-            const captureResult = await captureFn(orderId, orderAmount)
-            console.log('[WEBHOOK][cashfree_capture]', { orderId, success: captureResult.success });
-            
-            if (!captureResult.success) {
-              const isNotEnabled = 
-                captureResult.error?.includes('not enabled') || 
-                captureResult.data?.message?.includes('not enabled');
-              if (isNotEnabled) {
-                console.info('[WEBHOOK][capture_not_enabled]', { 
-                  message: 'Preauthorization not enabled. Using direct settlement.',
-                  orderId 
-                });
+      try {
+        // Attempt to capture payment before completing cart (only if enabled)
+        const autoCaptureEnabled = process.env.CASHFREE_AUTO_CAPTURE === 'true'
+        if (autoCaptureEnabled) {
+          try {
+            const captureFn = await captureCashfreePaymentPromise
+            if (captureFn && orderAmount > 0) {
+              const captureResult = await captureFn(orderId, orderAmount)
+              console.log('[WEBHOOK][cashfree_capture]', { orderId, success: captureResult.success });
+
+              if (!captureResult.success) {
+                const isNotEnabled =
+                  captureResult.error?.includes('not enabled') ||
+                  captureResult.data?.message?.includes('not enabled');
+                if (isNotEnabled) {
+                  console.info('[WEBHOOK][capture_not_enabled]', {
+                    message: 'Preauthorization not enabled. Using direct settlement.',
+                    orderId
+                  });
+                }
               }
             }
+          } catch (captureErr) {
+            console.error('[WEBHOOK][cashfree_capture][error]', { orderId, error: String(captureErr) });
           }
-        } catch (captureErr) {
-          console.error('[WEBHOOK][cashfree_capture][error]', { orderId, error: String(captureErr) });
         }
-      }
 
-      // Complete the cart directly via shared utility (no HTTP self-fetch)
-      if (cartId && mappingValid) {
-        try {
-          const completeCartFromPaymentModule = await import('../../utils/completeCartFromPayment.ts');
-          const completeResult = await completeCartFromPaymentModule.completeCartFromPayment({
-            cartId,
-            cashfreeOrderId: orderId,
-          });
-          if (!completeResult.success) {
-            console.error('[WEBHOOK][complete_error]', { error: completeResult.error });
-          } else {
-            console.log('[WEBHOOK][complete_success]', { orderId: completeResult.orderId });
+        // Complete the cart directly via shared utility (no HTTP self-fetch)
+        if (cartId && mappingValid) {
+          try {
+            const completeCartFromPaymentModule = await import('../../utils/completeCartFromPayment.ts');
+            const completeResult = await completeCartFromPaymentModule.completeCartFromPayment({
+              cartId,
+              cashfreeOrderId: orderId,
+            });
+            if (!completeResult.success) {
+              console.error('[WEBHOOK][complete_error]', { error: completeResult.error });
+            } else {
+              console.log('[WEBHOOK][complete_success]', { orderId: completeResult.orderId });
+            }
+          } catch (e) {
+            console.error('[WEBHOOK][complete_error]', { error: String(e) });
           }
-        } catch (e) {
-          console.error('[WEBHOOK][complete_error]', { error: String(e) });
+        } else {
+          console.error('[WEBHOOK][completion_skipped] No valid cart mapping');
         }
-      } else {
-        console.error('[WEBHOOK][completion_skipped] No valid cart mapping');
+      } finally {
+        // Always release the completion lock
+        if (acquiredLock) {
+          try {
+            const releaseLock = await releaseCompletionLockPromise;
+            if (releaseLock) await releaseLock(acquiredLock);
+          } catch (releaseErr) {
+            console.error('[WEBHOOK][lock_release_error]', { orderId, error: String(releaseErr) });
+          }
+        }
       }
     } else {
       console.log('[WEBHOOK][ignored]', { orderId, status, reason: 'Not PAID status' });
