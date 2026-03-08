@@ -10,15 +10,17 @@ export interface LoadingScreenProps {
   imageSrc?: string;
   imagesFolder?: string;
   shaderEffect?: 'smoke';
+  statusText?: string;
 }
 
-export default function LoadingScreen({ 
-  show = true, 
+export default function LoadingScreen({
+  show = true,
   onComplete,
   duration = 1200,
   imageSrc,
   imagesFolder,
-  shaderEffect = 'smoke'
+  shaderEffect = 'smoke',
+  statusText = 'Getting things ready for you...'
 }: LoadingScreenProps) {
   const [isVisible, setIsVisible] = useState(show);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
@@ -36,6 +38,8 @@ export default function LoadingScreen({
   
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const textAnimationRef = useRef<number | null>(null);
+  const statusTextRef = useRef(statusText);
+  statusTextRef.current = statusText;
 
   useEffect(() => {
     if (!show && isVisible) {
@@ -972,7 +976,8 @@ export default function LoadingScreen({
     textCtx.textAlign = 'center';
     textCtx.textBaseline = 'middle';
     textCtx.letterSpacing = '0.05em';
-    textCtx.fillText('Getting things ready for you...', 400, 50);
+    textCtx.fillText(statusTextRef.current, 400, 50);
+    let lastRenderedText = statusTextRef.current;
 
     canvas.width = 800;
     canvas.height = 100;
@@ -1168,6 +1173,13 @@ export default function LoadingScreen({
 
       gl.uniform1i(imageLocation, 0);
       gl.uniform1f(timeLocation, currentTime);
+
+      if (statusTextRef.current !== lastRenderedText) {
+        textCtx.clearRect(0, 0, 800, 100);
+        textCtx.fillText(statusTextRef.current, 400, 50);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
+        lastRenderedText = statusTextRef.current;
+      }
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
