@@ -1,6 +1,13 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { capturePaymentWorkflow } from "@medusajs/medusa/core-flows"
 import { Modules } from "@medusajs/framework/utils"
+import { timingSafeEqual } from "crypto"
+
+/** Constant-time comparison to prevent timing attacks */
+function safeCompare(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
 
 const redact = (id: string) => id ? '...' + id.slice(-8) : 'N/A'
 
@@ -20,7 +27,8 @@ export const POST = async (
     // SECURITY FIX C4: Auth is now enforced by middleware (authGuard in middlewares.ts)
     // The customer_id is attached by authGuard after JWT verification
     // Internal server-to-server calls (e.g. auto-capture after payment) bypass customer check
-    const isInternalCall = req.headers['x-internal-call'] === process.env.INTERNAL_API_SECRET
+    const internalHeader = (req.headers['x-internal-call'] || '') as string
+    const isInternalCall = !!(process.env.INTERNAL_API_SECRET && safeCompare(internalHeader, process.env.INTERNAL_API_SECRET))
     const customerId = (req as any).customer_id || (req as any).auth?.customer_id
     if (!customerId && !isInternalCall) {
       return res.status(401).json({
@@ -62,7 +70,6 @@ export const POST = async (
       })
       return res.status(409).json({
         error: 'Payment already captured',
-        captured_at: payment.captured_at,
       })
     }
 
@@ -81,7 +88,15 @@ export const POST = async (
         }
 
         // Verify order belongs to authenticated customer
-        if (order.customer_id && order.customer_id !== customerId) {
+        if (!order.customer_id) {
+          // Guest order — external callers cannot capture guest order payments
+          console.error('[BACKEND][STORE_CAPTURE_PAYMENT][guest_order_denied]', {
+            payment_id: redact(payment_id),
+            order_id: redact(order_id),
+          })
+          return res.status(403).json({ error: 'Cannot capture payment for guest order' })
+        }
+        if (order.customer_id !== customerId) {
           console.error('[BACKEND][STORE_CAPTURE_PAYMENT][ownership_violation]', {
             payment_id: redact(payment_id),
             order_id: redact(order_id),
@@ -95,7 +110,14 @@ export const POST = async (
         const orderPaymentIds = (order.payment_collections || [])
           .flatMap((pc: any) => (pc.payments || []).map((p: any) => p.id))
 
-        if (orderPaymentIds.length > 0 && !orderPaymentIds.includes(payment_id)) {
+        if (orderPaymentIds.length === 0) {
+          console.error('[BACKEND][STORE_CAPTURE_PAYMENT][no_payments_on_order]', {
+            payment_id: redact(payment_id),
+            order_id: redact(order_id),
+          })
+          return res.status(400).json({ error: 'No payments found for this order' })
+        }
+        if (!orderPaymentIds.includes(payment_id)) {
           console.error('[BACKEND][STORE_CAPTURE_PAYMENT][payment_mismatch]', {
             payment_id: redact(payment_id),
             order_id: redact(order_id),
@@ -117,7 +139,7 @@ export const POST = async (
     }
 
     // Proceed with capture
-    const result = await capturePaymentWorkflow(req.scope).run({
+    await capturePaymentWorkflow(req.scope).run({
       input: {
         payment_id,
       },
@@ -129,7 +151,6 @@ export const POST = async (
       success: true,
       payment_id,
       order_id,
-      result,
     })
   } catch (error: any) {
     console.error('[BACKEND][STORE_CAPTURE_PAYMENT][error]', {

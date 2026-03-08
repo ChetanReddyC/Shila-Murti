@@ -1,12 +1,19 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
+import { timingSafeEqual } from "crypto"
 import { extractBearerToken, verifyAccessToken } from "../../../../../../utils/jwt"
+
+function safeCompare(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     // SECURITY: Check if this is an internal system call (from webhook or admin)
     // Internal calls will have a special header or use admin auth
-    const isInternalCall = req.headers['x-internal-call'] === process.env.INTERNAL_API_SECRET
+    const internalHeader = (req.headers['x-internal-call'] || '') as string
+    const isInternalCall = !!(process.env.INTERNAL_API_SECRET && safeCompare(internalHeader, process.env.INTERNAL_API_SECRET))
     
     // If not internal, require customer JWT authentication
     let authenticatedCustomerId: string | undefined
@@ -96,16 +103,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         orderId,
         error: String(updateError)
       })
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "Failed to update metadata",
-        error: String(updateError)
       })
     }
   } catch (error: any) {
     console.error("[METADATA_UPDATE_ERROR]", error)
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: "Internal Server Error",
-      error: error?.message
     })
   }
 }

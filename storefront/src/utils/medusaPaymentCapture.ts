@@ -1,3 +1,5 @@
+import 'server-only'
+
 /**
  * Medusa Payment Capture Utility
  *

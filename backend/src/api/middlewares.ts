@@ -1,7 +1,14 @@
 import { defineMiddlewares } from "@medusajs/framework/http"
 import type { MedusaRequest, MedusaResponse, MedusaNextFunction } from "@medusajs/framework/http"
+import { timingSafeEqual } from "crypto"
 import { extractBearerToken, verifyAccessToken } from "../utils/jwt"
 import { validateCartOwnership } from "./middlewares/cartOwnership"
+
+/** Constant-time comparison to prevent timing attacks on secret values */
+function safeCompare(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
 
 // Explicit CORS + diagnostics for Store routes. This guarantees that
 // custom headers like `x-publishable-api-key` are allowed and that
@@ -13,7 +20,7 @@ const allowedOrigins = (process.env.STORE_CORS || "http://localhost:3000,http://
 
 const allowedHeaders = (
   process.env.STORE_ALLOWED_HEADERS ||
-  "Content-Type, Accept, Authorization, X-Requested-With, x-publishable-api-key, x-internal-call"
+  "Content-Type, Accept, Authorization, X-Requested-With, x-publishable-api-key"
 )
 
 async function corsAndDiagnostics(
@@ -61,7 +68,7 @@ async function authGuard(
   try {
     // Allow internal server-to-server calls (e.g. payment capture from storefront server)
     const internalSecret = req.headers['x-internal-call'] as string | undefined
-    if (internalSecret && process.env.INTERNAL_API_SECRET && internalSecret === process.env.INTERNAL_API_SECRET) {
+    if (internalSecret && process.env.INTERNAL_API_SECRET && safeCompare(internalSecret, process.env.INTERNAL_API_SECRET)) {
       return next()
     }
 
@@ -101,7 +108,8 @@ function rateLimit(
   res: MedusaResponse,
   next: MedusaNextFunction
 ) {
-  const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+  // Use socket IP directly to prevent spoofing via X-Forwarded-For header
+  const ip = req.socket?.remoteAddress || "unknown"
   const key = `${ip}:${req.path}`
   const now = Date.now()
 
