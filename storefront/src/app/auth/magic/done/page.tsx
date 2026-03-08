@@ -28,11 +28,10 @@ export default function MagicDonePage() {
       // Note: Removed automatic passkey registration prompt for better UX
       // Users can set up passkeys later from their account settings
 
-      // Check if we're in a checkout flow with order confirmation active
-      const orderConfirmationActive = sessionStorage.getItem('order_confirmation_active');
+      // Check if we're in a checkout flow
       const isCheckoutFlow = state && state.startsWith('checkout-');
-      
-      if (isCheckoutFlow || orderConfirmationActive) {
+
+      if (isCheckoutFlow) {
         // If in checkout flow, close this window/tab rather than redirect
         // This prevents disrupting the checkout flow in the original tab
         try {

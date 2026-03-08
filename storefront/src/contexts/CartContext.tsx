@@ -16,7 +16,6 @@ interface CartState {
   loading: boolean;
   error: string | null;
   cartId: string | null;
-  orderConfirmationProtection: boolean;
   calculatedTotals: CartTotals | null;
   priceValidation: PriceConsistencyResult | null;
 }
@@ -29,7 +28,6 @@ type CartAction =
   | { type: 'SET_CART_ID'; payload: string | null }
   | { type: 'CLEAR_CART' }
   | { type: 'CLEAR_CART_SILENTLY' }
-  | { type: 'SET_ORDER_CONFIRMATION_PROTECTION'; payload: boolean }
   | { type: 'SET_CALCULATED_TOTALS'; payload: CartTotals | null }
   | { type: 'SET_PRICE_VALIDATION'; payload: PriceConsistencyResult | null }
   | { type: 'RESET_STATE' };
@@ -53,8 +51,6 @@ interface CartContextType {
   clearError: () => void;
   retryLastOperation: () => Promise<void>;
   isRetryable: boolean;
-  isOrderConfirmationActive: () => boolean;
-  setOrderConfirmationProtection: (active: boolean) => void;
   // Price calculation methods
   formatCurrency: (amount: number, currency?: string) => string;
   getFormattedTotal: () => string;
@@ -70,7 +66,6 @@ const initialState: CartState = {
   loading: false,
   error: null,
   cartId: null,
-  orderConfirmationProtection: false,
   calculatedTotals: null,
   priceValidation: null,
 };
@@ -127,11 +122,6 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         calculatedTotals: null,
         priceValidation: null,
       };
-    case 'SET_ORDER_CONFIRMATION_PROTECTION':
-      return {
-        ...state,
-        orderConfirmationProtection: action.payload,
-      };
     case 'SET_CALCULATED_TOTALS':
       return {
         ...state,
@@ -162,13 +152,6 @@ const safeParseJSON = <T,>(payload: string | null): T | null => {
     return null;
   }
 };
-import {
-  ORDER_CONFIRMATION_ACTIVE_KEY,
-  DEFAULT_TTL_MS as ORDER_CONFIRMATION_TTL_MS,
-  getOrderConfirmationProtectionExpiry,
-  isOrderConfirmationProtectionActive as extIsActive,
-  setOrderConfirmationProtection as extSetActive,
-} from '../utils/orderConfirmationProtection';
 
 // Create context
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -339,19 +322,6 @@ export function CartProvider({ children }: CartProviderProps) {
     }
   }, []);
 
-  // Order confirmation protection helpers (sessionStorage-backed with TTL)
-  const getOrderConfirmationActive = React.useCallback((): boolean => {
-    return extIsActive();
-  }, []);
-
-  const setOrderConfirmationProtection = React.useCallback((active: boolean): void => {
-    try {
-      extSetActive(active, ORDER_CONFIRMATION_TTL_MS);
-    } catch (error) {
-    }
-    dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: active });
-  }, []);
-
   // Price calculation and validation functions
   const recalculatePrices = React.useCallback((selectedShippingOptionId?: string): void => {
     if (!state.cart) {
@@ -427,19 +397,6 @@ export function CartProvider({ children }: CartProviderProps) {
   const validatePrices = React.useCallback((): PriceConsistencyResult | null => {
     return state.priceValidation;
   }, [state.priceValidation]);
-
-  const isOrderConfirmationActive = React.useCallback((): boolean => {
-    const expiry = getOrderConfirmationProtectionExpiry();
-    return typeof expiry === 'number' ? expiry > Date.now() : false;
-  }, []);
-
-  // Keep in-memory state in sync with persisted flag without dispatching during render
-  useEffect(() => {
-    const derivedActive = isOrderConfirmationActive();
-    if (derivedActive !== state.orderConfirmationProtection) {
-      dispatch({ type: 'SET_ORDER_CONFIRMATION_PROTECTION', payload: derivedActive });
-    }
-  }, [isOrderConfirmationActive, state.orderConfirmationProtection]);
 
   // Recalculate prices whenever cart changes
   useEffect(() => {
@@ -1071,8 +1028,6 @@ export function CartProvider({ children }: CartProviderProps) {
     clearError,
     retryLastOperation,
     isRetryable: errorState.isRetryable || (lastOperation !== null && isRetryableError(errorState.originalError)),
-    isOrderConfirmationActive,
-    setOrderConfirmationProtection,
     // Price calculation methods
     formatCurrency,
     getFormattedTotal,
@@ -1102,8 +1057,6 @@ export function CartProvider({ children }: CartProviderProps) {
     lastOperation,
     isRetryableError,
     errorState.originalError,
-    isOrderConfirmationActive,
-    setOrderConfirmationProtection,
     formatCurrency,
     getFormattedTotal,
     getFormattedSubtotal,

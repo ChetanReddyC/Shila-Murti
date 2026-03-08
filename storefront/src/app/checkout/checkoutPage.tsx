@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import Script from 'next/script';
 import styles from './checkoutPage.module.css';
 import loginStyles from '../(auth)/login/loginPage.module.css';
@@ -13,6 +14,7 @@ import { usePasskey } from '../../hooks/usePasskey';
 import { PriceCalculationService } from '../../services/PriceCalculationService';
 import { validateIndianAddress, validateAddressField, type AddressInput } from '../../utils/addressValidation';
 import AuthRequiredModal from '../../components/AuthRequiredModal';
+import LoadingScreen from '../../components/LoadingScreen';
 import { useNavigationLoading } from '../../providers/NavigationLoadingProvider';
 import { setCustomerId as setCustomerIdHybrid, getCustomerId as getCustomerIdHybrid } from '../../utils/hybridCustomerStorage';
 
@@ -20,7 +22,7 @@ export default function CheckoutPage() {
 
   const router = useRouter();
 
-  const { cart, loading, refreshCart, loadSpecificCart, clearCart, setOrderConfirmationProtection, clearCartSilently } = useCart();
+  const { cart, loading, refreshCart, loadSpecificCart, clearCart, clearCartSilently } = useCart();
 
   const { authenticate, authenticateConditional, isConditionalMediationAvailable } = usePasskey();
 
@@ -99,6 +101,7 @@ export default function CheckoutPage() {
   const [loginIdentifier, setLoginIdentifier] = useState('')
 
   const [loginProcessing, setLoginProcessing] = useState(false)
+  const [loginStatusText, setLoginStatusText] = useState('Checking your credentials...')
 
 
 
@@ -655,7 +658,11 @@ export default function CheckoutPage() {
 
           console.log('[Checkout ConditionalUI] Passkey selected from autofill!')
 
-          setIdentityError('Authenticating with passkey...')
+          // Show full-page loading screen with status progression
+          flushSync(() => {
+            setLoginProcessing(true)
+            setLoginStatusText('Authenticating with passkey...')
+          })
 
 
 
@@ -685,11 +692,13 @@ export default function CheckoutPage() {
 
             setIdentityError('Passkey authentication failed')
 
+            setLoginProcessing(false)
+
             return
 
           }
 
-
+          setLoginStatusText('Verifying your identity...')
 
           const result = await verifyRes.json()
 
@@ -742,6 +751,7 @@ export default function CheckoutPage() {
 
 
           // Ensure customer exists
+          setLoginStatusText('Setting up your account...')
 
           let ensuredCustomerId: string | undefined
 
@@ -804,6 +814,7 @@ export default function CheckoutPage() {
 
 
             // Update NextAuth session
+            setLoginStatusText('Creating your session...')
 
             try {
 
@@ -830,6 +841,8 @@ export default function CheckoutPage() {
                 setIdentityError('⚠️ Session creation failed. Please refresh the page.')
 
                 setPurchaseReady(false)
+
+                setLoginProcessing(false)
 
                 return
 
@@ -875,6 +888,8 @@ export default function CheckoutPage() {
 
                   setPurchaseReady(false)
 
+                  setLoginProcessing(false)
+
                   return
 
                 }
@@ -883,6 +898,8 @@ export default function CheckoutPage() {
 
                 console.log('✅ [Checkout ConditionalUI] Session validated successfully')
 
+              setLoginProcessing(false)
+
               } catch (validationError) {
 
                 console.error('[Checkout ConditionalUI] Session validation error:', validationError)
@@ -890,6 +907,8 @@ export default function CheckoutPage() {
                 setIdentityError('⚠️ Could not validate session. Please refresh the page.')
 
                 setPurchaseReady(false)
+
+                setLoginProcessing(false)
 
                 return
 
@@ -904,6 +923,8 @@ export default function CheckoutPage() {
               setIdentityError('⚠️ Authentication failed. Please refresh the page.')
 
               setPurchaseReady(false)
+
+              setLoginProcessing(false)
 
               return
 
@@ -923,6 +944,8 @@ export default function CheckoutPage() {
 
             setIdentityError('Failed to get customer information. Please try again.')
 
+            setLoginProcessing(false)
+
           }
 
         }
@@ -936,6 +959,8 @@ export default function CheckoutPage() {
           console.warn('[Checkout ConditionalUI] Error:', err)
 
         }
+
+        setLoginProcessing(false)
 
       }
 
@@ -3518,9 +3543,11 @@ export default function CheckoutPage() {
 
       setIdentityError(null)
 
-      setLoginProcessing(true)
-
-
+      // Force immediate render so loading screen appears before async work
+      flushSync(() => {
+        setLoginProcessing(true)
+        setLoginStatusText('Checking your credentials...')
+      })
 
       if (!loginIdentifier.trim()) {
 
@@ -3575,7 +3602,7 @@ export default function CheckoutPage() {
           console.log('[Checkout Login] Platform authenticator available:', available)
 
           if (available) {
-
+            setLoginStatusText('Authenticating with passkey...')
             // Fetch passkey request options
 
             const optionsRes = await fetch('/api/auth/passkey/options', {
@@ -3607,7 +3634,7 @@ export default function CheckoutPage() {
 
 
               if (!error && data) {
-
+                setLoginStatusText('Verifying your identity...')
                 // Verify passkey assertion
 
                 const verifyRes = await fetch('/api/auth/passkey/verify', {
@@ -3637,7 +3664,7 @@ export default function CheckoutPage() {
 
 
                 if (verifyRes.ok) {
-
+                  setLoginStatusText('Setting up your account...')
                   // Successful passkey authentication (proceed even if comboRequired for checkout flow)
 
                   // Ensure customer exists (same as login page)
@@ -3682,6 +3709,7 @@ export default function CheckoutPage() {
 
 
 
+                    setLoginStatusText('Creating your session...')
                     // Sign in with NextAuth session (same as login page but no redirect)
 
                     const { signIn } = await import('next-auth/react')
@@ -4347,7 +4375,7 @@ export default function CheckoutPage() {
                           onClick={handleLoginSubmit}
                           disabled={loginProcessing || !loginIdentifier.trim()}
                         >
-                          {loginProcessing ? 'Processing...' : 'Login'}
+                          Login
                         </button>
                       </div>
                     </div>
@@ -4473,6 +4501,12 @@ export default function CheckoutPage() {
       />
 
       {/* OTP Modal */}
+      <LoadingScreen
+        show={loginProcessing}
+        statusText={loginStatusText}
+        imagesFolder="/loading-animations"
+        shaderEffect="smoke"
+      />
       {showOtpModal && (
         <div className={loginStyles.modalOverlay}>
           <div className={loginStyles.modal}>
