@@ -4,7 +4,8 @@
       "Bash(xargs grep:*)",
       "Bash(grep:*)",
       "Bash(ls:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(node -e \"const pkg = require\\(''./node_modules/react/package.json''\\); console.log\\(''React:'', pkg.version\\); const next = require\\(''./node_modules/next/package.json''\\); console.log\\(''Next.js:'', next.version\\);\")"
     ]
   }
 }

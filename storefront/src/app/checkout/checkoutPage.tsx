@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import Script from 'next/script';
 import styles from './checkoutPage.module.css';
 import loginStyles from '../(auth)/login/loginPage.module.css';
@@ -657,7 +658,11 @@ export default function CheckoutPage() {
 
           console.log('[Checkout ConditionalUI] Passkey selected from autofill!')
 
-          setIdentityError('Authenticating with passkey...')
+          // Show full-page loading screen with status progression
+          flushSync(() => {
+            setLoginProcessing(true)
+            setLoginStatusText('Authenticating with passkey...')
+          })
 
 
 
@@ -687,11 +692,13 @@ export default function CheckoutPage() {
 
             setIdentityError('Passkey authentication failed')
 
+            setLoginProcessing(false)
+
             return
 
           }
 
-
+          setLoginStatusText('Verifying your identity...')
 
           const result = await verifyRes.json()
 
@@ -744,6 +751,7 @@ export default function CheckoutPage() {
 
 
           // Ensure customer exists
+          setLoginStatusText('Setting up your account...')
 
           let ensuredCustomerId: string | undefined
 
@@ -806,6 +814,7 @@ export default function CheckoutPage() {
 
 
             // Update NextAuth session
+            setLoginStatusText('Creating your session...')
 
             try {
 
@@ -832,6 +841,8 @@ export default function CheckoutPage() {
                 setIdentityError('⚠️ Session creation failed. Please refresh the page.')
 
                 setPurchaseReady(false)
+
+                setLoginProcessing(false)
 
                 return
 
@@ -877,6 +888,8 @@ export default function CheckoutPage() {
 
                   setPurchaseReady(false)
 
+                  setLoginProcessing(false)
+
                   return
 
                 }
@@ -885,6 +898,8 @@ export default function CheckoutPage() {
 
                 console.log('✅ [Checkout ConditionalUI] Session validated successfully')
 
+              setLoginProcessing(false)
+
               } catch (validationError) {
 
                 console.error('[Checkout ConditionalUI] Session validation error:', validationError)
@@ -892,6 +907,8 @@ export default function CheckoutPage() {
                 setIdentityError('⚠️ Could not validate session. Please refresh the page.')
 
                 setPurchaseReady(false)
+
+                setLoginProcessing(false)
 
                 return
 
@@ -906,6 +923,8 @@ export default function CheckoutPage() {
               setIdentityError('⚠️ Authentication failed. Please refresh the page.')
 
               setPurchaseReady(false)
+
+              setLoginProcessing(false)
 
               return
 
@@ -925,6 +944,8 @@ export default function CheckoutPage() {
 
             setIdentityError('Failed to get customer information. Please try again.')
 
+            setLoginProcessing(false)
+
           }
 
         }
@@ -938,6 +959,8 @@ export default function CheckoutPage() {
           console.warn('[Checkout ConditionalUI] Error:', err)
 
         }
+
+        setLoginProcessing(false)
 
       }
 
@@ -3520,8 +3543,11 @@ export default function CheckoutPage() {
 
       setIdentityError(null)
 
-      setLoginProcessing(true)
-      setLoginStatusText('Checking your credentials...')
+      // Force immediate render so loading screen appears before async work
+      flushSync(() => {
+        setLoginProcessing(true)
+        setLoginStatusText('Checking your credentials...')
+      })
 
       if (!loginIdentifier.trim()) {
 

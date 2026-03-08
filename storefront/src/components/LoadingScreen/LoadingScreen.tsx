@@ -22,11 +22,11 @@ export default function LoadingScreen({
   shaderEffect = 'smoke',
   statusText = 'Getting things ready for you...'
 }: LoadingScreenProps) {
-  const [isVisible, setIsVisible] = useState(show);
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+  const prevShowRef = useRef(show);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
-  
+
   const [imageList, setImageList] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loadedImages, setLoadedImages] = useState<HTMLImageElement[]>([]);
@@ -35,25 +35,35 @@ export default function LoadingScreen({
   const glRef = useRef<WebGLRenderingContext | null>(null);
   const lastPhaseIndexRef = useRef<number>(-1);
   const PHASE_DURATION = 1.5;
-  
+
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
   const textAnimationRef = useRef<number | null>(null);
   const statusTextRef = useRef(statusText);
   statusTextRef.current = statusText;
 
+  // Synchronous visibility transitions — no effect-based delay
+  if (prevShowRef.current !== show) {
+    prevShowRef.current = show;
+    if (!show) {
+      setIsFadingOut(true);
+    } else if (isFadingOut) {
+      setIsFadingOut(false);
+    }
+  }
+
+  // Derived visibility: render when showing OR fading out
+  const isVisible = show || isFadingOut;
+
+  // Fade-out timer
   useEffect(() => {
-    if (!show && isVisible) {
-      setIsAnimatingOut(true);
+    if (isFadingOut) {
       const timer = setTimeout(() => {
-        setIsVisible(false);
+        setIsFadingOut(false);
         onComplete?.();
       }, 600);
       return () => clearTimeout(timer);
-    } else if (show && !isVisible) {
-      setIsVisible(true);
-      setIsAnimatingOut(false);
     }
-  }, [show, isVisible, onComplete]);
+  }, [isFadingOut, onComplete]);
 
   // Prevent scrolling when loading screen is visible (keep scrollbar visible)
   useEffect(() => {
@@ -1198,7 +1208,7 @@ export default function LoadingScreen({
   if (!isVisible) return null;
 
   return (
-    <div className={`${styles.loadingScreen} ${isAnimatingOut ? styles.fadeOut : ''}`}>
+    <div className={`${styles.loadingScreen} ${isFadingOut ? styles.fadeOut : ''}`}>
       <div className={styles.content}>
         <div className={styles.logoContainer}>
           {(imageSrc || imagesFolder) ? (
