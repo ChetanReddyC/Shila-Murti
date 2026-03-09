@@ -1034,6 +1034,23 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+.wishlistBtnActive {
+    color: #e11d48;
+    border-color: #e11d48;
+    background-color: #fff1f2;
+}
+
+.wishlistBtnActive:hover {
+    background-color: #ffe4e6;
+}
+
+.wishlistBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
 @media (min-width: 1024px) {
     .wishlistBtn {
         height: 3.5rem;

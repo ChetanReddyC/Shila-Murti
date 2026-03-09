@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Public_Sans, Noto_Sans, Cinzel, Inter } from "next/font/google";
 import "./globals.css";
-import { CartProvider } from "../contexts";
+import { CartProvider, WishlistProvider } from "../contexts";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthSessionProvider from "@/providers/SessionProvider";
 import PasskeyNudge from "@/components/PasskeyNudge";
 import Header from "@/components/Header";
@@ -50,15 +51,19 @@ export default function RootLayout({
       <body className={`${publicSans.variable} ${notoSans.variable} ${cinzel.variable} ${inter.variable} w-full`}>
         <AuthSessionProvider>
           <CartProvider>
-            <Suspense fallback={null}>
-              <NavigationLoadingProvider>
-                {/* Global post-elevation passkey prompt */}
-                <PasskeyNudge />
-                {/* Global header - persists across all pages */}
-                <Header />
-                {children}
-              </NavigationLoadingProvider>
-            </Suspense>
+            <ErrorBoundary>
+              <WishlistProvider>
+                <Suspense fallback={null}>
+                  <NavigationLoadingProvider>
+                    {/* Global post-elevation passkey prompt */}
+                    <PasskeyNudge />
+                    {/* Global header - persists across all pages */}
+                    <Header />
+                    {children}
+                  </NavigationLoadingProvider>
+                </Suspense>
+              </WishlistProvider>
+            </ErrorBoundary>
           </CartProvider>
         </AuthSessionProvider>
       </body>

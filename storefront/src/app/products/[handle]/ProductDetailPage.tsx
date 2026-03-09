@@ -9,6 +9,7 @@ import { Product } from '../../../types/medusa';
 import { useRetry } from '../../../hooks/useRetry';
 import { isValidHandle, generateProductHandle } from '../../../utils/productHandleGenerator';
 import { useCart } from '../../../contexts/CartContext';
+import { useWishlist } from '../../../contexts/WishlistContext';
 import { medusaApiClient } from '../../../utils/medusaApiClient';
 import styles from './ProductDetailPage.module.css'
 
@@ -99,6 +100,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   // All hooks must be at the top before any conditional logic
   const [handle, setHandle] = useState<string | null>(null);
   const { addToCart, loading: cartLoading, error: cartError, clearError } = useCart();
+  const { isInWishlist, toggleWishlist, pendingIds: wishlistPending, isAuthenticated: isWishlistAuth } = useWishlist();
 
   // Use a single state object to minimize state updates
   const [state, setState] = useState<ProductDetailState>({
@@ -847,15 +849,17 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         </button>
                         <button
                           type="button"
-                          className={styles.wishlistBtn}
-                          aria-label="Add to wishlist"
-                          onClick={(e) => {
+                          className={`${styles.wishlistBtn} ${state.product && isInWishlist(state.product.id) ? styles.wishlistBtnActive : ''}`}
+                          aria-label={state.product && isInWishlist(state.product.id) ? "Remove from wishlist" : "Add to wishlist"}
+                          disabled={!!(state.product && wishlistPending.has(state.product.id))}
+                          onClick={async (e) => {
                             e.preventDefault();
-                            // Placeholder for wishlist logic
-                            console.log('Wishlist clicked');
+                            if (!state.product) return;
+                            if (!isWishlistAuth) { window.location.href = '/login'; return; }
+                            await toggleWishlist(state.product.id);
                           }}
                         >
-                          <svg className={styles.iconMd} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={styles.iconMd} fill={state.product && isInWishlist(state.product.id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
                         </button>

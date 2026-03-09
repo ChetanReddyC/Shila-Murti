@@ -165,6 +165,11 @@ export default defineMiddlewares({
       middlewares: [authGuard],
     },
     {
+      // Wishlist endpoints require authentication + rate limiting
+      matcher: "/store/custom/wishlist*",
+      middlewares: [rateLimit, authGuard],
+    },
+    {
       // SECURITY FIX C4: Payment capture must require authentication
       // SECURITY FIX M9: Rate limit payment capture
       matcher: "/store/payments/*",
