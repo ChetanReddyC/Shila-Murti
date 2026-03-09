@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useState, useRef, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { usePasskey, PublicKeyRequestOptionsJSON } from '@/hooks/usePasskey'
 import { signIn } from 'next-auth/react'
 import styles from './loginPage.module.css'
@@ -80,6 +81,7 @@ export default function LoginPage() {
   
   // Loading screen state
   const [showLoadingScreen, setShowLoadingScreen] = useState<boolean>(false)
+  const [loginStatusText, setLoginStatusText] = useState('Checking your credentials...')
 
   // Attempt passkey silently when identifier is prefilled via sessionStorage
   React.useEffect(() => {
@@ -132,7 +134,7 @@ export default function LoginPage() {
         
         if (data) {
           console.log('[ConditionalUI] Passkey selected from autofill!')
-          setStatus('Authenticating with passkey...')
+          flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Authenticating with passkey...') })
           
           // Verify the passkey
           const verifyRes = await fetch('/api/auth/passkey/verify', {
@@ -146,10 +148,11 @@ export default function LoginPage() {
           })
           
           if (!verifyRes.ok) {
+            setShowLoadingScreen(false)
             setError('Passkey authentication failed')
             return
           }
-          
+          setLoginStatusText('Verifying your identity...')
           const result = await verifyRes.json()
           console.log('🔵 [ConditionalUI] Verify response:', result)
           
@@ -176,6 +179,7 @@ export default function LoginPage() {
           }
           
           // Ensure customer exists
+          setLoginStatusText('Setting up your account...')
           let ensuredCustomerId: string | undefined
           try {
             const id = userIdentifier.includes('@') ? { email: userIdentifier } : { phone: userIdentifier }
@@ -208,7 +212,7 @@ export default function LoginPage() {
             hasPasskey: true 
           })
           
-          setStatus('Authenticated! Redirecting...')
+          setLoginStatusText('Creating your session...')
           const conditionalSignInResult = await signIn('session', { 
             identifier: userIdentifier, 
             customerId: ensuredCustomerId, 
@@ -225,10 +229,12 @@ export default function LoginPage() {
             window.location.href = '/account'
           } else {
             console.error('❌ [ConditionalUI] SignIn failed:', conditionalSignInResult?.error)
+            setShowLoadingScreen(false)
             setError('Failed to create session. Please try again.')
           }
         }
       } catch (err: any) {
+        setShowLoadingScreen(false)
         // AbortError is expected when user navigates away
         if (err?.name !== 'AbortError') {
           console.warn('[ConditionalUI] Error:', err)
@@ -272,7 +278,7 @@ export default function LoginPage() {
         if (typeof isAvailable === 'function') {
           const available = await isAvailable()
           if (available) {
-            setStatus('Attempting passkey authentication…')
+            flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Authenticating with passkey...') })
             const fetched = await fetchPasskeyRequestOptions(id)
             if (fetched) {
               const { options, userId: canonicalUserId } = fetched
@@ -280,9 +286,10 @@ export default function LoginPage() {
               
               if (!authError && data) {
                 try {
+                  setLoginStatusText('Verifying your identity...')
                   const result = await verifyPasskey({ ...data, userId: canonicalUserId }, id, canonicalUserId)
                   if (!result.comboRequired) {
-                    setStatus('Authenticated with passkey. Redirecting...')
+                    setLoginStatusText('Setting up your account...')
                     
                     // Mark passkey authentication success
                     try {
@@ -326,6 +333,7 @@ export default function LoginPage() {
                     
                     // Sign in with the ensured customer ID
                     // IMPORTANT: Use redirect: false to wait for session creation
+                    setLoginStatusText('Creating your session...')
                     const passkeySignInResult = await signIn('session', { 
                       identifier: (id.email || id.phone) as string, 
                       customerId: ensuredCustomerId, 
@@ -341,11 +349,13 @@ export default function LoginPage() {
                       window.location.href = '/account'
                     } else {
                       console.error('[Login] Passkey signIn failed:', passkeySignInResult?.error)
+                      setShowLoadingScreen(false)
                       setStatus('Session creation failed. Please try again.')
                     }
                     return
                   }
                 } catch (err) {
+                  setShowLoadingScreen(false)
                   setStatus('Passkey verification failed.')
                 }
               }
@@ -357,7 +367,8 @@ export default function LoginPage() {
       console.error('[Login] Error checking passkey:', err)
     }
 
-    // Show authentication method selection
+    // Show authentication method selection (passkey not available or failed)
+    setShowLoadingScreen(false)
     setStatus('')
     setShowAuthMethods(true)
     
@@ -439,7 +450,7 @@ export default function LoginPage() {
       }
       
       // Show loading screen immediately when verification starts
-      setShowLoadingScreen(true)
+      flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Checking your credentials...') })
       setOtpVerifying(true)
       
       // Verify OTP
@@ -452,6 +463,7 @@ export default function LoginPage() {
       if (!vr.ok || vj?.ok !== true) {
         throw new Error('Invalid OTP code')
       }
+      setLoginStatusText('Verifying your identity...')
 
       // Ensure customer exists
       const ensure = await fetch('/api/account/customer/ensure', { 
@@ -514,7 +526,7 @@ export default function LoginPage() {
         console.warn('[Login] Failed to clear passkey flags:', clearError)
       }
 
-      setStatus('Phone verified successfully! Redirecting...')
+      setLoginStatusText('Setting up your account...')
       
       // CRITICAL: Logout first to clear any old JWT token with hasPasskey: true
       try {
@@ -528,6 +540,7 @@ export default function LoginPage() {
       
       // Sign in without hasPasskey flag (this is OTP login)
       // IMPORTANT: Use redirect: false to wait for session creation
+      setLoginStatusText('Creating your session...')
       console.log('[Login] Signing in with:', { phone, customerId: ej.customerId, hasPasskey: false })
       const signInResult = await signIn('session', { 
         identifier: phone, 
@@ -592,7 +605,8 @@ export default function LoginPage() {
             clearInterval(magicPollTimerRef.current)
             magicPollTimerRef.current = null
             setMagicVerified(true)
-            
+            flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Verifying your identity...') })
+
             // Ensure customer exists
             const ensure = await fetch('/api/account/customer/ensure', { 
               method: 'POST', 
@@ -652,7 +666,7 @@ export default function LoginPage() {
                 console.warn('[Login] Failed to clear passkey flags:', clearError)
               }
               
-              setStatus('Email verified successfully! Redirecting...')
+              setLoginStatusText('Setting up your account...')
               
               // CRITICAL: Logout first to clear any old JWT token with hasPasskey: true
               try {
@@ -666,6 +680,7 @@ export default function LoginPage() {
               
               // Sign in without hasPasskey flag (this is Magic Link login)
               // IMPORTANT: Use redirect: false to wait for session creation
+              setLoginStatusText('Creating your session...')
               console.log('[Login] Signing in with:', { email: em, customerId: ej.customerId, hasPasskey: false })
               const signInResult = await signIn('session', { 
                 identifier: em, 
@@ -683,13 +698,18 @@ export default function LoginPage() {
                 window.location.href = '/account'
               } else {
                 console.error('[Login] SignIn failed:', signInResult?.error)
-                // Don't throw error here, just show status
+                setShowLoadingScreen(false)
                 setStatus('Failed to create session. Please try again.')
               }
+            } else {
+              setShowLoadingScreen(false)
+              setError('Failed to create account. Please try again.')
             }
           }
-        } catch {}
-        
+        } catch {
+          setShowLoadingScreen(false)
+        }
+
         // Stop after 5 minutes
         if (attempts >= 150) {
           clearInterval(magicPollTimerRef.current)
@@ -737,7 +757,7 @@ export default function LoginPage() {
     <>
       <LoadingScreen
         show={showLoadingScreen}
-        duration={1200}
+        statusText={loginStatusText}
         imagesFolder="/loading-animations"
         shaderEffect="smoke"
       />
