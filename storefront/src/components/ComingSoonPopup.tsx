@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContinuousSmokeShader from './ContinuousSmokeShader';
-import './ComingSoonPopup.css';
+import styles from './ComingSoonPopup.module.css';
 
 interface ComingSoonPopupProps {
     isOpen: boolean;
@@ -14,73 +14,63 @@ export default function ComingSoonPopup({ isOpen, onClose }: ComingSoonPopupProp
     return (
         <AnimatePresence>
             {isOpen && (
-                <>
-                    {/* Backdrop */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className={styles.overlay}
+                    onClick={onClose}
+                >
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="popup-backdrop"
-                    />
-
-                    {/* Popup Card - Styled like Idol Card */}
-                    <motion.div
-                        className="popup-card"
-                        initial={{ opacity: 0, scale: 0.9, y: 20, x: '-50%', top: '50%', left: '50%' }}
-                        animate={{ opacity: 1, scale: 1, y: '-50%', x: '-50%', top: '50%', left: '50%' }}
-                        exit={{ opacity: 0, scale: 0.9, y: 20, x: '-50%', top: '50%', left: '50%' }}
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className={styles.modal}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        transition={{ duration: 0.25, ease: [0.25, 0.8, 0.25, 1] }}
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Background subtle effect */}
-                        <div className="popup-bg-glow" />
-
-                        {/* Top Random Mist (Barely Visible) */}
-                        <div className="popup-mist-top">
-                            <ContinuousSmokeShader shape="circle" className="popup-mist-shader" style={{ opacity: 0.4 }} />
+                        {/* Top mist shader */}
+                        <div className={styles.mistTop}>
+                            <ContinuousSmokeShader shape="circle" className={styles.mistShader} style={{ opacity: 0.4 }} />
                         </div>
 
-                        {/* Top Right Close X */}
-                        <button onClick={onClose} className="popup-close-x" aria-label="Close">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                        {/* Close button */}
+                        <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
 
-                        <div className="popup-content">
-                            {/* Title Section matching Idol Gallery */}
-                            <h2 className="popup-title">Namaste</h2>
-                            <h3 className="popup-subtitle">Thank You for Your Interest</h3>
+                        <div className={styles.content}>
+                            <h3 className={styles.title}>Namaste</h3>
+                            <p className={styles.subtitle}>Thank You for Your Interest</p>
 
-                            {/* Smoke Divider */}
-                            <div className="popup-divider-container">
-                                <ContinuousSmokeShader shape="line" className="popup-divider-shader" />
+                            {/* Smoke divider */}
+                            <div className={styles.dividerContainer}>
+                                <ContinuousSmokeShader shape="line" className={styles.dividerShader} />
                             </div>
 
-                            <p className="popup-message">
-                                We are truly delighted to have you here. <br />
+                            <p className={styles.message}>
+                                We are truly delighted to have you here.<br />
                                 We have currently launched this webstore for you to
-                                <span className="popup-highlight"> experience and explore our art catalogue</span>.
-                                <br />
-                                <span className="popup-subtext">Full operations commencing soon.</span>
+                                <span className={styles.highlight}> experience and explore our art catalogue</span>.
+                                <span className={styles.subtext}>Full operations commencing soon.</span>
                             </p>
 
-                            {/* Close Button - Matching 'Inquire Now' style */}
-                            <button onClick={onClose} className="popup-cta-btn">
-                                <span className="btn-text">Close</span>
-                                <div className="popup-btn-divider-container">
-                                    <ContinuousSmokeShader shape="line" className="popup-btn-divider-shader" />
+                            <button onClick={onClose} className={styles.ctaBtn}>
+                                <span className={styles.btnText}>Close</span>
+                                <div className={styles.btnDividerContainer}>
+                                    <ContinuousSmokeShader shape="line" className={styles.btnDividerShader} />
                                 </div>
                             </button>
                         </div>
 
-                        {/* Bottom Mist Effect */}
-                        <div className="popup-mist-container">
-                            <ContinuousSmokeShader shape="circle" className="popup-mist-shader" style={{ opacity: 0.8 }} />
+                        {/* Bottom mist shader */}
+                        <div className={styles.mistBottom}>
+                            <ContinuousSmokeShader shape="circle" className={styles.mistShader} style={{ opacity: 0.8 }} />
                         </div>
                     </motion.div>
-                </>
+                </motion.div>
             )}
         </AnimatePresence>
     );

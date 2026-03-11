@@ -5,7 +5,8 @@
       "Bash(grep:*)",
       "Bash(ls:*)",
       "Bash(python3:*)",
-      "Bash(node -e \"const pkg = require\\(''./node_modules/react/package.json''\\); console.log\\(''React:'', pkg.version\\); const next = require\\(''./node_modules/next/package.json''\\); console.log\\(''Next.js:'', next.version\\);\")"
+      "Bash(node -e \"const pkg = require\\(''./node_modules/react/package.json''\\); console.log\\(''React:'', pkg.version\\); const next = require\\(''./node_modules/next/package.json''\\); console.log\\(''Next.js:'', next.version\\);\")",
+      "Bash(node node_modules/jest-cli/bin/jest.js src/contexts/__tests__/CartContext.test.tsx --no-coverage)"
     ]
   }
 }

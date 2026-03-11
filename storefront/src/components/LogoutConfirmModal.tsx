@@ -9,9 +9,9 @@ interface LogoutConfirmModalProps {
   onConfirm: () => void
 }
 
-export default function LogoutConfirmModal({ 
-  isOpen, 
-  onClose, 
+export default function LogoutConfirmModal({
+  isOpen,
+  onClose,
   onConfirm
 }: LogoutConfirmModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
@@ -38,13 +38,6 @@ export default function LogoutConfirmModal({
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isOpen, onClose])
 
-  // Handle backdrop click to close modal
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      onClose()
-    }
-  }
-
   // Handle confirm button click
   const handleConfirm = () => {
     onConfirm()
@@ -54,70 +47,48 @@ export default function LogoutConfirmModal({
   if (!isOpen) return null
 
   return (
-    <div 
-      role="dialog" 
-      aria-modal="true" 
+    <div
+      role="dialog"
+      aria-modal="true"
       aria-labelledby="logout-confirm-title"
       aria-describedby="logout-confirm-description"
       className={styles.overlay}
-      onClick={handleBackdropClick}
+      onClick={onClose}
     >
-      <div 
+      <div
         ref={modalRef}
         className={styles.modal}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
-        <div className={styles.closeRow}>
+        <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <h3 id="logout-confirm-title" className={styles.title}>
+          Confirm Logout
+        </h3>
+
+        <p id="logout-confirm-description" className={styles.subtitle}>
+          Are you sure you want to log out? You'll need to sign in again to access your account.
+        </p>
+
+        <div className={styles.actions}>
           <button
-            className={styles.closeBtn}
-            onClick={onClose}
-            aria-label="Close logout confirmation dialog"
+            ref={confirmButtonRef}
+            className={styles.confirmBtn}
+            onClick={handleConfirm}
           >
-            ×
+            Yes, Logout
           </button>
-        </div>
-
-        {/* Modal content */}
-        <div className={styles.content}>
-          {/* Icon */}
-          <div className={styles.iconWrapper}>
-            <svg 
-              className={styles.icon} 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-          </div>
-
-          <h2 id="logout-confirm-title" className={styles.title}>
-            Confirm Logout
-          </h2>
-          
-          <p id="logout-confirm-description" className={styles.description}>
-            Are you sure you want to log out? You'll need to sign in again to access your account and view your orders.
-          </p>
-
-          <div className={styles.actions}>
-            <button 
-              ref={confirmButtonRef}
-              className={styles.confirmBtn}
-              onClick={handleConfirm}
-            >
-              Yes, Logout
-            </button>
-            <button 
-              className={styles.cancelBtn}
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-          </div>
+          <button
+            className={styles.cancelBtn}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>

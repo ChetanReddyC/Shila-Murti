@@ -63,7 +63,7 @@ interface CartContextType {
 // Initial state
 const initialState: CartState = {
   cart: null,
-  loading: false,
+  loading: true,
   error: null,
   cartId: null,
   calculatedTotals: null,
@@ -863,28 +863,35 @@ export function CartProvider({ children }: CartProviderProps) {
   // Initialize cart on mount and handle session management
   useEffect(() => {
     const initializeCart = async () => {
-      // Lock removed - immediate cart recovery after order completion
-      const savedCartId = await getCartIdFromSession();
+      dispatch({ type: 'SET_LOADING', payload: true });
+      try {
+        // Lock removed - immediate cart recovery after order completion
+        const savedCartId = await getCartIdFromSession();
 
-      // On order-confirmation page, do not recover cart to avoid interference
-      const path = typeof window !== 'undefined' ? window.location.pathname : ''
-      if (path && path.startsWith('/order-confirmation')) {
-        return
-      }
-
-      if (savedCartId) {
-        // Performance Enhancement: Validate and load cart in single API call
-        // Previously: validateCartSession fetched cart, then refreshCart fetched again (N+1 problem)
-        const validation = await validateCartSession(savedCartId);
-        if (validation.valid && validation.cart) {
-          dispatch({ type: 'SET_CART_ID', payload: savedCartId });
-          dispatch({ type: 'SET_CART', payload: validation.cart });
-        } else {
-          await removeCartIdFromSession();
-          dispatch({ type: 'CLEAR_CART' });
+        // On order-confirmation page, do not recover cart to avoid interference
+        const path = typeof window !== 'undefined' ? window.location.pathname : ''
+        if (path && path.startsWith('/order-confirmation')) {
+          return
         }
-      } else {
-        console.log('[CART] No saved cart session found');
+
+        if (savedCartId) {
+          // Performance Enhancement: Validate and load cart in single API call
+          // Previously: validateCartSession fetched cart, then refreshCart fetched again (N+1 problem)
+          const validation = await validateCartSession(savedCartId);
+          if (validation.valid && validation.cart) {
+            dispatch({ type: 'SET_CART_ID', payload: savedCartId });
+            dispatch({ type: 'SET_CART', payload: validation.cart });
+          } else {
+            await removeCartIdFromSession();
+            dispatch({ type: 'CLEAR_CART' });
+          }
+        } else {
+          console.log('[CART] No saved cart session found');
+        }
+      } catch (error) {
+        console.error('[CART] Initialization failed:', error);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
 

@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
-import { redirectTo } from '@/lib/redirect'
 
 interface WishlistContextType {
   wishlistIds: Set<string>
@@ -84,7 +83,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ product_id: productId }),
       })
       if (!res.ok) {
-        if (res.status === 401) { redirectTo('/login'); return false }
+        if (res.status === 401) { window.location.href = '/login'; return false }
         console.error('[Wishlist] API error:', res.status, await res.text().catch(() => ''))
         throw new Error(`${res.status}`)
       }
