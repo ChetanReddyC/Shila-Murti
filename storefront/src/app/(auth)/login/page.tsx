@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useCallback, useState, useRef, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { usePasskey, PublicKeyRequestOptionsJSON } from '@/hooks/usePasskey'
 import { signIn } from 'next-auth/react'
+import Link from 'next/link'
 import styles from './loginPage.module.css'
 import { setCustomerId as setCustomerIdHybrid } from '../../../utils/hybridCustomerStorage'
 import LoadingScreen from '@/components/LoadingScreen'
@@ -50,6 +52,17 @@ async function verifyPasskey(assertion: unknown, identifier: Identifier, canonic
   return { ...result, comboRequired: false }
 }
 
+// Helpers for signup data passthrough (outside component to avoid re-creation)
+function getSignupFormData() {
+  try { const r = sessionStorage.getItem('signupData'); if (!r) return undefined; const d = JSON.parse(r); return { first_name: d.firstName, last_name: d.lastName } } catch { return undefined }
+}
+function cleanupSignup() { try { sessionStorage.removeItem('signupData'); sessionStorage.removeItem('signupAutoAdvance') } catch {} }
+async function updateCustomerNameIfSignup() {
+  const sd = getSignupFormData()
+  if (!sd) return
+  await fetch('/api/account/customer/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sd) }).catch(() => {})
+}
+
 export default function LoginPage() {
   const { authenticate, authenticateConditional, isConditionalMediationAvailable } = usePasskey()
   const [identifier, setIdentifier] = useState<string>('')
@@ -60,6 +73,7 @@ export default function LoginPage() {
   // Authentication method selection
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone')
   const [showAuthMethods, setShowAuthMethods] = useState<boolean>(false)
+  const [isSignupFlow, setIsSignupFlow] = useState(false)
   
   // Phone authentication state
   const [phone, setPhone] = useState<string>('')
@@ -80,11 +94,25 @@ export default function LoginPage() {
   
   // Loading screen state
   const [showLoadingScreen, setShowLoadingScreen] = useState<boolean>(false)
+  const [loginStatusText, setLoginStatusText] = useState('Checking your credentials...')
 
   // Attempt passkey silently when identifier is prefilled via sessionStorage
   React.useEffect(() => {
     const stored = typeof window !== 'undefined' ? (sessionStorage.getItem('identifier') || '') : ''
     if (stored && !identifier) setIdentifier(stored)
+  }, [identifier])
+
+  // Auto-advance to auth methods when coming from signup page
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const autoAdvance = sessionStorage.getItem('signupAutoAdvance')
+    if (autoAdvance && identifier) {
+      sessionStorage.removeItem('signupAutoAdvance')
+      setIsSignupFlow(true)
+      setShowAuthMethods(true)
+      if (identifier.includes('@')) { setEmail(identifier); setAuthMethod('email') }
+      else { setPhone(identifier); setAuthMethod('phone') }
+    }
   }, [identifier])
 
   // Conditional UI: Start listening for passkey autofill on page load
@@ -132,7 +160,7 @@ export default function LoginPage() {
         
         if (data) {
           console.log('[ConditionalUI] Passkey selected from autofill!')
-          setStatus('Authenticating with passkey...')
+          flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Authenticating with passkey...') })
           
           // Verify the passkey
           const verifyRes = await fetch('/api/auth/passkey/verify', {
@@ -146,10 +174,11 @@ export default function LoginPage() {
           })
           
           if (!verifyRes.ok) {
+            setShowLoadingScreen(false)
             setError('Passkey authentication failed')
             return
           }
-          
+          setLoginStatusText('Verifying your identity...')
           const result = await verifyRes.json()
           console.log('🔵 [ConditionalUI] Verify response:', result)
           
@@ -176,14 +205,15 @@ export default function LoginPage() {
           }
           
           // Ensure customer exists
+          setLoginStatusText('Setting up your account...')
           let ensuredCustomerId: string | undefined
           try {
             const id = userIdentifier.includes('@') ? { email: userIdentifier } : { phone: userIdentifier }
             console.log('🔵 [ConditionalUI] Ensuring customer for:', id)
-            const ensure = await fetch('/api/account/customer/ensure', { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/json' }, 
-              body: JSON.stringify(id) 
+            const ensure = await fetch('/api/account/customer/ensure', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...id, formData: getSignupFormData() })
             })
             const ej = await ensure.json().catch(() => ({}))
             console.log('🔵 [ConditionalUI] Customer ensure response:', ej)
@@ -208,7 +238,7 @@ export default function LoginPage() {
             hasPasskey: true 
           })
           
-          setStatus('Authenticated! Redirecting...')
+          setLoginStatusText('Creating your session...')
           const conditionalSignInResult = await signIn('session', { 
             identifier: userIdentifier, 
             customerId: ensuredCustomerId, 
@@ -220,15 +250,18 @@ export default function LoginPage() {
           
           if (conditionalSignInResult?.ok) {
             console.log('✅ [ConditionalUI] Session created, redirecting to /account...')
-            // Small delay to ensure session cookie is set
+            await updateCustomerNameIfSignup()
+            cleanupSignup()
             await new Promise(resolve => setTimeout(resolve, 300))
             window.location.href = '/account'
           } else {
             console.error('❌ [ConditionalUI] SignIn failed:', conditionalSignInResult?.error)
+            setShowLoadingScreen(false)
             setError('Failed to create session. Please try again.')
           }
         }
       } catch (err: any) {
+        setShowLoadingScreen(false)
         // AbortError is expected when user navigates away
         if (err?.name !== 'AbortError') {
           console.warn('[ConditionalUI] Error:', err)
@@ -256,23 +289,35 @@ export default function LoginPage() {
     setError('')
 
     const id: Identifier = identifier.includes('@') ? { email: identifier } : { phone: identifier }
-    
-    // Check if user already has a passkey registered
+    const fetchOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(id) }
+
+    // Fire both calls in parallel: ensure (new-user detection) + policy (passkey check)
     try {
-      const policyRes = await fetch('/api/auth/passkey/policy', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(id) 
-      })
-      const policy = await policyRes.json().catch(() => ({}))
-      
+      const [ensureRes, policyRes] = await Promise.all([
+        fetch('/api/account/customer/ensure', fetchOpts),
+        fetch('/api/auth/passkey/policy', fetchOpts),
+      ])
+      const [ensureJson, policy] = await Promise.all([
+        ensureRes.json().catch(() => ({})),
+        policyRes.json().catch(() => ({})),
+      ])
+
+      // New user — redirect to signup to collect name
+      if (ensureRes.ok && ensureJson?.created === true) {
+        setShowLoadingScreen(false)
+        setStatus('')
+        const param = identifier.includes('@') ? 'email' : 'phone'
+        window.location.href = `/signup?${param}=${encodeURIComponent(identifier)}`
+        return
+      }
+
       // If user has a passkey, attempt passkey authentication first
       if (policyRes.ok && policy?.hasPasskey) {
         const isAvailable = (window as any).PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable
         if (typeof isAvailable === 'function') {
           const available = await isAvailable()
           if (available) {
-            setStatus('Attempting passkey authentication…')
+            flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Authenticating with passkey...') })
             const fetched = await fetchPasskeyRequestOptions(id)
             if (fetched) {
               const { options, userId: canonicalUserId } = fetched
@@ -280,9 +325,10 @@ export default function LoginPage() {
               
               if (!authError && data) {
                 try {
+                  setLoginStatusText('Verifying your identity...')
                   const result = await verifyPasskey({ ...data, userId: canonicalUserId }, id, canonicalUserId)
                   if (!result.comboRequired) {
-                    setStatus('Authenticated with passkey. Redirecting...')
+                    setLoginStatusText('Setting up your account...')
                     
                     // Mark passkey authentication success
                     try {
@@ -306,10 +352,10 @@ export default function LoginPage() {
                     // Ensure customer exists and get customerId
                     let ensuredCustomerId: string | undefined
                     try {
-                      const ensure = await fetch('/api/account/customer/ensure', { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(id) 
+                      const ensure = await fetch('/api/account/customer/ensure', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...id, formData: getSignupFormData() })
                       })
                       const ej = await ensure.json().catch(() => ({}))
                       if (ej?.customerId) {
@@ -326,6 +372,7 @@ export default function LoginPage() {
                     
                     // Sign in with the ensured customer ID
                     // IMPORTANT: Use redirect: false to wait for session creation
+                    setLoginStatusText('Creating your session...')
                     const passkeySignInResult = await signIn('session', { 
                       identifier: (id.email || id.phone) as string, 
                       customerId: ensuredCustomerId, 
@@ -336,16 +383,19 @@ export default function LoginPage() {
                     
                     if (passkeySignInResult?.ok) {
                       console.log('[Login] Session created, redirecting to /account...')
-                      // Small delay to ensure session cookie is set
+                      await updateCustomerNameIfSignup()
+                      cleanupSignup()
                       await new Promise(resolve => setTimeout(resolve, 300))
                       window.location.href = '/account'
                     } else {
                       console.error('[Login] Passkey signIn failed:', passkeySignInResult?.error)
+                      setShowLoadingScreen(false)
                       setStatus('Session creation failed. Please try again.')
                     }
                     return
                   }
                 } catch (err) {
+                  setShowLoadingScreen(false)
                   setStatus('Passkey verification failed.')
                 }
               }
@@ -357,7 +407,8 @@ export default function LoginPage() {
       console.error('[Login] Error checking passkey:', err)
     }
 
-    // Show authentication method selection
+    // Show authentication method selection (passkey not available or failed)
+    setShowLoadingScreen(false)
     setStatus('')
     setShowAuthMethods(true)
     
@@ -439,7 +490,7 @@ export default function LoginPage() {
       }
       
       // Show loading screen immediately when verification starts
-      setShowLoadingScreen(true)
+      flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Checking your credentials...') })
       setOtpVerifying(true)
       
       // Verify OTP
@@ -452,12 +503,13 @@ export default function LoginPage() {
       if (!vr.ok || vj?.ok !== true) {
         throw new Error('Invalid OTP code')
       }
+      setLoginStatusText('Verifying your identity...')
 
       // Ensure customer exists
-      const ensure = await fetch('/api/account/customer/ensure', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ phone }) 
+      const ensure = await fetch('/api/account/customer/ensure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, formData: getSignupFormData() })
       })
       const ej = await ensure.json().catch(() => ({}))
       if (!ensure.ok || !ej?.customerId) {
@@ -514,7 +566,7 @@ export default function LoginPage() {
         console.warn('[Login] Failed to clear passkey flags:', clearError)
       }
 
-      setStatus('Phone verified successfully! Redirecting...')
+      setLoginStatusText('Setting up your account...')
       
       // CRITICAL: Logout first to clear any old JWT token with hasPasskey: true
       try {
@@ -528,6 +580,7 @@ export default function LoginPage() {
       
       // Sign in without hasPasskey flag (this is OTP login)
       // IMPORTANT: Use redirect: false to wait for session creation
+      setLoginStatusText('Creating your session...')
       console.log('[Login] Signing in with:', { phone, customerId: ej.customerId, hasPasskey: false })
       const signInResult = await signIn('session', { 
         identifier: phone, 
@@ -539,9 +592,9 @@ export default function LoginPage() {
       
       if (signInResult?.ok) {
         console.log('[Login] Session created successfully, redirecting to /account...')
-        // Small delay to ensure session cookie is set
+        await updateCustomerNameIfSignup()
+        cleanupSignup()
         await new Promise(resolve => setTimeout(resolve, 300))
-        // Manual redirect after session is confirmed
         window.location.href = '/account'
       } else {
         console.error('[Login] SignIn failed:', signInResult?.error)
@@ -592,12 +645,13 @@ export default function LoginPage() {
             clearInterval(magicPollTimerRef.current)
             magicPollTimerRef.current = null
             setMagicVerified(true)
-            
+            flushSync(() => { setShowLoadingScreen(true); setLoginStatusText('Verifying your identity...') })
+
             // Ensure customer exists
-            const ensure = await fetch('/api/account/customer/ensure', { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/json' }, 
-              body: JSON.stringify({ email: em }) 
+            const ensure = await fetch('/api/account/customer/ensure', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: em, formData: getSignupFormData() })
             })
             const ej = await ensure.json().catch(() => ({}))
             if (ensure.ok && ej?.customerId) {
@@ -652,7 +706,7 @@ export default function LoginPage() {
                 console.warn('[Login] Failed to clear passkey flags:', clearError)
               }
               
-              setStatus('Email verified successfully! Redirecting...')
+              setLoginStatusText('Setting up your account...')
               
               // CRITICAL: Logout first to clear any old JWT token with hasPasskey: true
               try {
@@ -666,6 +720,7 @@ export default function LoginPage() {
               
               // Sign in without hasPasskey flag (this is Magic Link login)
               // IMPORTANT: Use redirect: false to wait for session creation
+              setLoginStatusText('Creating your session...')
               console.log('[Login] Signing in with:', { email: em, customerId: ej.customerId, hasPasskey: false })
               const signInResult = await signIn('session', { 
                 identifier: em, 
@@ -677,19 +732,24 @@ export default function LoginPage() {
               
               if (signInResult?.ok) {
                 console.log('[Login] Session created successfully, redirecting to /account...')
-                // Small delay to ensure session cookie is set
+                await updateCustomerNameIfSignup()
+                cleanupSignup()
                 await new Promise(resolve => setTimeout(resolve, 300))
-                // Manual redirect after session is confirmed
                 window.location.href = '/account'
               } else {
                 console.error('[Login] SignIn failed:', signInResult?.error)
-                // Don't throw error here, just show status
+                setShowLoadingScreen(false)
                 setStatus('Failed to create session. Please try again.')
               }
+            } else {
+              setShowLoadingScreen(false)
+              setError('Failed to create account. Please try again.')
             }
           }
-        } catch {}
-        
+        } catch {
+          setShowLoadingScreen(false)
+        }
+
         // Stop after 5 minutes
         if (attempts >= 150) {
           clearInterval(magicPollTimerRef.current)
@@ -737,13 +797,13 @@ export default function LoginPage() {
     <>
       <LoadingScreen
         show={showLoadingScreen}
-        duration={1200}
+        statusText={loginStatusText}
         imagesFolder="/loading-animations"
         shaderEffect="smoke"
       />
       <div className={styles.pageWrapper}>
         <div className={styles.container}>
-        <h2 className={styles.title}>Login</h2>
+        <h2 className={styles.title}>{isSignupFlow ? 'Create Account' : 'Login'}</h2>
         
         {!showAuthMethods ? (
           <div className={styles.loginForm}>
@@ -777,7 +837,7 @@ export default function LoginPage() {
           </div>
         ) : (
           <div className={styles.methodSection}>
-            <div className={styles.methodTitle}>Select Authentication Method</div>
+            <div className={styles.methodTitle}>{isSignupFlow ? 'Verify your identity' : 'Select Authentication Method'}</div>
             
             <div className={styles.methodOptions}>
               <label className={styles.methodOption}>
@@ -880,9 +940,10 @@ export default function LoginPage() {
             )}
 
             <div className={styles.formGroup}>
-              <button 
+              <button
                 className={styles.secondaryBtn}
                 onClick={() => {
+                  if (isSignupFlow) { window.location.href = '/signup'; return }
                   setShowAuthMethods(false)
                   setOtpSent(false)
                   setMagicSent(false)
@@ -912,7 +973,8 @@ export default function LoginPage() {
         )}
 
         <p className={styles.signupText}>
-          <span className={styles.signupLink}>Don&apos;t have an account? Sign up</span>
+          Don&apos;t have an account?{' '}
+          <Link href="/signup" className={styles.signupLink}>Sign up</Link>
         </p>
       </div>
 

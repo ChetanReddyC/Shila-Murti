@@ -140,6 +140,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/review",
     },
     {
+      resolve: "./src/modules/wishlist",
+    },
+    {
       resolve: "@medusajs/medusa/file",
       options: {
         providers: [

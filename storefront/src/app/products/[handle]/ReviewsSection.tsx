@@ -289,7 +289,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
       try {
         if (editingReviewId) {
           // ── Update existing review ──
-          const updatedReview = await updateReview({
+          await updateReview({
             review_id: editingReviewId,
             author_name: authorName.trim(),
             rating,
@@ -297,7 +297,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ productId }) => {
           });
 
           setReviews((prev) =>
-            prev.map((r) => (r.id === editingReviewId ? { ...r, ...updatedReview } : r))
+            prev.map((r) => (r.id === editingReviewId ? { ...r, author_name: authorName.trim(), rating, content: content.trim() } : r))
           );
         } else {
           // ── Create new review ──

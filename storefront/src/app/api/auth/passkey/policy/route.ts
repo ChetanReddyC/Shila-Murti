@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { kvGet, kvListKeys } from '@/lib/kv'
 import { getCounter, getHistogram } from '@/lib/metrics'
 
-async function ensureCustomerId(identifier: { email?: string; phone?: string; userId?: string }): Promise<{ customerId: string; fallbackId: string } | null> {
+async function ensureCustomerId(identifier: { email?: string; phone?: string; userId?: string }): Promise<{ customerId: string; fallbackId: string; created?: boolean } | null> {
   if (identifier.userId) {
     const id = String(identifier.userId)
     return { customerId: id, fallbackId: id }
@@ -29,7 +29,7 @@ async function ensureCustomerId(identifier: { email?: string; phone?: string; us
       console.warn('[PASSKEY_POLICY][ENSURE_FAILED]', { status: res.status, identifier, fallbackId })
       return { customerId: fallbackId, fallbackId }
     }
-    return { customerId: String(json.customerId), fallbackId }
+    return { customerId: String(json.customerId), fallbackId, created: !!json?.created }
   } catch (err) {
     console.warn('[PASSKEY_POLICY][ENSURE_ERROR]', err)
     return { customerId: fallbackId, fallbackId }
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   try { const c = await getCounter({ name: hasPasskey ? 'auth_passkey_available_total' : 'auth_passkey_unavailable_total', help: 'Passkey availability decisions' }); c.inc() } catch {}
   
   // Return the ID that was used to find the passkey, or the customerId as primary choice
-  return new Response(JSON.stringify({ ok: true, hasPasskey, userId: foundWithId || customerId }), { status: 200 })
+  return new Response(JSON.stringify({ ok: true, hasPasskey, userId: foundWithId || customerId, created: !!result.created }), { status: 200 })
 }
 
 

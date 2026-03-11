@@ -10,19 +10,19 @@ interface AuthRequiredModalProps {
   message?: string
 }
 
-export default function AuthRequiredModal({ 
-  isOpen, 
-  onClose, 
+export default function AuthRequiredModal({
+  isOpen,
+  onClose,
   onVerifyNow,
-  message 
+  message
 }: AuthRequiredModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const verifyButtonRef = useRef<HTMLButtonElement>(null)
 
-  // Focus management - focus the close button when modal opens
+  // Focus management
   useEffect(() => {
-    if (isOpen && closeButtonRef.current) {
-      closeButtonRef.current.focus()
+    if (isOpen && verifyButtonRef.current) {
+      verifyButtonRef.current.focus()
     }
   }, [isOpen])
 
@@ -40,13 +40,6 @@ export default function AuthRequiredModal({
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isOpen, onClose])
 
-  // Handle backdrop click to close modal
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      onClose()
-    }
-  }
-
   // Handle verify now button click
   const handleVerifyNow = () => {
     onVerifyNow()
@@ -56,85 +49,67 @@ export default function AuthRequiredModal({
   if (!isOpen) return null
 
   return (
-    <div 
-      role="dialog" 
-      aria-modal="true" 
+    <div
+      role="dialog"
+      aria-modal="true"
       aria-labelledby="auth-required-title"
       aria-describedby="auth-required-description"
       className={styles.overlay}
-      onClick={handleBackdropClick}
+      onClick={onClose}
     >
-      <div 
+      <div
         ref={modalRef}
         className={styles.modal}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
-        <div className={styles.closeRow}>
-          <button
-            ref={closeButtonRef}
-            className={styles.closeBtn}
-            onClick={onClose}
-            aria-label="Close authentication required dialog"
-          >
-            ×
-          </button>
+        <button
+          className={styles.closeBtn}
+          onClick={onClose}
+          aria-label="Close"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <h3 id="auth-required-title" className={styles.title}>
+          Verification Required
+        </h3>
+
+        <p id="auth-required-description" className={styles.description}>
+          {message || 'Please verify your identity before placing an order. This keeps your account secure.'}
+        </p>
+
+        <div className={styles.verificationMethods}>
+          <h3 className={styles.methodsTitle}>Verification methods:</h3>
+          <ul className={styles.methodsList}>
+            <li>
+              <strong>Login:</strong> Sign in with your existing account
+            </li>
+            <li>
+              <strong>WhatsApp OTP:</strong> Receive a code via WhatsApp
+            </li>
+            <li>
+              <strong>Email Link:</strong> Get a secure link to your email
+            </li>
+          </ul>
         </div>
 
-        {/* Modal content */}
-        <div className={styles.content}>
-          {/* Icon */}
-          <div className={styles.iconWrapper}>
-            <svg 
-              className={styles.icon} 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-          </div>
-
-          <h2 id="auth-required-title" className={styles.title}>
-            Authentication Required
-          </h2>
-          
-          <p id="auth-required-description" className={styles.description}>
-            {message || 'You must verify your identity before placing an order or making a payment. This helps us keep your account secure and prevent fraud.'}
-          </p>
-
-          <div className={styles.verificationMethods}>
-            <h3 className={styles.methodsTitle}>Choose a verification method:</h3>
-            <ul className={styles.methodsList}>
-              <li>
-                <strong>Login:</strong> If you already have an account, log in with your credentials
-              </li>
-              <li>
-                <strong>WhatsApp OTP:</strong> Receive a verification code via WhatsApp
-              </li>
-              <li>
-                <strong>Email Link:</strong> Get a secure verification link sent to your email
-              </li>
-            </ul>
-          </div>
-
-          <div className={styles.actions}>
-            <button 
-              className={styles.verifyBtn}
-              onClick={handleVerifyNow}
-            >
-              Verify Identity Now
-            </button>
-            <button 
-              className={styles.cancelBtn}
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-          </div>
+        <div className={styles.actions}>
+          <button
+            ref={verifyButtonRef}
+            className={styles.verifyBtn}
+            onClick={handleVerifyNow}
+          >
+            Verify Now
+          </button>
+          <button
+            className={styles.cancelBtn}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>

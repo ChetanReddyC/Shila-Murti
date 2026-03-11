@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useSession, signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { setCustomerId as setCustomerIdHybrid, getCustomerId } from '../../utils/hybridCustomerStorage';
+import { useWishlist } from '../../contexts/WishlistContext';
 const PasskeySection = dynamic(() => import('./PasskeySection'), { ssr: false })
 
 export default function AccountPage() {
@@ -20,6 +21,8 @@ export default function AccountPage() {
   const [addresses, setAddresses] = useState<Array<{ label: string; value: string }>>([]);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const { data: session } = useSession();
+  const { wishlistIds, removeFromWishlist, loading: wishlistLoading } = useWishlist();
+  const [wishlistProducts, setWishlistProducts] = useState<Array<{ id: string; title: string; handle: string; thumbnail: string | null; price: string }>>([]);
   const [ensureInFlight, setEnsureInFlight] = useState(false);
   
   const [cursorCache, setCursorCache] = useState<Map<number, string | null>>(new Map([[1, null]]));
@@ -208,6 +211,70 @@ export default function AccountPage() {
       fetchOrders(1, searchQuery)
     }
   }, [customerId])
+
+  // Fetch product details for wishlist items
+  useEffect(() => {
+    if (wishlistIds.size === 0) { setWishlistProducts([]); return }
+    const controller = new AbortController()
+    const ids = Array.from(wishlistIds)
+    const params = new URLSearchParams()
+    ids.forEach(id => params.append('id[]', id))
+    params.set('fields', '*variants.calculated_price')
+    const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'
+    const apiKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ''
+    fetch(`${baseUrl}/store/products?${params}`, { headers: { 'x-publishable-api-key': apiKey }, signal: controller.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.products) return
+        setWishlistProducts(data.products.map((p: any) => ({
+          id: p.id,
+          title: p.title || '',
+          handle: p.handle || '',
+          thumbnail: p.thumbnail || p.images?.[0]?.url || null,
+          price: p.variants?.[0]?.calculated_price?.calculated_amount
+            ? `₹${(p.variants[0].calculated_price.calculated_amount / 100).toLocaleString('en-IN')}`
+            : '',
+        })))
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [wishlistIds])
+
+  const renderWishlistContent = () => {
+    if (wishlistLoading) {
+      return <p style={{ textAlign: 'center', padding: '24px', color: '#757575' }}>Loading wishlist...</p>
+    }
+    if (wishlistProducts.length > 0) {
+      return (
+        <div className={styles.wishlistGrid}>
+          {wishlistProducts.map(p => (
+            <div key={p.id} className={styles.wishlistCard}>
+              <Link href={`/products/${p.handle}`} className={styles.wishlistCardLink}>
+                {p.thumbnail && <img src={p.thumbnail} alt={p.title} className={styles.wishlistCardImage} />}
+                <div className={styles.wishlistCardInfo}>
+                  <span className={styles.wishlistCardTitle}>{p.title}</span>
+                  {p.price && <span className={styles.wishlistCardPrice}>{p.price}</span>}
+                </div>
+              </Link>
+              <button className={styles.wishlistRemoveBtn} onClick={() => removeFromWishlist(p.id)} aria-label="Remove from wishlist">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return (
+      <div className={styles.emptyWishlist}>
+        <img src="/theme_images/whishlistempty.png" alt="Empty wishlist" className={styles.emptyWishlistIcon} />
+        <div className={styles.emptyWishlistContent}>
+          <h3 className={styles.emptyWishlistTitle}>Your wishlist is empty</h3>
+          <p className={styles.emptyWishlistText}>Save your favorite items to easily find them later.</p>
+        </div>
+        <Link href="/" className={styles.actionButton}>Browse Products</Link>
+      </div>
+    )
+  }
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -614,20 +681,8 @@ export default function AccountPage() {
                   
                   {/* Wishlist Section */}
                   <h2 className={styles.sectionTitle}>Wishlist</h2>
-                  
-                  <div className={styles.emptyWishlist}>
-                    <img 
-                      src="/theme_images/whishlistempty.png" 
-                      alt="Empty wishlist"
-                      className={styles.emptyWishlistIcon}
-                    />
-                    <div className={styles.emptyWishlistContent}>
-                      <h3 className={styles.emptyWishlistTitle}>Your wishlist is empty</h3>
-                      <p className={styles.emptyWishlistText}>Save your favorite items to easily find them later.</p>
-                    </div>
-                    <button className={styles.actionButton}>Browse Products</button>
-                  </div>
-                  
+                  {renderWishlistContent()}
+
                   {/* Address Book Section */}
                   <h2 className={styles.sectionTitle}>Address Book</h2>
                   
@@ -825,19 +880,7 @@ export default function AccountPage() {
               {activeTab === 'Wishlist' && (
                 <>
                   <h2 className={styles.sectionTitle}>Wishlist</h2>
-                  
-                  <div className={styles.emptyWishlist}>
-                    <img 
-                      src="/theme_images/whishlistempty.png" 
-                      alt="Empty wishlist"
-                      className={styles.emptyWishlistIcon}
-                    />
-                    <div className={styles.emptyWishlistContent}>
-                      <h3 className={styles.emptyWishlistTitle}>Your wishlist is empty</h3>
-                      <p className={styles.emptyWishlistText}>Save your favorite items to easily find them later.</p>
-                    </div>
-                    <button className={styles.actionButton}>Browse Products</button>
-                  </div>
+                  {renderWishlistContent()}
                 </>
               )}
               

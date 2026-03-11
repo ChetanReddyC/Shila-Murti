@@ -26,7 +26,7 @@ export default function CheckoutPage() {
 
   const { authenticate, authenticateConditional, isConditionalMediationAvailable } = usePasskey();
 
-  const { showLoading } = useNavigationLoading();
+  const { showLoading, hideLoading } = useNavigationLoading();
 
   // Performance Enhancement: Removed redundant refreshCart() call
   // CartContext already loads cart on initialization - no need to call it again here
@@ -2445,6 +2445,7 @@ export default function CheckoutPage() {
 
       if (!cart || !cart.id || cartItems.length === 0) {
 
+        hideLoading();
         alert('Your cart is empty.');
 
         return;
@@ -2453,6 +2454,7 @@ export default function CheckoutPage() {
 
       if (!(window as any).Cashfree) {
 
+        hideLoading();
         alert('Cashfree SDK not loaded');
 
         return;
@@ -2487,8 +2489,10 @@ export default function CheckoutPage() {
       }
 
       if (!actualCustomerId) {
-        console.error('[CASHFREE] Customer ID required')
-        alert('Please complete identity verification before payment. Use phone OTP or email magic link in the Identity Verification section.')
+        console.warn('[CASHFREE] Customer ID required')
+        hideLoading()
+        setAuthModalMessage('Please complete identity verification before payment. Use phone OTP or email magic link in the Identity Verification section.')
+        setAuthModalOpen(true)
         setCashfreeLoading(false)
         return
       }
