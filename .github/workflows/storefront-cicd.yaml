@@ -39,7 +39,6 @@ jobs:
           push: true
           tags: |
             ${{ env.DOCKERHUB_REPO }}:latest
-            ${{ env.DOCKERHUB_REPO }}:${{ github.sha }}
           build-args: |
             BACKEND_ENV_FILE_CONTENTS=${{ secrets.BACKEND_ENV }}
           cache-from: type=gha
