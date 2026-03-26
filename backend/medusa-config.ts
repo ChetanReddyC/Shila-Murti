@@ -95,9 +95,9 @@ loadEnv(process.env.NODE_ENV || "development", process.cwd())
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
-    databaseDriverOptions: (process.env.DATABASE_URL || "").includes("sslmode=require")
-      ? { ssl: { rejectUnauthorized: false } }
-      : { ssl: false },
+    databaseDriverOptions: process.env.DATABASE_URL?.includes("localhost")
+      ? { ssl: false }
+      : { ssl: { rejectUnauthorized: false } },
     http: {
       /**
        * ✅ PROD + DEV CORS
