@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y curl postgresql-client && rm -rf /var/l
 COPY package*.json ./
 
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm install --prefer-offline --no-optional 
 
 COPY . .
 
