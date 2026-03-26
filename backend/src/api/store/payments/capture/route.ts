@@ -107,7 +107,7 @@ export const POST = async (
         }
 
         // Verify payment_id belongs to this order
-        const orderPaymentIds = (order.payment_collections || [])
+        const orderPaymentIds = ((order as any).payment_collections || [])
           .flatMap((pc: any) => (pc.payments || []).map((p: any) => p.id))
 
         if (orderPaymentIds.length === 0) {
