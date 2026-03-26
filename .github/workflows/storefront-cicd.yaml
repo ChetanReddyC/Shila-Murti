@@ -91,10 +91,4 @@ jobs:
         run: docker rmi $(docker images -q --filter "dangling=true") || true
       - name: Remove unused images
         run: |
-          docker image prune -a --force || true
-
-          
-
-
-
-          
+          docker image prune -a --force || true   
