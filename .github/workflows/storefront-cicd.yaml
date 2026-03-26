@@ -7,88 +7,48 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/storefront-cicd.yaml'
-      
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 env:
-  ENV: ${{ github.ref == 'refs/heads/main' && secrets.BACKEND_ENV_DEV }}
-  DOCKERHUB_REPO_NAME: ${{ github.ref == 'refs/heads/main' && secrets.DOCKER_HUB_REPO_NAME }}
-  DOCKERR_HUB_USERNAME: ${{ github.ref == 'refs/heads/main' && secrets.DOCKER_HUB_USERNAME }}
-  DOCKERR_HUB_PASSWORD: ${{ github.ref == 'refs/heads/main' && secrets.DOCKER_HUB_PASSWORD }}
+  DOCKERHUB_REPO: cr996/medusa-backend
+  DO_APP_ID: 6aff8bbc-b444-4348-b98f-9676d81306cd
 
 jobs:
-  validate-env:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Validate environment variables
-        run: |
-          MISSING_VARS=()
-          for var in ENV; do
-            if [ -z "${!var}" ]; then
-              MISSING_VARS+=("$var")
-            fi
-          done
-          if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-            echo "Error: Missing environment variables: ${MISSING_VARS[*]}"
-            exit 1
-          fi
-      - name: Validation of env successfully completed
-        run: echo "success"
-
-  build-image:
-    runs-on: ubuntu-latest
-    needs: validate-env
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: |
-          IMAGE_NAME="${{ env.DOCKERHUB_REPO_NAME }}:latest"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-          docker buildx build \
-            --build-arg BACKEND_ENV_FILE_CONTENTS="$(cat << 'EOF'
-          ${{ env.ENV }}
-          EOF
-          )" \
-                -t "$IMAGE_NAME" \
-                --cache-from type=gha \
-                --cache-to type=gha,mode=max \
-                -f ./backend/Dockerfile \
-                backend
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: List Docker images after build
-        run: docker images
-      - name: Save Docker image
-        run: |
-          IMAGE_NAME="${{ env.DOCKERHUB_REPO_NAME }}:latest"
-          docker save $IMAGE_NAME -o image.tar
-      
-      - name: Load Docker image
-        run: |
-          docker load -i image.tar
-          echo "Docker images after loading the artifact:"
-          docker images
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:latest
+            ${{ env.DOCKERHUB_REPO }}:${{ github.sha }}
+          build-args: |
+            BACKEND_ENV_FILE_CONTENTS=${{ secrets.BACKEND_ENV }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Log in to Docker Hub
+      - name: Trigger DigitalOcean App Deployment
         run: |
-          echo "${{ env.DOCKERR_HUB_PASSWORD }}" | docker login -u "${{ env.DOCKERR_HUB_USERNAME }}" --password-stdin
-      
-      - name: Push Docker image
-        run: |
-          IMAGE_NAME="${{ env.DOCKERHUB_REPO_NAME }}:latest"
-          docker push $IMAGE_NAME
-
-  cleanup:
-    runs-on: ubuntu-latest
-    needs: build-image
-    if: always()
-    steps:
-      - name: Clean up Docker images
-        run: docker rmi $(docker images -q --filter "dangling=true") || true
-      - name: Remove unused images
-        run: |
-          docker image prune -a --force || true   
+          curl -s -X POST \
+            "https://api.digitalocean.com/v2/apps/${{ env.DO_APP_ID }}/deployments" \
+            -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"force_build": false}'
