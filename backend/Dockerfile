@@ -1,23 +1,22 @@
-FROM node:22-slim
+FROM node:22-slim                                                                                                                                          
+  WORKDIR /app                                                                                                                                               
+                                                                                                                                                             
+  RUN apt-get update && apt-get install -y nano vim curl iputils-ping postgresql-client
 
-WORKDIR /app
+  COPY package*.json ./
 
-RUN apt-get update && apt-get install -y nano vim curl iputils-ping postgresql-client
+  RUN --mount=type=cache,target=/root/.npm \
+      npm ci
 
-COPY package*.json ./
+  RUN npm install @rollup/rollup-linux-x64-gnu
 
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+  COPY . .
 
-RUN npm install @rollup/rollup-linux-x64-gnu
+  ARG BACKEND_ENV_FILE_CONTENTS=""
+  RUN if [ -n "$BACKEND_ENV_FILE_CONTENTS" ]; then printf "%s" "$BACKEND_ENV_FILE_CONTENTS" > .env; fi
 
-COPY . .
+  RUN npm run build
 
-ARG BACKEND_ENV_FILE_CONTENTS=""
-RUN if [ -n "$BACKEND_ENV_FILE_CONTENTS" ]; then printf "%s" "$BACKEND_ENV_FILE_CONTENTS" > .env; fi
+  EXPOSE 9000
 
-RUN npm run build
-
-EXPOSE 9000
-
-CMD ["npm", "run", "start"]
+  CMD ["sh", "-c", "npx medusa db:migrate && npm run start"]
