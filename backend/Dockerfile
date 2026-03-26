@@ -13,8 +13,8 @@ RUN npm install @rollup/rollup-linux-x64-gnu
 
 COPY . .
 
-ARG BACKEND_ENV_FILE_CONTENTS
-RUN printf "%s" "$BACKEND_ENV_FILE_CONTENTS" > .env
+ARG BACKEND_ENV_FILE_CONTENTS=""
+RUN if [ -n "$BACKEND_ENV_FILE_CONTENTS" ]; then printf "%s" "$BACKEND_ENV_FILE_CONTENTS" > .env; fi
 
 RUN npm run build
 
