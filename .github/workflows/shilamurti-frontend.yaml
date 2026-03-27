@@ -33,6 +33,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Create env file
+        run: printf '%s' "$FRONTEND_ENV" > ./storefront/.env
+        env:
+          FRONTEND_ENV: ${{ secrets.FRONTEND_ENV }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -42,8 +47,6 @@ jobs:
           tags: |
             ${{ env.DOCKERHUB_REPO }}:latest
             ${{ env.DOCKERHUB_REPO }}:${{ github.sha }}
-          build-args: |
-            ENV_FILE_CONTENTS=${{ secrets.FRONTEND_ENV }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

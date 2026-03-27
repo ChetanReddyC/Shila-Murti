@@ -17,10 +17,6 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM node:22-slim AS builder
 WORKDIR /app
 
-ARG ENV_FILE_CONTENTS
-
-RUN printf "%s" "$ENV_FILE_CONTENTS" > .env.production
-
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -47,9 +43,7 @@ ENV PORT=3000
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/.env.production .env.local
-
-RUN chmod +x .env.local 
+COPY --from=builder /app/.env .env.local
 
 EXPOSE 3000
 
