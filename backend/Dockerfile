@@ -13,7 +13,8 @@ RUN npm install @rollup/rollup-linux-x64-gnu
 
 COPY . .
 
-RUN NODE_ENV=production npm run build
+RUN NODE_ENV=production npm run build && \
+    cp -r .medusa/server/public public
 
 EXPOSE 9000
 
