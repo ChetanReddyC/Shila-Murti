@@ -18,3 +18,4 @@ RUN NODE_ENV=production npm run build
 EXPOSE 9000
 
 CMD ["sh", "-c", "npx medusa db:migrate && npm run start"]
+
