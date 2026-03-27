@@ -13,7 +13,7 @@ permissions:
 
 env:
   DOCKERHUB_REPO: cr996/shilamurti-storefront
-  DO_APP_ID: 96ffe9bf-7827-4ace-af24-93b8bea795d7
+  DO_APP_ID: 1febe873-c572-422f-b574-f5b2f45fc57a
 
 jobs:
   build-and-deploy:
