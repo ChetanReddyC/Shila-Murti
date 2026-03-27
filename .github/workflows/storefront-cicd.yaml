@@ -31,6 +31,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Create production env file
+        run: printf '%s' "$BACKEND_ENV" > ./backend/.env.production
+        env:
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -39,8 +44,6 @@ jobs:
           push: true
           tags: |
             ${{ env.DOCKERHUB_REPO }}:latest
-          build-args: |
-            BACKEND_ENV_FILE_CONTENTS=${{ secrets.BACKEND_ENV }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
