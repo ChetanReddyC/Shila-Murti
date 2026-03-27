@@ -96,8 +96,8 @@ module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     databaseDriverOptions: process.env.DATABASE_URL?.includes("localhost")
-      ? { ssl: false }
-      : { ssl: { rejectUnauthorized: false } },
+      ? { connection: { ssl: false } }
+      : { connection: { ssl: { rejectUnauthorized: false } } },
     http: {
       /**
        * ✅ PROD + DEV CORS
