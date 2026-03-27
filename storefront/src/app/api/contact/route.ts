@@ -35,7 +35,7 @@ const MAX_LENGTHS = { name: 100, email: 254, subject: 200, message: 5000 } as co
 export async function POST(req: NextRequest) {
     try {
         // Rate limiting (#2)
-        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.ip || 'unknown'
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
         if (isRateLimited(ip)) {
             return NextResponse.json(
                 { error: 'Too many requests. Please try again later.' },
