@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import SharedSmokeOverlay, { SharedSmokeTarget } from '../components/SharedSmokeOverlay/SharedSmokeOverlay';
@@ -78,49 +78,72 @@ const imageRevealVariants = {
     }
 };
 
+const MAX_RETRIES = 3;
+const BASE_STALL_TIMEOUT = 10000; // 10s base, +5s per retry
+
 const VideoDisplay = ({ src, align, config }: { src: string, align: 'left' | 'right', config?: { x: number, y: number, scale: number } }) => {
     const [isLoading, setIsLoading] = React.useState(true);
     const [videoSrc, setVideoSrc] = React.useState<string | undefined>(undefined);
+    const [retryKey, setRetryKey] = React.useState(0);
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isVisibleRef = useRef(false);
+    const retryCountRef = useRef(0);
+    const isLoadingRef = useRef(true);
 
-    // 1. Just-in-Time Loading (Streaming-like efficiency)
+    const clearStallTimer = useCallback(() => {
+        if (stallTimerRef.current) {
+            clearTimeout(stallTimerRef.current);
+            stallTimerRef.current = null;
+        }
+    }, []);
+
+    const hardRetry = useCallback(() => {
+        if (retryCountRef.current >= MAX_RETRIES) return;
+        clearStallTimer();
+        retryCountRef.current += 1;
+        isLoadingRef.current = true;
+        setIsLoading(true);
+        setRetryKey(prev => prev + 1);
+    }, [clearStallTimer]);
+
+    const startStallTimer = useCallback(() => {
+        clearStallTimer();
+        const timeout = BASE_STALL_TIMEOUT + (retryCountRef.current * 5000);
+        stallTimerRef.current = setTimeout(() => {
+            if (isLoadingRef.current) hardRetry();
+        }, timeout);
+    }, [clearStallTimer, hardRetry]);
+
+    // 1. Lazy loading — load video src when container approaches viewport
     useEffect(() => {
         if (!containerRef.current) return;
-
-        const loadObserver = new IntersectionObserver((entries) => {
-            const entry = entries[0];
-            if (entry.isIntersecting) {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
                 setVideoSrc(src);
-                loadObserver.disconnect();
+                observer.disconnect();
             }
-        }, {
-            rootMargin: '200px',
-            threshold: 0
-        });
-
-        loadObserver.observe(containerRef.current);
-        return () => loadObserver.disconnect();
+        }, { rootMargin: '200px', threshold: 0 });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
     }, [src]);
 
-    // 2. Smart Playback Control
+    // 2. Playback control + stall detection
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !videoSrc) return;
 
+        startStallTimer();
+
         const playbackObserver = new IntersectionObserver((entries) => {
-            const entry = entries[0];
-            if (entry.isIntersecting) {
-                video.play().catch(e => {
-                    console.warn("Video play failed", e);
-                });
+            isVisibleRef.current = entries[0].isIntersecting;
+            if (entries[0].isIntersecting) {
+                video.play().catch(() => {});
             } else {
                 video.pause();
             }
-        }, {
-            threshold: 0.1,
-            rootMargin: "50px"
-        });
+        }, { threshold: 0.1, rootMargin: '50px' });
 
         if (containerRef.current) {
             playbackObserver.observe(containerRef.current);
@@ -128,10 +151,29 @@ const VideoDisplay = ({ src, align, config }: { src: string, align: 'left' | 'ri
 
         return () => {
             playbackObserver.disconnect();
+            clearStallTimer();
         };
-    }, [videoSrc]);
+    }, [videoSrc, retryKey, startStallTimer, clearStallTimer]);
 
-    // Use config if provided, else default
+    const handleReady = useCallback(() => {
+        clearStallTimer();
+        isLoadingRef.current = false;
+        setIsLoading(false);
+        if (isVisibleRef.current && videoRef.current) {
+            videoRef.current.play().catch(() => {});
+        }
+    }, [clearStallTimer]);
+
+    const handleError = useCallback(() => {
+        const video = videoRef.current;
+        if (video?.error?.code === MediaError.MEDIA_ERR_ABORTED) return;
+        hardRetry();
+    }, [hardRetry]);
+
+    const handleStalled = useCallback(() => {
+        if (isLoadingRef.current) startStallTimer();
+    }, [startStallTimer]);
+
     const position = config ? { x: config.x, y: config.y } : { x: 50, y: 50 };
     const scale = config?.scale || 1;
 
@@ -146,19 +188,26 @@ const VideoDisplay = ({ src, align, config }: { src: string, align: 'left' | 'ri
                 </div>
             )}
 
-            <video
-                ref={videoRef}
-                className={`gallery-video ${isLoading ? 'hidden' : 'visible'}`}
-                src={videoSrc}
-                muted
-                loop
-                playsInline
-                onCanPlay={() => setIsLoading(false)}
-                style={{
-                    objectPosition: `${position.x}% ${position.y}%`,
-                    transform: `scale(${scale})`
-                }}
-            />
+            {videoSrc && (
+                <video
+                    key={retryKey}
+                    ref={videoRef}
+                    className={`gallery-video ${isLoading ? 'hidden' : 'visible'}`}
+                    src={retryKey > 0 ? `${videoSrc}?retry=${retryKey}` : videoSrc}
+                    muted
+                    loop
+                    playsInline
+                    preload="auto"
+                    onCanPlayThrough={handleReady}
+                    onError={handleError}
+                    onStalled={handleStalled}
+                    onWaiting={handleStalled}
+                    style={{
+                        objectPosition: `${position.x}% ${position.y}%`,
+                        transform: `scale(${scale})`
+                    }}
+                />
+            )}
             <div className="video-overlay-gradient" />
         </div>
     );
