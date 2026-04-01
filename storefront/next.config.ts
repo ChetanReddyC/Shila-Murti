@@ -8,10 +8,8 @@ const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL ||
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   turbopack: {
+    root: __dirname,
     rules: {
       '*.svg': {
         loaders: ['@svgr/webpack'],
