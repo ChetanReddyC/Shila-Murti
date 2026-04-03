@@ -89,10 +89,14 @@ export async function acquireDistributedLock(
       }
 
     } catch (error) {
+      const cause = error instanceof Error ? (error as any).cause : undefined
       console.error('[DISTRIBUTED_LOCK][acquire][error]', {
         resource,
         attempt: attempts + 1,
         error: String(error),
+        cause: cause ? String(cause) : 'no cause',
+        causeMessage: cause?.message || 'none',
+        causeCode: cause?.code || 'none',
       })
 
       return {

@@ -1,6 +1,6 @@
 /**
  * Hybrid KV Store Strategy
- * 
+ *
  * Uses the best KV store for each use case:
  * - Upstash Redis: Distributed locks, atomic operations (critical path)
  * - Cloudflare KV: Sessions, caching, general storage (non-critical)
@@ -14,6 +14,17 @@ const UPSTASH_TOKEN = process.env.KV_REST_API_TOKEN
 const CF_ACCOUNT_ID = process.env.CF_KV_ACCOUNT_ID
 const CF_NAMESPACE_ID = process.env.CF_KV_NAMESPACE_ID
 const CF_API_TOKEN = process.env.CF_KV_API_TOKEN
+
+// Startup diagnostic (server-side only)
+if (typeof window === 'undefined') {
+  console.log('[KV_HYBRID] Config:', {
+    upstash: Boolean(UPSTASH_URL && UPSTASH_TOKEN) ? 'configured' : 'NOT configured',
+    cloudflare: Boolean(CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN) ? 'configured' : 'NOT configured',
+    cfAccountIdSet: Boolean(CF_ACCOUNT_ID),
+    cfNamespaceIdSet: Boolean(CF_NAMESPACE_ID),
+    cfApiTokenSet: Boolean(CF_API_TOKEN),
+  })
+}
 
 /**
  * Check which providers are available

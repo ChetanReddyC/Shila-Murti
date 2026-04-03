@@ -49,18 +49,19 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     
     if (!validation.valid) {
       // Clear invalid cookie
+      const isProductionEnv = process.env.NODE_ENV === 'production'
       const cookieValue = [
         `${CART_SESSION_COOKIE}=`,
         'HttpOnly',
-        process.env.NODE_ENV === 'production' ? 'Secure' : '',
-        'SameSite=Lax',
+        isProductionEnv ? 'Secure' : '',
+        isProductionEnv ? 'SameSite=None' : 'SameSite=Lax',
         'Max-Age=0',
         'Path=/'
       ].filter(Boolean).join('; ')
-      
+
       res.setHeader('Set-Cookie', cookieValue)
-      
-      return res.json({ 
+
+      return res.json({
         session: null,
         message: `Session ${validation.reason}`,
         reason: validation.reason
@@ -157,7 +158,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       `${CART_SESSION_COOKIE}=${sessionToken}`,
       'HttpOnly',
       isProduction ? 'Secure' : '',
-      'SameSite=Lax',
+      isProduction ? 'SameSite=None' : 'SameSite=Lax',
       `Max-Age=${CART_SESSION_TTL}`,
       'Path=/'
     ].filter(Boolean).join('; ')
@@ -195,11 +196,12 @@ export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
     }
 
     // Clear cookie
+    const isProductionEnv = process.env.NODE_ENV === 'production'
     const cookieValue = [
       `${CART_SESSION_COOKIE}=`,
       'HttpOnly',
-      process.env.NODE_ENV === 'production' ? 'Secure' : '',
-      'SameSite=Lax',
+      isProductionEnv ? 'Secure' : '',
+      isProductionEnv ? 'SameSite=None' : 'SameSite=Lax',
       'Max-Age=0',
       'Path=/'
     ].filter(Boolean).join('; ')
@@ -246,7 +248,7 @@ export async function PUT(req: MedusaRequest, res: MedusaResponse) {
       `${CART_SESSION_COOKIE}=${result.token}`,
       'HttpOnly',
       isProduction ? 'Secure' : '',
-      'SameSite=Lax',
+      isProduction ? 'SameSite=None' : 'SameSite=Lax',
       `Max-Age=${CART_SESSION_TTL}`,
       'Path=/'
     ].filter(Boolean).join('; ')
