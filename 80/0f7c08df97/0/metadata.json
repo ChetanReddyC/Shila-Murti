@@ -1,0 +1,36 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "800f7c08df97",
+  "session_id": "73f1619c-2f9b-49f2-8137-9733fa42fc7a",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-03T11:05:06.3615479Z",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 28,
+  "files_touched": [
+    "backend/src/api/store/cart-session/route.ts",
+    "storefront/src/lib/distributedLock.ts",
+    "storefront/src/lib/kvHybrid.ts"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6[1m]",
+  "turn_id": "8870d340954b",
+  "token_usage": {
+    "input_tokens": 2692,
+    "cache_creation_tokens": 346105,
+    "cache_read_tokens": 6006210,
+    "output_tokens": 94422,
+    "api_call_count": 63
+  },
+  "session_metrics": {
+    "turn_count": 28
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-03T11:05:04.9728404Z",
+    "agent_lines": 0,
+    "human_added": 87,
+    "human_modified": 811,
+    "human_removed": 0,
+    "total_committed": 898,
+    "agent_percentage": 0
+  }
+}
