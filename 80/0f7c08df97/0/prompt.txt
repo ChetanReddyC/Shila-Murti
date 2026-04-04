@@ -402,3 +402,15 @@ hey how can we alow that!!!! we need to fix the rootcause!
 ---
 
 hey wait i just completed an order in the localhost and it works fine so the issue isnt logical, investigate harder!!
+
+---
+
+hey tell me onething that i have set that envs in the GH secrets as well so in the process should i update those as well there or else if i maintain updated in the DO app level would that be fine?
+
+---
+
+i have set the env vars on DO in the app level!
+
+---
+
+i have already pushed and process started but earlier the backend build was quick but now its taking 10m+ was that cause of i did the fore-redeploy on DO by clearing the cathe and all?
