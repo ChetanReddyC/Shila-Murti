@@ -1,0 +1,69 @@
+{
+  "checkpoint_id": "800f7c08df97",
+  "session_id": "73f1619c-2f9b-49f2-8137-9733fa42fc7a",
+  "date": "2026-04-03",
+  "branch": "fixingmajorissues",
+  "files": [
+    "store/cart-session/route.ts",
+    "src/lib/distributedLock.ts",
+    "src/lib/kvHybrid.ts"
+  ],
+  "tags": [
+    "route",
+    "cart-session",
+    "distributedlock",
+    "lib",
+    "kvhybrid",
+    "auth",
+    "server-error",
+    "cors",
+    "timeout",
+    "permissions",
+    "deployment",
+    "environment",
+    "cache",
+    "api"
+  ],
+  "turn_count": 28,
+  "token_usage": 97114,
+  "intent": "Debug add-to-cart and order completion failures on DigitalOcean-hosted Medusa storefront after re-setup",
+  "decisions": [
+    "SameSite=Lax→None fix was premature — shilamurti.com and admin.shilamurti.com are same-site, not cross-origin",
+    "Root cause of 401 was KV 500 with error swallowed, not cookie policy",
+    "CF_KV_NAMESPACE_ID changed when admin was recreated — must update both DO env vars and local .env files",
+    "Lock logic uses kvHybrid.ts (prefers Upstash) while session uses kv.ts — two separate KV clients in storefront",
+    "Added diagnostic logging to kvHybrid.ts to expose actual fetch failure cause (DNS/TLS/connection)"
+  ],
+  "failed_approaches": [
+    "SameSite=None fix — wrong diagnosis, same-site subdomain doesn't need None",
+    "Rotating CF_KV_API_TOKEN — old namespace ID was also wrong, rotating token alone didn't fix 500",
+    "Removing Upstash env vars and redeploying — lock still failed with 'fetch failed', DO requires rebuild not just restart",
+    "Making lock fail-open — user rejected, wanted root cause fixed instead"
+  ],
+  "warnings": [
+    "saveCartIdToSession() catches ALL errors silently — KV failures look like success on frontend, only visible in backend terminal",
+    "Recreating Medusa admin generates a new CF_KV_NAMESPACE_ID — always verify namespace ID after admin re-setup",
+    "kvHybrid.ts prefers Upstash for atomic locks — if KV_REST_API_URL is set (even stale), it tries Upstash first and fails",
+    "Next.js on DO reads env vars at build time — removing env vars requires full redeploy/rebuild, not just restart",
+    "Order completion is fail-closed on KV unreachable — all orders blocked if storefront KV fetch fails"
+  ],
+  "resolution": "KV session 500 fixed by correcting CF_KV_NAMESPACE_ID and rotating token; lock 'fetch failed' root cause still being diagnosed via added diagnostic logging",
+  "error_signatures": [
+    "POST /store/cart-session 500 (Internal Server Error)",
+    "Cloudflare SET failed: 401 Unauthorized {\"result\":null,\"success\":false,\"errors\":[{\"code\":10000,\"message\":\"Authentication error\"}]}",
+    "CART_SESSION_MISSING: No cart session found. Please refresh the page and try again.",
+    "Sales channel sc_01KMPXT8E89SYHS9X2AMCSER69 is not associated with any stock location for variant",
+    "TypeError: fetch failed"
+  ],
+  "cause_chain": [
+    "401 on line-items POST → assumed SameSite cookie policy → actual cause: cart-session POST silently returning 500 so no cookie was ever set",
+    "cart-session POST 500 → assumed wrong API token → actual cause: CF_KV_NAMESPACE_ID changed when admin was recreated, old namespace ID caused Cloudflare auth error",
+    "order completion lock 'TypeError: fetch failed' → assumed env var misconfiguration → actual cause still unknown — storefront KV fetch to Cloudflare API fails entirely in DO environment, diagnostic logging added to get real error cause"
+  ],
+  "file_dependencies": [
+    "Recreating Medusa admin requires updating CF_KV_NAMESPACE_ID in both .env, .env.production, and all DO environment variable sets",
+    "Storefront lock (distributedLock.ts) uses kvHybrid.ts which has different provider priority than backend kv.ts — same env vars behave differently",
+    "DO Next.js storefront env var changes require full redeploy/rebuild — runtime changes alone do not take effect"
+  ],
+  "key_insight": "When Medusa admin is recreated on DO, the Cloudflare KV namespace ID changes — always verify and update CF_KV_NAMESPACE_ID everywhere (local .env, .env.production, DO backend env vars, DO storefront env vars) or all cart session writes will 500."
+}
