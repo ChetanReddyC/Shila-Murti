@@ -1,0 +1,29 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "a96c5e8e498d",
+  "strategy": "manual-commit",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "storefront/src/app/api/auth/magic/confirm/route.ts",
+    "storefront/src/app/auth/magic/done/done.module.css",
+    "storefront/src/app/auth/magic/done/page.tsx",
+    "storefront/src/app/checkout/checkoutPage.tsx",
+    "storefront/src/lib/kv.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a9/6c5e8e498d/0/metadata.json",
+      "transcript": "/a9/6c5e8e498d/0/full.jsonl",
+      "content_hash": "/a9/6c5e8e498d/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
