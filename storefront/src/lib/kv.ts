@@ -118,7 +118,7 @@ export async function kvSetNX(key: string, value: unknown, ttlSeconds?: number):
 export async function kvGet<T = unknown>(key: string): Promise<T | null> {
   if (useCloudflare()) {
     const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${CF_API_TOKEN}` } })
+    const res = await fetch(url, { cache: 'no-store', headers: { Authorization: `Bearer ${CF_API_TOKEN}` } })
     if (res.status === 404) return null
     if (!res.ok) throw new Error(`CF KV get failed ${res.status}`)
     const text = await res.text()
@@ -127,7 +127,7 @@ export async function kvGet<T = unknown>(key: string): Promise<T | null> {
 
   if (!KV_URL || !KV_TOKEN) return null
   const url = `${KV_URL}/get/${encodeURIComponent(key)}`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${KV_TOKEN}` } })
+  const res = await fetch(url, { cache: 'no-store', headers: { Authorization: `Bearer ${KV_TOKEN}` } })
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`KV get failed ${res.status}`)
   const json = await res.json().catch(() => null)
@@ -191,7 +191,7 @@ export async function kvExpire(key: string, ttlSeconds: number): Promise<void> {
 export async function kvListKeys(prefix = '', limit = 1000): Promise<string[]> {
   if (useCloudflare()) {
     const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/keys?prefix=${encodeURIComponent(prefix)}&limit=${limit}`
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${CF_API_TOKEN}` } })
+    const res = await fetch(url, { cache: 'no-store', headers: { Authorization: `Bearer ${CF_API_TOKEN}` } })
     if (!res.ok) throw new Error(`CF KV list failed ${res.status}`)
     const json = await res.json().catch(() => null) as any
     const result = Array.isArray(json?.result) ? json.result : []
