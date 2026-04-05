@@ -67,3 +67,11 @@ hey once have a look into the code very previous commits codes while this was wo
 ---
 
 ok now its working!!
+
+---
+
+so lets push this into the current fixingmajorissues branch!
+
+---
+
+remove that coautherd by and keep the commit msg normal one line only!
