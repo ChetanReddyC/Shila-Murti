@@ -1,0 +1,5 @@
+Distillation mode: LLM (Claude CLI)
+  agent-memory | distilled 1 checkpoint (0 decisions, 2 warnings)
+
+Done. 1 distilled, 2 skipped (already exists).
+Total memories: 4

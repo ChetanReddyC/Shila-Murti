@@ -73,6 +73,15 @@
             "command": "entire hooks claude-code user-prompt-submit"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .agent-memory/inject-hook.sh"
+          }
+        ]
       }
     ]
   },

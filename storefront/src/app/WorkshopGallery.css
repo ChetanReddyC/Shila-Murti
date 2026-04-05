@@ -14,6 +14,17 @@
     padding: 0;
 }
 
+.workshop-gallery-mist {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2rem;
+    background: linear-gradient(to bottom, #ffffff, transparent);
+    pointer-events: none;
+    z-index: 10;
+}
+
 .shared-smoke-overlay-wrapper {
     position: absolute;
     top: 0;
