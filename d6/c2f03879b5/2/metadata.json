@@ -1,0 +1,34 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "d6c2f03879b5",
+  "session_id": "3aa943ce-434c-4afa-a7fd-941c0fba4810",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-05T10:42:48.2343295Z",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "storefront/src/app/order-confirmation/orderConfirmationPage.module.css"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6[1m]",
+  "turn_id": "2a92816e6e27",
+  "token_usage": {
+    "input_tokens": 2460,
+    "cache_creation_tokens": 308268,
+    "cache_read_tokens": 13153786,
+    "output_tokens": 77789,
+    "api_call_count": 121
+  },
+  "session_metrics": {
+    "turn_count": 13
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-05T10:42:44.9981931Z",
+    "agent_lines": 0,
+    "human_added": 0,
+    "human_modified": 475,
+    "human_removed": 1,
+    "total_committed": 474,
+    "agent_percentage": 0
+  }
+}
