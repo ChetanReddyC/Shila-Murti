@@ -4310,8 +4310,8 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
-              {/* Identity Verification Section (Task 2) - Only show for unauthenticated users */}
-              {status !== 'authenticated' && (
+              {/* Identity Verification Section - hide after successful verification or auth */}
+              {status !== 'authenticated' && !purchaseReady && (
                 <div ref={identityVerificationRef} className={styles.section}>
                   <h2 className={styles.sectionTitle}>Identity Verification</h2>
                   {identityError && (
@@ -4472,6 +4472,14 @@ export default function CheckoutPage() {
                     <span className={styles.totalValue}>{PriceCalculationService.formatCurrency(total, cart?.currency_code)}</span>
                   </div>
                 </div>
+                {/* Verification status near payment button */}
+                {status !== 'authenticated' && !purchaseReady && magicSent && (
+                  <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, fontSize: 14, lineHeight: 1.5, background: magicVerified ? '#f0fff4' : '#fffff0', border: `1px solid ${magicVerified ? '#c6f6d5' : '#fefcbf'}`, color: magicVerified ? '#276749' : '#744210' }}>
+                    {magicVerified
+                      ? 'Email verified — setting up your account...'
+                      : 'We sent a verification link to your email. Click it and return here — we check every few seconds.'}
+                  </div>
+                )}
                 {paymentMethod === 'cashfree' ? (
                   <button
                     type="button"

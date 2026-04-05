@@ -61,12 +61,13 @@ export async function GET(req: NextRequest) {
   // Smart redirect based on context
   const base = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
 
-  // If this is a checkout flow, redirect directly to checkout page
+  // Checkout flow: redirect to the lightweight done page instead of a second checkout tab.
+  // The done page calls the verify endpoint (with a delay for KV propagation),
+  // stores the customerId in localStorage, and closes itself.
   if (state?.startsWith('checkout-')) {
-    // Use cart ID from record (more reliable) or fallback to state
     const cartId = record?.cartId || state.replace('checkout-', '')
-    const checkoutUrl = `${base}/checkout?verified=true&email=${encodeURIComponent(email)}${cartId ? `&cartId=${encodeURIComponent(cartId)}` : ''}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}`
-    return new Response(null, { status: 302, headers: { Location: checkoutUrl } })
+    const doneUrl = `${base}/auth/magic/done?email=${encodeURIComponent(email)}&state=${encodeURIComponent(state)}${cartId ? `&cartId=${encodeURIComponent(cartId)}` : ''}${record?.phonePrimary ? `&phone=${encodeURIComponent(record.phonePrimary)}` : ''}`
+    return new Response(null, { status: 302, headers: { Location: doneUrl } })
   }
 
   // For regular login flows, redirect to the new welcome page
