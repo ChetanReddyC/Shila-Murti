@@ -1,0 +1,60 @@
+hey in the DO hosted version the images are not loading , earlier when i was hosted in gcp as well got the similar or more like an same issue arraisd but then i have create a bucker in gcp and hosted the image there but now guide me here what should we do? [Image #2]
+
+---
+
+1. no there is no products have images attached there, and 2nd is all ican see it this [Image #3]
+
+---
+
+hey i wanted to mirate to DO so guide me on that clearly!!
+
+---
+
+hey why do we need to have an another service? and can we just do that with the existing postgress db??
+
+---
+
+Okay. So once again, check and tell me that does that a digital ocean would actually compatible with our app. I mean, to host the images so that it could properly You're telling that something s3 and like sort of things??
+
+---
+
+[Image #4] Hey. But see, it is telling that the Bangalore the Bangalore region is not available currently. So should we wait to get it back up or what should we actually do now?
+
+---
+
+K. We we And tell me this that you are telling essentially by ones visit and load that images on my device after the whole thing in the digital ocean. That you're telling everybody in India would be serving at the faster speeds once have get it loaded for the very first time. From my device.
+
+---
+
+Yeah. That is what I'm asking for. Don't worry. Leave it. I understood.
+
+---
+
+[Image #5] see this is what im donna do create!
+
+---
+
+[Image #6] ok see its created And I'm not gonna give you that access keys and or API keys on secrets directly with you. It is not actually secure. Tell me through how can I update that carefully so by step? And also where I supposed to be paste them
+
+---
+
+[Image #7] which would need to select??
+
+---
+
+[Image #8] Hey. This is showing this button there. We need to click on this?
+
+---
+
+hey see that im getting this error when i try to upload the image on medusa admin panel! index-BUch4ton.js:28 
+ POST https://admin.shilamurti.com/admin/uploads 500 (Internal Server Error)
+index-BUch4ton.js:28 
+ POST https://admin.shilamurti.com/admin/products/REDACTED 400 (Bad Request)
+index-BUch4ton.js:23 Uncaught (in promise) Jg: Invalid request: Field 'images, 0, url' is required
+    at index-BUch4ton.js:23:30410
+    at Generator.next (<anonymous>)
+    at s (index-BUch4ton.js:23:29379)
+
+---
+
+wait i forgot havent pushed give me a sec i will push now!! and i updated that env vars!!
