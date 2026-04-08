@@ -21,6 +21,7 @@ interface ProductCardWithShaderProps {
     material?: string;
     dimensions?: string;
     inStock?: boolean;
+    metadata?: Record<string, any> | null;
   };
   overlayRef?: React.RefObject<HoverOverlayAPI | null>;
 }
@@ -280,7 +281,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
                   src={product.foregroundImage}
                   alt={product.title}
                   fallbackSrc="/images/placeholder-product.svg"
-                  className={`${styles.foregroundImage} ${isHovering ? styles.foregroundImageHovered : ''}`}
+                  className={`${styles.foregroundImage} ${product.metadata?.image_fit === 'contain' ? styles.foregroundImageContain : ''} ${isHovering ? styles.foregroundImageHovered : ''}`}
                   containerClassName={styles.foregroundContainer}
                   priority={false}
                   showRetryButton={false}
