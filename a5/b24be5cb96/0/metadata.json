@@ -1,0 +1,34 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "a5b24be5cb96",
+  "session_id": "18eedf78-a903-4220-8a95-5bb1776cff57",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-08T14:09:46.3206068Z",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "storefront/src/utils/medusaApiClient.ts"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6[1m]",
+  "turn_id": "120ac500e851",
+  "token_usage": {
+    "input_tokens": 117,
+    "cache_creation_tokens": 108158,
+    "cache_read_tokens": 1652028,
+    "output_tokens": 22368,
+    "api_call_count": 47
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-08T14:09:44.944453Z",
+    "agent_lines": 0,
+    "human_added": 0,
+    "human_modified": 989,
+    "human_removed": 0,
+    "total_committed": 989,
+    "agent_percentage": 0
+  }
+}
