@@ -1,0 +1,25 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "684d27896c0f",
+  "strategy": "manual-commit",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "storefront/src/components/ProductCardWithShader/ProductCardWithShader.module.css"
+  ],
+  "sessions": [
+    {
+      "metadata": "/68/4d27896c0f/0/metadata.json",
+      "transcript": "/68/4d27896c0f/0/full.jsonl",
+      "content_hash": "/68/4d27896c0f/0/content_hash.txt",
+      "prompt": "/68/4d27896c0f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 43,
+    "cache_creation_tokens": 63304,
+    "cache_read_tokens": 754113,
+    "output_tokens": 16040,
+    "api_call_count": 27
+  }
+}

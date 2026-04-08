@@ -1,0 +1,29 @@
+[Image #1] [Image #2] Hey, Wams. I'm looking to the both screenshot or screenshots. I've actually started uploading the product images. The issue that I have noticed is that you can have a look into that screenshot too. That divine hanuman gadha  on one that is actually Doesn't fitting there properly. I don't know what's the issue, whether that issue was probably from the image creation and the size of it, proportion or just its styling and all. But rather than other images are properly actually looking. For which their sizes. This is being somewhat even more width If it is the case, what kind of soluation we can implement there so think deeply on this!
+
+---
+
+[Image #1] [Image #2] Hey, Wams. I'm looking to the both screenshot or screenshots. I've actually started uploading the product images. The issue that I have noticed is that you can have a look into that screenshot too. That divine hanuman gadha  on one that is actually Doesn't fitting there properly. I don't know what's the issue, whether that issue was probably from the image creation and the size of it, proportion or just its styling and all. But rather than other images are properly actually looking. For which their sizes. This is being somewhat even more width If it is the case,but i would say i have a soluation for this we need to implement that here the first point is that for almost of our all the images this current style of displaying the images is perfectly fine for only some of the images like a 3peice set of art images only the have this problem that its look that image scaled cause that styling isnt compatable to this kind so my idea is that i will make the foreground images small and with backgound images it wont be much big issue so now i need a feature the when i uploaded that size scale down foreground images i need it to show as it is insted of filled/coverd currently how it is as of now dont right away go to the implementation discuss with me this first and lets understand deeper and then can be finalize the fix!
+
+---
+
+ok lets try and see the option A first if that dosent suit we can ty B
+
+---
+
+[Image #3] hey see i feel that foreground image is too small i feel what can we doo?
+
+---
+
+hey think hard and brain strome more deeper and dont we have any other efficeient way to handle this??
+
+---
+
+[Image #4] see im designing like this!!
+
+---
+
+ok  do that, lets try!
+
+---
+
+hey dont revery that to cover now only it looks perfect see this screenshot ive took it before i accepting the changes!!  [Image #6]
