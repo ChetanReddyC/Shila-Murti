@@ -558,7 +558,7 @@ export class MedusaApiClient {
     }
 
     // Medusa v2 official approach: use calculated_price with region for proper pricing
-    queryParams.append('fields', '*variants.calculated_price,metadata');
+    queryParams.append('fields', '*variants.calculated_price,+metadata');
 
     const endpoint = `/store/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
@@ -779,10 +779,10 @@ export class MedusaApiClient {
     // Medusa v2 requires region_id when using calculated_price
     if (regionId) {
       queryParams.append('region_id', regionId);
-      queryParams.append('fields', '*variants.calculated_price,metadata');
+      queryParams.append('fields', '*variants.calculated_price,+metadata');
     } else {
       // Fallback without calculated_price if no region available
-      queryParams.append('fields', '*variants,*variants.prices,metadata');
+      queryParams.append('fields', '*variants,*variants.prices,+metadata');
     }
 
     const endpoint = `/store/products?${queryParams.toString()}`;
