@@ -7,6 +7,7 @@ const MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL ||
   'https://admin.shilamurti.com';
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['*.ngrok-free.app', '*.ngrok.io'],
   output: "standalone",
   turbopack: {
     root: __dirname,
