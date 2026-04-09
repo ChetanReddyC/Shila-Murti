@@ -97,6 +97,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
   const containerRef = useRef<HTMLDivElement>(null);
   const imageSectionRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number | null>(null);
+  const isMobileRef = useRef(false);
 
   const resetTilt = useCallback(() => {
     if (imageSectionRef.current) {
@@ -182,6 +183,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
       cleanupObserver();
 
       // 2. Only create observer if we are on a mobile/tablet view
+      isMobileRef.current = mediaQuery.matches;
       if (!mediaQuery.matches) return;
 
       const targetEl = containerRef.current;
@@ -220,6 +222,7 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
 
     // Handle Resize/Orientation Changes
     const handleMediaChange = (e: MediaQueryListEvent) => {
+      isMobileRef.current = e.matches;
       if (e.matches) {
         setupObserver();
       } else {
@@ -251,8 +254,8 @@ const ProductCardWithShader: React.FC<ProductCardWithShaderProps> = memo(({ prod
         className={`${styles.cardContainer} ${isHovering ? styles.cardContainerHovered : ''}`}
         onMouseEnter={handleContainerMouseEnter}
         onMouseLeave={handleContainerMouseLeave}
-        onTouchStart={() => setIsHovering(true)}
-        onTouchEnd={() => setIsHovering(false)}
+        onTouchStart={() => { if (!isMobileRef.current) setIsHovering(true); }}
+        onTouchEnd={() => { if (!isMobileRef.current) setIsHovering(false); }}
       >
         <div className={styles.cardWrapper}>
           {/* Image section with 3D rotation effect */}

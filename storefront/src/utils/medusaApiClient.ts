@@ -194,7 +194,12 @@ export class MedusaApiClient {
   public static readonly MANUAL_PAYMENT_PROVIDER_ID = 'manual';
 
   constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000';
+    // On the client (browser), use relative URLs so requests go through Next.js rewrites proxy.
+    // On the server (SSR), use the full backend URL directly.
+    const defaultBaseUrl = typeof window !== 'undefined'
+      ? ''
+      : (process.env.MEDUSA_BACKEND_URL || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000');
+    this.baseUrl = config.baseUrl || defaultBaseUrl;
     this.timeout = config.timeout || 8000;
     this.retryOptions = config.retryOptions || {
       maxRetries: 3,
@@ -228,6 +233,7 @@ export class MedusaApiClient {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'x-publishable-api-key': this.publishableApiKey,
+        ...(process.env.NODE_ENV === 'development' ? { 'ngrok-skip-browser-warning': '1' } : {}),
       };
 
       // Normalize provided headers

@@ -140,9 +140,11 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 }
 
 // Session API endpoint for secure cart management
-// IMPORTANT: Must use backend API to set cookie on backend domain (localhost:9000)
-// so that cookies are sent with subsequent cart requests to the backend
-const CART_SESSION_API = `${process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL}/store/cart-session`;
+// On the client, use relative URL so requests go through Next.js rewrites proxy (works with ngrok/remote devices).
+// On the server, use the full backend URL directly.
+const CART_SESSION_API = typeof window !== 'undefined'
+  ? '/store/cart-session'
+  : `${process.env.MEDUSA_BACKEND_URL || process.env.NEXT_PUBLIC_MEDUSA_API_BASE_URL || 'http://localhost:9000'}/store/cart-session`;
 
 const safeParseJSON = <T,>(payload: string | null): T | null => {
   if (!payload) return null;
