@@ -1,290 +1,145 @@
 /**
- * Hybrid KV Store Strategy
+ * Hybrid KV Store — Cloudflare KV only
  *
- * Uses the best KV store for each use case:
- * - Upstash Redis: Distributed locks, atomic operations (critical path)
- * - Cloudflare KV: Sessions, caching, general storage (non-critical)
+ * All atomic operations (SETNX for locks) use Cloudflare KV with
+ * a check-then-set pattern.  True Redis-level atomicity is not
+ * available, but the TTL-guarded window is small enough for our
+ * single-writer completion flow.
  */
 
-// Upstash Redis config (for atomic operations)
-const UPSTASH_URL = process.env.KV_REST_API_URL
-const UPSTASH_TOKEN = process.env.KV_REST_API_TOKEN
-
-// Cloudflare KV config (for general storage)
 const CF_ACCOUNT_ID = process.env.CF_KV_ACCOUNT_ID
 const CF_NAMESPACE_ID = process.env.CF_KV_NAMESPACE_ID
 const CF_API_TOKEN = process.env.CF_KV_API_TOKEN
 
-// Startup diagnostic (server-side only)
+function cfConfigured(): boolean {
+  return Boolean(CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN)
+}
+
 if (typeof window === 'undefined') {
   console.log('[KV_HYBRID] Config:', {
-    upstash: Boolean(UPSTASH_URL && UPSTASH_TOKEN) ? 'configured' : 'NOT configured',
-    cloudflare: Boolean(CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN) ? 'configured' : 'NOT configured',
-    cfAccountIdSet: Boolean(CF_ACCOUNT_ID),
-    cfNamespaceIdSet: Boolean(CF_NAMESPACE_ID),
-    cfApiTokenSet: Boolean(CF_API_TOKEN),
+    cloudflare: cfConfigured() ? 'configured' : 'NOT configured',
   })
 }
 
-/**
- * Check which providers are available
- */
-export function getAvailableProviders(): {
-  upstash: boolean
-  cloudflare: boolean
-  recommended: 'upstash' | 'cloudflare' | 'none'
-} {
-  const upstash = Boolean(UPSTASH_URL && UPSTASH_TOKEN)
-  const cloudflare = Boolean(CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN)
+// ── helpers ──────────────────────────────────────────────────────────
 
-  let recommended: 'upstash' | 'cloudflare' | 'none' = 'none'
-  if (upstash) recommended = 'upstash' // Prefer Upstash for atomic ops
-  else if (cloudflare) recommended = 'cloudflare' // Fallback to Cloudflare
-
-  return { upstash, cloudflare, recommended }
+function cfUrl(key: string): string {
+  return `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
 }
 
+function cfHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${CF_API_TOKEN}` }
+}
+
+// ── public API ───────────────────────────────────────────────────────
+
 /**
- * Atomic SET NX for distributed locks
- * REQUIRES Upstash Redis for true atomicity
+ * Atomic-ish SET NX for distributed locks.
+ * Uses Cloudflare KV check-then-set (best available without Redis).
  */
 export async function kvSetNXAtomic(
   key: string,
   value: unknown,
   ttlSeconds?: number
 ): Promise<boolean> {
-  // If Upstash is not configured, fall back to check-then-set (less atomic but works for dev)
-  if (!UPSTASH_URL || !UPSTASH_TOKEN) {
-    console.warn('[KV_HYBRID][kvSetNXAtomic] Upstash not configured - falling back to Cloudflare KV check-then-set (NOT ATOMIC)')
-
-    // Check if key exists using Cloudflare KV
-    const existing = await kvGet(key)
-    if (existing !== null) {
-      return false // Key already exists
-    }
-
-    // Key doesn't exist, set it
-    await kvSet(key, value, ttlSeconds)
-    return true
+  if (!cfConfigured()) {
+    throw new Error('Cloudflare KV not configured — cannot acquire lock')
   }
 
-  console.log('[KV_HYBRID][kvSetNXAtomic] Attempting atomic SET NX', {
-    key,
-    upstashUrl: UPSTASH_URL.substring(0, 30) + '...',
-    hasToken: Boolean(UPSTASH_TOKEN),
-    ttlSeconds
+  // Check if key already exists
+  const existing = await kvGet(key)
+  if (existing !== null) return false
+
+  // Cloudflare KV minimum TTL is 60s
+  const actualTTL = ttlSeconds && ttlSeconds >= 60 ? ttlSeconds : 60
+  const url = `${cfUrl(key)}?expiration_ttl=${actualTTL}`
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { ...cfHeaders(), 'Content-Type': 'text/plain' },
+    body: typeof value === 'string' ? value : JSON.stringify(value),
   })
 
-  // CRITICAL FIX: Upstash requires using the SETNX command, not SET with nx flag
-  // We need to use pipeline to do SETNX + EXPIRE atomically
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error')
+    throw new Error(`CF KV setNX failed ${res.status}: ${errorText}`)
+  }
 
-  if (ttlSeconds) {
-    // Use Redis pipeline for atomic SETNX + EXPIRE
-    const pipelineUrl = `${UPSTASH_URL}/pipeline`
-    const commands = [
-      ['SETNX', key, typeof value === 'string' ? value : JSON.stringify(value)],
-      ['EXPIRE', key, ttlSeconds]
-    ]
+  return true
+}
 
-    console.log('[KV_HYBRID][kvSetNXAtomic] Using pipeline for SETNX + EXPIRE')
-
-    const res = await fetch(pipelineUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${UPSTASH_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(commands),
-    })
-
-    console.log('[KV_HYBRID][kvSetNXAtomic] Response status:', res.status)
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => 'Unknown error')
-      console.error('[KV_HYBRID][kvSetNXAtomic] Request failed:', errorText)
-      throw new Error(`Upstash pipeline failed ${res.status}: ${errorText}`)
-    }
-
-    const json = await res.json().catch(() => null)
-    console.log('[KV_HYBRID][kvSetNXAtomic] Response JSON:', json)
-
-    // Pipeline returns array: [SETNX result, EXPIRE result]
-    // SETNX returns 1 if key was set, 0 if key already existed
-    const setnxResult = json?.[0]?.result
-    const acquired = setnxResult === 1
-
-    console.log('[KV_HYBRID][kvSetNXAtomic] Lock acquired:', acquired, 'SETNX result:', setnxResult)
-
-    return acquired
-
-  } else {
-    // No TTL - just use SETNX directly
-    const url = `${UPSTASH_URL}/setnx/${encodeURIComponent(key)}/${encodeURIComponent(
-      typeof value === 'string' ? value : JSON.stringify(value)
-    )}`
-
-    console.log('[KV_HYBRID][kvSetNXAtomic] Using simple SETNX')
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${UPSTASH_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    console.log('[KV_HYBRID][kvSetNXAtomic] Response status:', res.status)
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => 'Unknown error')
-      console.error('[KV_HYBRID][kvSetNXAtomic] Request failed:', errorText)
-      throw new Error(`Upstash setnx failed ${res.status}: ${errorText}`)
-    }
-
-    const json = await res.json().catch(() => null)
-    console.log('[KV_HYBRID][kvSetNXAtomic] Response JSON:', json)
-
-    // SETNX returns 1 if key was set, 0 if key already existed
-    const acquired = json?.result === 1
-    console.log('[KV_HYBRID][kvSetNXAtomic] Lock acquired:', acquired, 'result:', json?.result)
-
-    return acquired
+export function getAvailableProviders() {
+  return {
+    upstash: false,
+    cloudflare: cfConfigured(),
+    recommended: cfConfigured() ? 'cloudflare' as const : 'none' as const,
   }
 }
 
-/**
- * Regular SET - works with either provider
- * Uses Upstash if available, falls back to Cloudflare
- */
+/** SET */
 export async function kvSet(
   key: string,
   value: unknown,
   ttlSeconds?: number
 ): Promise<void> {
-  // Try Upstash first (if available)
-  if (UPSTASH_URL && UPSTASH_TOKEN) {
-    const url = `${UPSTASH_URL}/set/${encodeURIComponent(key)}`
-    const body: any = { value }
-    if (ttlSeconds) body.ex = ttlSeconds
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${UPSTASH_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body),
-    })
-
-    if (res.ok) return
+  if (!cfConfigured()) {
+    console.warn('[KV_HYBRID] No KV store available for key:', key)
+    return
   }
 
-  // Fallback to Cloudflare KV
-  if (CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN) {
-    // Cloudflare requires minimum 60s TTL
-    const actualTTL = ttlSeconds && ttlSeconds >= 60 ? ttlSeconds : 60
+  const actualTTL = ttlSeconds && ttlSeconds >= 60 ? ttlSeconds : 60
+  const url = ttlSeconds ? `${cfUrl(key)}?expiration_ttl=${actualTTL}` : cfUrl(key)
 
-    const base = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
-    const url = ttlSeconds ? `${base}?expiration_ttl=${actualTTL}` : base
-
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${CF_API_TOKEN}`,
-        'Content-Type': 'text/plain',
-      },
-      body: typeof value === 'string' ? value : JSON.stringify(value),
-    })
-
-    if (res.ok) return
-  }
-
-  console.warn('[KV_HYBRID] No KV store available for key:', key)
-}
-
-/**
- * GET - works with either provider
- */
-export async function kvGet<T = unknown>(key: string): Promise<T | null> {
-  // Try Upstash first (if available and key might be there)
-  if (UPSTASH_URL && UPSTASH_TOKEN) {
-    const url = `${UPSTASH_URL}/get/${encodeURIComponent(key)}`
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
-    })
-
-    if (res.ok) {
-      const json = await res.json().catch(() => null)
-      const result = json?.result
-      if (result !== null) return result as T
-    }
-  }
-
-  // Try Cloudflare KV
-  if (CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN) {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${CF_API_TOKEN}` }
-    })
-
-    if (res.status === 404) return null
-    if (res.ok) {
-      const text = await res.text()
-      try { return JSON.parse(text) as T }
-      catch { return text as unknown as T }
-    }
-  }
-
-  return null
-}
-
-/**
- * DELETE - works with either provider
- */
-export async function kvDel(key: string): Promise<void> {
-  // Delete from both stores (if available)
-  const promises: Promise<any>[] = []
-
-  if (UPSTASH_URL && UPSTASH_TOKEN) {
-    const url = `${UPSTASH_URL}/del/${encodeURIComponent(key)}`
-    promises.push(
-      fetch(url, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
-      })
-    )
-  }
-
-  if (CF_ACCOUNT_ID && CF_NAMESPACE_ID && CF_API_TOKEN) {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${encodeURIComponent(key)}`
-    promises.push(
-      fetch(url, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${CF_API_TOKEN}` }
-      })
-    )
-  }
-
-  await Promise.allSettled(promises)
-}
-
-/**
- * INCREMENT - requires Upstash
- */
-export async function kvIncr(key: string): Promise<number | null> {
-  if (!UPSTASH_URL || !UPSTASH_TOKEN) {
-    console.warn('[KV_HYBRID] Increment requires Upstash Redis')
-    return null
-  }
-
-  const url = `${UPSTASH_URL}/incr/${encodeURIComponent(key)}`
   const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
+    method: 'PUT',
+    headers: { ...cfHeaders(), 'Content-Type': 'text/plain' },
+    body: typeof value === 'string' ? value : JSON.stringify(value),
   })
 
-  if (!res.ok) return null
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '')
+    throw new Error(`CF KV set failed ${res.status}: ${errorText}`)
+  }
+}
 
-  const json = await res.json().catch(() => null)
-  return json?.result ?? null
+/** GET */
+export async function kvGet<T = unknown>(key: string): Promise<T | null> {
+  if (!cfConfigured()) return null
+
+  const res = await fetch(cfUrl(key), {
+    cache: 'no-store',
+    headers: cfHeaders(),
+  })
+
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`CF KV get failed ${res.status}`)
+
+  const text = await res.text()
+  try { return JSON.parse(text) as T }
+  catch { return text as unknown as T }
+}
+
+/** DELETE */
+export async function kvDel(key: string): Promise<void> {
+  if (!cfConfigured()) return
+
+  const res = await fetch(cfUrl(key), {
+    method: 'DELETE',
+    headers: cfHeaders(),
+  })
+
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`CF KV del failed ${res.status}`)
+  }
+}
+
+/** INCREMENT (non-atomic read-modify-write) */
+export async function kvIncr(key: string): Promise<number | null> {
+  if (!cfConfigured()) return null
+
+  const current = await kvGet<string | number | null>(key)
+  const n = (typeof current === 'number' ? current : parseInt(String(current || '0'), 10)) || 0
+  const next = n + 1
+  await kvSet(key, String(next))
+  return next
 }
