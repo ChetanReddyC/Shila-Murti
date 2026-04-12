@@ -81,7 +81,7 @@ export default function ReturnPage() {
     })();
   }, [router.isReady, orderIdParam, router]);
 
-  if (!orderIdParam) {
+  if (router.isReady && !orderIdParam) {
     return <div>Order ID missing in URL</div>;
   }
 
