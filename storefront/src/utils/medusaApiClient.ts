@@ -636,7 +636,7 @@ export class MedusaApiClient {
   async getCart(cartId: string): Promise<MedusaCart> {
     const queryParams = new URLSearchParams();
     // Expand cart items with variant and product information
-    queryParams.append('fields', '*items,*items.variant,*items.variant.product');
+    queryParams.append('fields', '*items,*items.variant,*items.variant.product,+items.variant.product.metadata');
 
     const endpoint = `/store/carts/${cartId}?${queryParams.toString()}`;
 
@@ -741,7 +741,7 @@ export class MedusaApiClient {
   }
 
   async getProduct(id: string): Promise<Product> {
-    const endpoint = `/store/products/${id}`;
+    const endpoint = `/store/products/${id}?fields=+metadata`;
     const response = await this.makeRequestWithRetry<{ product: Product }>(endpoint);
     return response.product;
   }
@@ -979,7 +979,7 @@ export class MedusaApiClient {
   async getOrder(orderId: string): Promise<OrderMinimal> {
     // Request expanded fields so the order confirmation page can render
     // shipping address, shipping methods and items reliably.
-    const endpoint = `/store/orders/${orderId}?fields=*shipping_address,*shipping_methods,*items,*items.variant,*items.variant.product`;
+    const endpoint = `/store/orders/${orderId}?fields=*shipping_address,*shipping_methods,*items,*items.variant,*items.variant.product,+items.variant.product.metadata`;
     const response = await this.makeRequestWithRetry<OrderResponse>(endpoint);
     return response.order;
   }
