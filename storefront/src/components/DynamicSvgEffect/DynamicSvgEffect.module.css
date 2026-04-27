@@ -33,6 +33,16 @@
   will-change: mask-image, -webkit-mask-image; /* Hint to browser about mask changes */
 }
 
+/* lightsweep — scroll-driven mask-position. JS sets --sweep-pos on the
+   wrapper from the element's scroll progress (rAF-throttled). The band
+   peak stays on the art at all times (range clamped to keep gradient
+   50% within the visible window). */
+.sweepLayer {
+  mask-position: var(--sweep-pos, 50%) var(--sweep-pos, 50%);
+  -webkit-mask-position: var(--sweep-pos, 50%) var(--sweep-pos, 50%);
+  will-change: mask-position, -webkit-mask-position;
+}
+
 .filterDefinition {
   position: absolute;
   width: 0;
