@@ -1,0 +1,21 @@
+ok in the product details page for that add to cart container as well i need that exact blur as it do in the header bg so have a look into carefully and apply that to it!
+
+---
+
+in the mobile version still it havent applied like that!!
+
+---
+
+hey still that exact blur havent applied to it!! check even deeper whats the issue, it just visible as normal as before still!, on what have u applying that actually? to cross check!
+
+---
+
+hey still same, [Image #1] once see this header i need exactly that blur im asking!!
+
+---
+
+hey still havent got that exactly, i think its not just a blur its a blur created with the a shader code or something that the diff check carefully and pply that i mean exactly copy that shader blur and apply to this as well!
+
+---
+
+perfect now we got it!!
