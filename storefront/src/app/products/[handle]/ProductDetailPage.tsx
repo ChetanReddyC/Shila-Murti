@@ -14,6 +14,7 @@ import { useWishlist } from '../../../contexts/WishlistContext';
 import { medusaApiClient } from '../../../utils/medusaApiClient';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import DynamicSvgEffect from '../../../components/DynamicSvgEffect';
+import NavLinkGLSLCanvas from '../../../components/NavLinkGLSLCanvas';
 import Reviews from './Reviews';
 import styles from './ProductDetailPage.module.css';
 
@@ -85,11 +86,67 @@ const Gallery = ({
   onOpenLightbox: (i: number) => void;
   productTitle: string;
 }) => {
+  // Pointer/swipe state — refs avoid re-renders on every move.
+  const dragStartRef = useRef<number | null>(null);
+  const justSwipedRef = useRef(false);
+  const lastInteractionRef = useRef(0);
+  const activeIdxRef = useRef(activeIdx);
+  useEffect(() => { activeIdxRef.current = activeIdx; }, [activeIdx]);
+
+  // Auto-advance: every ~4.5s, switch to a random different image. Pauses
+  // for 6s after any user interaction so swipes/clicks aren't fought by
+  // the timer.
+  useEffect(() => {
+    if (images.length < 2) return;
+    const id = setInterval(() => {
+      if (performance.now() - lastInteractionRef.current < 6000) return;
+      const cur = activeIdxRef.current;
+      let next = cur;
+      while (next === cur) next = Math.floor(Math.random() * images.length);
+      setActiveIdx(next);
+    }, 4500);
+    return () => clearInterval(id);
+  }, [images.length, setActiveIdx]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragStartRef.current = e.clientX;
+    lastInteractionRef.current = performance.now();
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartRef.current == null) return;
+    if (Math.abs(e.clientX - dragStartRef.current) > 10) {
+      // Capture so the gesture survives leaving a child element.
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
+    }
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current;
+    dragStartRef.current = null;
+    if (start == null) return;
+    const dx = e.clientX - start;
+    lastInteractionRef.current = performance.now();
+    if (Math.abs(dx) > 50 && images.length > 1) {
+      const dir = dx < 0 ? 1 : -1;
+      const n = images.length;
+      setActiveIdx((activeIdxRef.current + dir + n) % n);
+      // Suppress the trailing click on the card we just dragged across.
+      justSwipedRef.current = true;
+      setTimeout(() => { justSwipedRef.current = false; }, 50);
+    }
+  };
+  const onPointerCancel = () => { dragStartRef.current = null; };
+
   if (images.length === 0) return null;
 
   return (
     <div className={styles.gallery}>
-      <div className={styles.mosaicStack}>
+      <div
+        className={styles.mosaicStack}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+      >
         {images.map((src, i) => {
           const offset = i - activeIdx;
           const isActive = i === activeIdx;
@@ -101,7 +158,11 @@ const Gallery = ({
             <div
               key={`${src}-${i}`}
               className={`${styles.mosCard} ${isActive ? styles.mosCardActive : ''}`}
-              onClick={() => (isActive ? onOpenLightbox(i) : setActiveIdx(i))}
+              onClick={() => {
+                if (justSwipedRef.current) return;
+                if (isActive) onOpenLightbox(i);
+                else setActiveIdx(i);
+              }}
               style={{
                 transform: `translate(${offset * 22}px, ${Math.abs(offset) * 18}px) scale(${1 - Math.abs(offset) * 0.06}) rotate(${offset * 1.5}deg)`,
                 zIndex: 10 - Math.abs(offset),
@@ -109,7 +170,7 @@ const Gallery = ({
                 cursor: isActive ? 'zoom-in' : 'pointer',
               }}
             >
-              <img src={src} alt={isActive ? productTitle : ''} loading={isActive ? 'eager' : 'lazy'} decoding="async" />
+              <img src={src} alt={isActive ? productTitle : ''} loading={isActive ? 'eager' : 'lazy'} decoding="async" draggable={false} />
               {isActive && (
                 <>
                   <div className={styles.frameCounter}>
@@ -128,11 +189,16 @@ const Gallery = ({
             key={i}
             type="button"
             className={`${styles.scrubDot} ${i === activeIdx ? styles.scrubDotActive : ''}`}
-            onClick={() => setActiveIdx(i)}
+            onClick={() => {
+              lastInteractionRef.current = performance.now();
+              setActiveIdx(i);
+            }}
             aria-label={`View ${i + 1}`}
           >
             <span className={styles.scrubNum}>{String(i + 1).padStart(2, '0')}</span>
-            <span className={styles.scrubLine} />
+            <span className={styles.scrubLine}>
+              <NavLinkGLSLCanvas isHovered={i === activeIdx} inline width={160} height={16} />
+            </span>
           </button>
         ))}
       </div>
@@ -141,8 +207,8 @@ const Gallery = ({
 };
 
 // ─── material story ───────────────────────────────────────────────────
-const MaterialStory = () => (
-  <section className={styles.materialStory}>
+const MaterialStory = ({ className = '' }: { className?: string }) => (
+  <section className={`${styles.materialStory} ${className}`.trim()}>
     <div className={styles.msInner}>
       <img className={styles.msPeacock} src="/theme_images/peacock-art-white.png" alt="" aria-hidden="true" />
       <div className={styles.msEyebrow}><span className={styles.eyebrowGlyph} /> The Stone</div>
@@ -505,7 +571,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               onOpenLightbox={(i) => setLightbox({ open: true, idx: i })}
               productTitle={product.title}
             />
-            <MaterialStory />
+            <MaterialStory className={styles.msDesktopOnly} />
           </div>
 
           <div className={styles.info}>
@@ -561,9 +627,59 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               </div>
             </div>
 
+            <MaterialStory className={styles.msMobileOnly} />
+
             {product.description && <Description text={product.description} />}
 
             <div className={`${styles.buyBox} ${styles.buyBoxSticky}`}>
+              {/* Header glass parity — exact 1:1 clone of the layer stack
+                  inside Header.tsx (lines 176-215). The SVG filter is
+                  inlined locally so the buyBox doesn't depend on the
+                  header's filter being mounted/visible at the time of paint. */}
+              <svg style={{ display: 'none' }} aria-hidden="true">
+                <filter id="buybox-glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.000 0.000" numOctaves="1" seed="17" result="turbulence" />
+                  <feComponentTransfer in="turbulence" result="mapped">
+                    <feFuncR type="gamma" amplitude="1" exponent="10" offset="0.5" />
+                    <feFuncG type="gamma" amplitude="0" exponent="1" offset="0" />
+                    <feFuncB type="gamma" amplitude="0" exponent="1" offset="0.5" />
+                  </feComponentTransfer>
+                  <feGaussianBlur in="turbulence" stdDeviation="0" result="softMap" />
+                  <feSpecularLighting in="softMap" surfaceScale="1" specularConstant="1" specularExponent="100" lightingColor="white" result="specLight">
+                    <fePointLight x="-200" y="-200" z="300" />
+                  </feSpecularLighting>
+                  <feComposite in="specLight" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="litImage" />
+                  <feDisplacementMap in="SourceGraphic" in2="softMap" scale="200" xChannelSelector="R" yChannelSelector="G" />
+                </filter>
+              </svg>
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 0,
+                  overflow: 'hidden',
+                  borderRadius: 'inherit',
+                  backdropFilter: 'blur(2px)',
+                  WebkitBackdropFilter: 'blur(2px)',
+                  filter: 'url(#buybox-glass-distortion)',
+                  isolation: 'isolate',
+                  pointerEvents: 'none',
+                }}
+              />
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 1,
+                  borderRadius: 'inherit',
+                  backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                  backdropFilter: 'blur(2px)',
+                  WebkitBackdropFilter: 'blur(2px)',
+                  pointerEvents: 'none',
+                }}
+              />
               <div className={styles.qtyRow}>
                 <span className={styles.qtyLabel}>Quantity</span>
                 <div className={styles.qty}>

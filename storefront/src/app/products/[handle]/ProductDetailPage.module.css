@@ -200,6 +200,11 @@
   display: grid;
   place-items: center;
   perspective: 1200px;
+  /* Allow vertical page scroll to pass through; horizontal gestures are
+     captured by our pointer handlers for swipe-to-switch. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .mosCard {
   position: absolute;
@@ -284,15 +289,31 @@
   color: var(--shila-ink);
 }
 .scrubLine {
+  position: relative;
   width: 100%;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  /* Let the 2px blur halo on the canvas bleed slightly beyond the
+     canvas's intrinsic edges without being clipped. */
+  overflow: visible;
+}
+/* Inactive: thin gray rule via pseudo so the scrubber still has a visual
+   spine. Active state hides this rule and lets the shader canvas paint. */
+.scrubLine::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   height: 2px;
   border-radius: 2px;
   background: var(--shila-gray-5);
-  transition: background 0.3s, height 0.3s;
+  transition: opacity 0.3s ease;
 }
-.scrubDotActive .scrubLine {
-  background: var(--shila-ink);
-  height: 3px;
+.scrubDotActive .scrubLine::before {
+  opacity: 0;
 }
 
 /* ============================================================
@@ -563,6 +584,21 @@
   letter-spacing: 0.02em;
 }
 
+/* MaterialStory placement: lives in left column on desktop, but on
+   mobile the card moves into the info column, just above Description.
+   Two instances render in the JSX; this toggles which one is shown. */
+.msMobileOnly {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .msDesktopOnly {
+    display: none;
+  }
+  .msMobileOnly {
+    display: block;
+  }
+}
+
 /* CRAFT STRIP — same shell style as .materialStory / .buyBox. */
 .craftStrip {
   position: relative;
@@ -627,17 +663,34 @@
   }
 }
 
-/* BUY BOX */
+/* BUY BOX — exact 1:1 parity with the header glass shell. Outer container:
+   transparent + blur(12px) + thin border + soft shadow + 18px radius. The
+   inner SVG-shader-filter layer and the white-tint layer are inline-styled
+   in ProductDetailPage.tsx (mirroring the structure inside <motion.header>
+   in Header.tsx so the visual is byte-for-byte the same recipe). */
 .buyBox {
-  border-radius: 20px;
-  border: 1px solid rgba(229, 232, 235, 0.6);
-  background: linear-gradient(180deg, rgba(250, 250, 250, 0.6) 0%, rgba(255, 255, 255, 0.2) 100%);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  position: relative;
+  border-radius: 18px;
+  border: 1.5px solid rgba(229, 232, 235, 0.5);
+  background: transparent;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
   padding: 1.1rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 1rem;
+}
+/* Lift real content above the two inline-styled glass layers
+   (which sit at z-index 0 and 1 inside .buyBox). */
+.buyBox > .qtyRow,
+.buyBox > .shipNote,
+.buyBox > .actions,
+.buyBox > .feedback {
+  position: relative;
+  z-index: 2;
 }
 .buyBoxSticky {
   position: sticky;
@@ -772,28 +825,99 @@
 }
 
 @media (max-width: 1023px) {
-  .buyBoxSticky {
-    position: static;
+  .pdp {
+    padding-top: 5rem;
+    /* Reserve vertical room for the floating buy-bar so the last in-flow
+       block isn't covered. The bar floats above the viewport edge so we
+       account for its lift + height + safe-area inset. */
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
   }
   .crumbs {
-    padding-top: 4.5rem;
+    padding: 0.25rem 0 0.5rem;
   }
+
+  /* BUY BAR — floats as a pill above the viewport bottom on mobile. Glass
+     shell (border, blur, shadow) is inherited from the desktop base; this
+     rule only overrides positioning and the row layout. The inner `qtyRow`
+     and `actions` collapse via `display: contents` so their children become
+     direct flex items of the bar, giving us a single row:
+     [qty stepper] [Add to Cart] [wishlist heart]. */
+  .buyBox {
+    position: fixed;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    z-index: 100;
+    margin: 0;
+    padding: 0.7rem 1rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .buyBoxSticky {
+    /* Override the desktop sticky behavior — the fixed positioning above
+       fully replaces it on mobile. */
+    position: fixed;
+    top: auto;
+  }
+  .buyBox > .qtyRow,
+  .buyBox > .actions {
+    display: contents;
+  }
+  /* qtyRow/actions are display:contents on mobile — their children become
+     the direct flex items, so lift them above the ::before/::after layers. */
+  .buyBox > .qtyRow > *,
+  .buyBox > .actions > * {
+    position: relative;
+    z-index: 2;
+  }
+  .qtyLabel,
+  .shipNote {
+    display: none;
+  }
+  .cta {
+    flex: 1;
+    height: 48px;
+    border-radius: 12px;
+    font-size: 1rem;
+  }
+  .wish {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    flex: 0 0 auto;
+  }
+  .feedback {
+    /* Span the whole bar width on a wrapped second row so the message is
+       still readable above the action row. */
+    flex-basis: 100%;
+    margin-top: 0;
+  }
+  /* On mobile the gallery card sits at the very top of the column and was
+     covering the peacock entirely. Push every art down by the same delta
+     so the rhythm between them is preserved while peacock clears the
+     gallery image. */
   .pdpBg .bgPeacock {
+    top: 620px;
     width: min(72vw, 640px);
     right: -18vw;
     opacity: 0.9;
   }
   .pdpBg .bgMandala {
+    top: 1700px;
     width: min(56vw, 460px);
     right: -10vw;
     opacity: 0.9;
   }
   .pdpBg .bgElephant {
+    top: 2350px;
     width: min(72vw, 640px);
     right: -18vw;
     opacity: 0.9;
   }
   .pdpBg .bgSvgBand {
+    top: 2900px;
     display: block;
     left: -4vw;
     right: auto;
