@@ -8,6 +8,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './reviews.css';
 
 export type Review = {
@@ -161,6 +162,38 @@ export default function Reviews({ reviews: reviewsProp, onSubmit, seeAllHref = '
   useEffect(() => {
     if (reviewsProp) setReviews(reviewsProp);
   }, [reviewsProp]);
+
+  // Lock background scroll while the drawer is open. Without this, mobile
+  // touch and Lenis-driven wheel scroll bleed through to the page underneath.
+  // Also toggle body.overlay-blur — globals.css uses it to apply a real
+  // CSS filter:blur to the page tree, matching the lightbox treatment. Lenis
+  // keeps its own rAF scroll loop independent of overflow:hidden, so we
+  // stop it explicitly via the global instance and resume on close.
+  useEffect(() => {
+    if (!showDrawer) return;
+    const { body, documentElement: html } = document;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlOverflow = html.style.overflow;
+    body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+    body.classList.add('overlay-blur');
+    window.__lenis?.stop();
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      html.style.overflow = prevHtmlOverflow;
+      body.classList.remove('overlay-blur');
+      window.__lenis?.start();
+    };
+  }, [showDrawer]);
+
+  useEffect(() => {
+    if (!showDrawer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowDrawer(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showDrawer]);
 
   const total = reviews.length;
   const avg = total ? reviews.reduce((s, r) => s + r.rating, 0) / total : 0;
@@ -433,8 +466,8 @@ export default function Reviews({ reviews: reviewsProp, onSubmit, seeAllHref = '
       </div>
       )}
 
-      {showDrawer && (
-        <>
+      {showDrawer && typeof document !== 'undefined' && createPortal(
+        <div data-overlay="">
           <div className="rv-drawer-backdrop" onClick={() => setShowDrawer(false)} />
           <div className="rv-drawer" role="dialog" aria-label="Write a review">
             <div className="rv-drawer-head">
@@ -523,7 +556,8 @@ export default function Reviews({ reviews: reviewsProp, onSubmit, seeAllHref = '
               </div>
             </div>
           </div>
-        </>
+        </div>,
+        document.body,
       )}
     </section>
   );

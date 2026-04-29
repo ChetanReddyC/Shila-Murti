@@ -45,3 +45,16 @@ a {
     color-scheme: dark;
   }
 }
+
+/* Out-of-focus wash for full-screen overlays (lightbox, review drawer, etc).
+   When `body.overlay-blur` is on, every direct child of <body> except the
+   overlay itself (marked with data-overlay) gets a real CSS `filter: blur`,
+   not `backdrop-filter` — which the PDP's mix-blend-mode + stacking context
+   was silently suppressing. Saturate dip pushes the haze toward neutral so
+   the focused dialog/image owns the eye. Pointer-events disabled so the
+   page underneath can't be interacted with by accident. */
+body.overlay-blur > *:not([data-overlay]) {
+  filter: blur(2px);
+  transition: filter 0.2s ease;
+  pointer-events: none;
+}

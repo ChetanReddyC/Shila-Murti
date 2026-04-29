@@ -964,62 +964,115 @@
 .lightbox {
   position: fixed;
   inset: 0;
+  /* dvh keeps the lightbox at full visible viewport height on mobile so the
+     close button isn't hidden under the URL bar, while inset:0 still wins
+     on browsers that don't support dvh. */
+  height: 100dvh;
+  width: 100vw;
   z-index: 200;
-  background: rgba(15, 15, 15, 0.92);
+  /* Soft tint only — the actual out-of-focus blur is delivered by
+     globals.css via `body.overlay-blur` applying CSS `filter: blur` to the
+     page tree (backdrop-filter was being silently suppressed by the page's
+     mix-blend-mode + stacking context). This tint just adds a neutral
+     wash on top of the already-blurred page. */
+  background: rgba(20, 20, 20, 0.4);
   display: none;
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  backdrop-filter: blur(10px);
 }
 .lightboxOpen {
   display: flex;
 }
+/* Stage hugs the image so prev/next sit inline beside it instead of at
+   the screen edges. gap puts a fixed breathing room between the image and
+   each arrow regardless of viewport width. */
+.lbStage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  max-width: 100%;
+  max-height: 100%;
+}
 .lightbox img {
-  max-width: 92%;
-  max-height: 88%;
+  max-width: min(92%, 720px);
+  max-height: 88vh;
   border-radius: 16px;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  object-fit: contain;
 }
 .lbBtn {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(20, 20, 20, 0.12);
+  color: #1c1917;
   cursor: pointer;
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   width: 48px;
   height: 48px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 .lbBtn:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.98);
+  transform: scale(1.05);
+}
+.lbStage > .lbBtn:hover {
+  /* Stage arrows are flex children; scale would shift layout. Override the
+     scale on hover for those two without losing the brightness lift. */
+  transform: none;
 }
 .lbClose {
+  position: absolute;
   top: 2rem;
   right: 2rem;
-}
-.lbPrev {
-  left: 2rem;
-  top: 50%;
-  transform: translateY(-50%);
-}
-.lbNext {
-  right: 2rem;
-  top: 50%;
-  transform: translateY(-50%);
 }
 .lbCounter {
   position: absolute;
   bottom: 2rem;
   left: 50%;
   transform: translateX(-50%);
-  color: rgba(255, 255, 255, 0.85);
+  color: #1c1917;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .lightbox {
+    padding: 1rem;
+  }
+  .lbStage {
+    gap: 0.5rem;
+  }
+  .lightbox img {
+    max-width: 100%;
+    max-height: 78vh;
+    border-radius: 12px;
+  }
+  .lbBtn {
+    width: 38px;
+    height: 38px;
+  }
+  .lbClose {
+    top: 1rem;
+    right: 1rem;
+  }
+  .lbCounter {
+    bottom: 1.25rem;
+  }
 }
 
 /* LOADING / ERROR STATES */
