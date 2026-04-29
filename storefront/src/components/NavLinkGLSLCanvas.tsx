@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useId } from 'react';
 import { getWebGLContextManager } from '@/utils/webglContextManager';
 
 const vsSource = `
@@ -12,6 +12,12 @@ const vsSource = `
   }
 `;
 
+// Fragment shader transcribed from NavLinkShaderOverlay (the one Header
+// nav-link hover uses) so the active scrubber line reads identically to
+// a hovered nav link. Explosion logic is omitted — the scrubber switches
+// states via a CSS opacity fade rather than a particle dispersion, but
+// the active visual (zoomed flow, traveling pulse, vertical band, edge
+// fade, contrast) matches.
 const fsSource = `
   precision highp float;
   varying vec2 v_uv;
@@ -20,7 +26,6 @@ const fsSource = `
   uniform float u_hover_time;
   uniform float u_progress;
 
-  // 2D noise
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123);
   }
@@ -46,51 +51,64 @@ const fsSource = `
 
   void main() {
     vec2 uv = v_uv;
-    
-    // Create a horizontal smoke effect that flows from left to right
-    float flowTime = u_hover_time * 1.5;
-    
-    // Horizontal flow with slight upward drift
+
+    // ZOOM EFFECT
+    vec2 zoomedUV = (uv - 0.5) * 0.25 + 0.5;
+
+    // Slow horizontal flow
+    float flowTime = u_time * 0.5;
+
     vec2 flow = vec2(
-      flowTime * 0.8,
-      sin(flowTime * 2.0) * 0.15 - flowTime * 0.1
+      flowTime * 0.4,
+      sin(flowTime * 1.2) * 0.08 - flowTime * 0.05
     );
-    
-    // Scale for tighter, more concentrated smoke
-    vec2 smokeUV = (uv - 0.5) * vec2(3.0, 8.0) + flow;
-    
-    // Create swirling smoke pattern
-    float angleNoise = fbm(smokeUV * vec2(1.5, 3.0));
-    float swirlAngle = (angleNoise - 0.5) * 1.57; // Less rotation for underline
+
+    vec2 smokeUV = (zoomedUV - 0.5) * vec2(8.0, 12.0) + flow;
+
+    float angleNoise = fbm(smokeUV * vec2(1.5, 2.0));
+    float swirlAngle = (angleNoise - 0.5) * 1.0;
     mat2 rot = mat2(cos(swirlAngle), -sin(swirlAngle), sin(swirlAngle), cos(swirlAngle));
     vec2 p = rot * smokeUV;
-    
-    // Add subtle wave distortion
-    p.y += sin(uv.x * 6.28 + flowTime * 3.0) * 0.2;
-    p.x += cos(uv.y * 12.56 + flowTime * 2.0) * 0.1;
-    
-    // Compute smoke density
-    float d = fbm(p * vec2(2.0, 4.0) + flow);
-    
-    // Shape the smoke to be thin like an underline
-    float verticalMask = 1.0 - smoothstep(0.0, 0.3, abs(uv.y - 0.5) * 2.0);
-    
-    // Progress mask - smoke grows from left to right
-    float progressMask = smoothstep(0.0, u_progress, uv.x);
-    
-    // Edge softness
-    float edgeFade = smoothstep(0.0, 0.05, uv.x) * smoothstep(1.0, 0.95, uv.x);
-    
-    // Combine all masks
-    float alpha = smoothstep(0.2, 0.6, d) * verticalMask * progressMask * edgeFade;
-    
-    // Add some intensity variation
-    alpha *= 0.7 + 0.3 * sin(u_hover_time * 3.0 + uv.x * 5.0);
-    
-    // Smoke color - darker for better visibility
-    vec3 smokeColor = vec3(0.1, 0.15, 0.2);
-    
-    gl_FragColor = vec4(smokeColor, alpha * 0.9);
+
+    p.y += sin(zoomedUV.x * 15.0 + flowTime * 2.0) * 0.3;
+    p.x += cos(zoomedUV.y * 20.0 + flowTime * 1.5) * 0.2;
+
+    float d = fbm(p * vec2(2.5, 3.5) + flow);
+
+    float detailNoise = fbm(p * vec2(5.0, 6.0) + flow * 0.5);
+    d = mix(d, detailNoise, 0.3);
+
+    float verticalMask = 1.0 - smoothstep(0.0, 0.5, abs(uv.y - 0.5) * 1.1);
+
+    float formationMask = step(uv.x, u_progress);
+
+    float pulseSpeed = 0.6;
+    float pulsePosition = mod(u_time * pulseSpeed, 1.3) - 0.15;
+    float pulseWidth = 0.35;
+
+    float pulse1 = smoothstep(pulsePosition - pulseWidth, pulsePosition - pulseWidth * 0.3, uv.x) *
+                   smoothstep(pulsePosition + pulseWidth, pulsePosition + pulseWidth * 0.3, uv.x);
+    float pulse2 = smoothstep(pulsePosition - pulseWidth * 0.7, pulsePosition, uv.x) *
+                   smoothstep(pulsePosition + pulseWidth * 0.7, pulsePosition, uv.x);
+
+    float pulseBrightness = pulse1 * 0.7 + pulse2 * 0.3;
+    pulseBrightness *= formationMask;
+
+    float edgeFade = smoothstep(0.0, 0.08, uv.x) * smoothstep(1.0, 0.92, uv.x);
+
+    float baseAlpha = smoothstep(0.3, 0.7, d) * verticalMask * formationMask * edgeFade;
+
+    baseAlpha *= 0.75 + 0.25 * sin(u_time * 1.5 + uv.x * 4.0);
+
+    baseAlpha = pow(baseAlpha, 0.8);
+
+    float finalAlpha = baseAlpha * (1.0 + pulseBrightness * 0.25);
+
+    vec3 smokeColor = vec3(0.08, 0.12, 0.18);
+    vec3 pulseColor = vec3(0.09, 0.13, 0.20);
+    vec3 finalColor = mix(smokeColor, pulseColor, pulseBrightness * 0.2);
+
+    gl_FragColor = vec4(finalColor, finalAlpha * 1.5);
   }
 `;
 
@@ -98,36 +116,35 @@ interface NavLinkGLSLCanvasProps {
   isHovered: boolean;
   width?: number;
   height?: number;
+  /** When true, the canvas flows in normal layout (relative) instead of
+   *  pinning under the parent (absolute, bottom: -4px). Use for cases
+   *  where the host element already provides the line-shaped slot. */
+  inline?: boolean;
 }
 
-const NavLinkGLSLCanvas = ({ isHovered, width = 100, height = 8 }: NavLinkGLSLCanvasProps) => {
+const NavLinkGLSLCanvas = ({ isHovered, width = 100, height = 8, inline = false }: NavLinkGLSLCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hoverTimeRef = useRef<number>(0);
   const progressRef = useRef<number>(0);
   const isHoveredRef = useRef<boolean>(false);
-  const hasBeenHoveredRef = useRef<boolean>(false);
-  
+  // Unique per-instance context id so each canvas gets its own GL context.
+  const instanceId = useId();
+
   useEffect(() => {
     isHoveredRef.current = isHovered;
-    if (isHovered) {
-      hasBeenHoveredRef.current = true;
-    }
     if (!isHovered) {
       hoverTimeRef.current = 0;
       progressRef.current = 0;
     }
   }, [isHovered]);
-  
-  // Only initialize WebGL context after first hover to save contexts
+
   useEffect(() => {
-    if (!hasBeenHoveredRef.current) return; // Don't create context until first hover
-    
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const contextManager = getWebGLContextManager();
-    const contextId = 'navlink-glsl-canvas';
-    
+    const contextId = `navlink-glsl-canvas-${instanceId}`;
+
     const gl = contextManager.getContext(contextId, canvas, {
       alpha: true, 
       premultipliedAlpha: false,
@@ -258,21 +275,36 @@ const NavLinkGLSLCanvas = ({ isHovered, width = 100, height = 8 }: NavLinkGLSLCa
       // Note: We no longer force context loss - context manager handles lifecycle
       // This allows context reuse and prevents hitting browser limits
     };
-  }, [width, height]);
+  }, [width, height, instanceId]);
 
   return (
-    <canvas 
-      ref={canvasRef} 
-      style={{
-        position: 'absolute',
-        bottom: '-4px',
-        left: 0,
-        width: '100%',
-        height: `${height}px`,
-        pointerEvents: 'none',
-        opacity: isHovered ? 1 : 0,
-        transition: 'opacity 0.3s ease'
-      }}
+    <canvas
+      ref={canvasRef}
+      style={inline
+        ? {
+            position: 'relative',
+            display: 'block',
+            width: '100%',
+            height: `${height}px`,
+            pointerEvents: 'none',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.3s ease',
+            // Same compositor blur the Header's NavLinkShaderOverlay applies
+            // — turns the GPU smoke noise into a soft, diffused trail.
+            filter: 'blur(2px)',
+          }
+        : {
+            position: 'absolute',
+            bottom: '-4px',
+            left: 0,
+            width: '100%',
+            height: `${height}px`,
+            pointerEvents: 'none',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.3s ease',
+            filter: 'blur(2px)',
+          }
+      }
     />
   );
 };

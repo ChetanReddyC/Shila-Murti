@@ -30,7 +30,12 @@
   position: absolute;
   inset: 0;
   transform: translateZ(0); /* Force hardware acceleration */
-  will-change: mask-image, -webkit-mask-image; /* Hint to browser about mask changes */
+  /* For 'spotlight' the radial-gradient mask is sized to the layer once and
+     repositioned via its own `at <x> <y>` (CSS vars set per scroll frame in
+     JS). For 'specular' / 'ink' the mask string itself changes via inline
+     style. Either way, the mask image is what the browser is actually
+     re-rasterizing, so it's the right hint. */
+  will-change: mask-image, -webkit-mask-image;
 }
 
 .filterDefinition {

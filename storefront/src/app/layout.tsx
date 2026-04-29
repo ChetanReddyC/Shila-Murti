@@ -8,6 +8,7 @@ import AuthSessionProvider from "@/providers/SessionProvider";
 import PasskeyNudge from "@/components/PasskeyNudge";
 import Header from "@/components/Header";
 import NavigationLoadingProvider from "@/providers/NavigationLoadingProvider";
+import LenisScrollProvider from "@/providers/LenisScrollProvider";
 
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -55,6 +56,8 @@ export default function RootLayout({
               <WishlistProvider>
                 <Suspense fallback={null}>
                   <NavigationLoadingProvider>
+                    {/* Global smooth-scroll (Lenis). Renders nothing; runs rAF loop. */}
+                    <LenisScrollProvider />
                     {/* Global post-elevation passkey prompt */}
                     <PasskeyNudge />
                     {/* Global header - persists across all pages */}

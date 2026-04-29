@@ -217,6 +217,8 @@
 
   .header {
     padding: 0.5rem 1rem;
+    top: 0.5rem;
+    width: 96%;
     /* Use max-height for animatable values */
     height: auto;
     max-height: 55px;
