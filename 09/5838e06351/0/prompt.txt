@@ -1,0 +1,37 @@
+hey in the products details page it has a major but its, when user clicked on that product images it is opening up that images and howing as expected but the issue is that those are opening and displaying at the very end of the display fix that, and also handle this fix in the mobile version as well properly!
+
+---
+
+[Image #2] bring those navigating buttons to closer to the image and also it should be closed even else where user clicked!
+
+---
+
+[Image #3] also see this when user clicked on the write a review see that blurr bg isnt covering fully the whole screen with that effect fix that!
+
+---
+
+[Image #4] see how that dailoge looks like and it isnt properly centerd! fix that!
+
+---
+
+ok now for that images bg as well apply this exact bg outfocus effect when its opened!
+
+---
+
+[Image #5] see this it isnt exactly looking like that fix!!
+
+---
+
+[Image #6] hey see it still looks same!! havent applied!
+
+---
+
+hey decrese the blur it looks very strong! for both that images one and also for that comment dailoge
+
+---
+
+it is still scrolling when those are opend lock that when those are actively open!
+
+---
+
+make that comment popup dailoge bg as well only 2px blur and no saturation!
