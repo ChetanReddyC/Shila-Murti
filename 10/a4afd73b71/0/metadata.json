@@ -1,0 +1,37 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "10a4afd73b71",
+  "session_id": "4aff3529-1344-4c8b-acc7-7a06d480c364",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T12:44:36.1465111Z",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 23,
+  "files_touched": [
+    "storefront/src/app/products/[handle]/ProductDetailPage.module.css",
+    "storefront/src/app/products/[handle]/ProductDetailPage.tsx",
+    "storefront/src/components/Header.module.css",
+    "storefront/src/components/NavLinkGLSLCanvas.tsx"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-7[1m]",
+  "turn_id": "958ab5021a67",
+  "token_usage": {
+    "input_tokens": 230,
+    "cache_creation_tokens": 252073,
+    "cache_read_tokens": 14264422,
+    "output_tokens": 154768,
+    "api_call_count": 115
+  },
+  "session_metrics": {
+    "turn_count": 23
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T12:44:34.818515Z",
+    "agent_lines": 229,
+    "human_added": 0,
+    "human_modified": 733,
+    "human_removed": 21,
+    "total_committed": 962,
+    "agent_percentage": 23.804573804573806
+  }
+}

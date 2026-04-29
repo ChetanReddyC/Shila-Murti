@@ -1,0 +1,28 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "10a4afd73b71",
+  "strategy": "manual-commit",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 23,
+  "files_touched": [
+    "storefront/src/app/products/[handle]/ProductDetailPage.module.css",
+    "storefront/src/app/products/[handle]/ProductDetailPage.tsx",
+    "storefront/src/components/Header.module.css",
+    "storefront/src/components/NavLinkGLSLCanvas.tsx"
+  ],
+  "sessions": [
+    {
+      "metadata": "/10/a4afd73b71/0/metadata.json",
+      "transcript": "/10/a4afd73b71/0/full.jsonl",
+      "content_hash": "/10/a4afd73b71/0/content_hash.txt",
+      "prompt": "/10/a4afd73b71/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 230,
+    "cache_creation_tokens": 252073,
+    "cache_read_tokens": 14264422,
+    "output_tokens": 154768,
+    "api_call_count": 115
+  }
+}

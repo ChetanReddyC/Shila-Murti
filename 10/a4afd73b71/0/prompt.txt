@@ -1,0 +1,89 @@
+[Image #1] hey once have a look into the the image its an a productdetails page for the desktop version that page is fine and good but for the mobile versions we need to tweek that a little bit so first just have a lookinto it and have understanding of that page and get me back with short and crisp and i will let u know furthur!
+
+---
+
+ok now move that ,"The stone" card the one with all that quary details and all move and keep that card just above the description!
+
+---
+
+hey in the mobile version only move all the bg-arts with the sync move all those to a slightly to bottom side becuase that product images were blocking that peacock art completely!so then all would be visible properly!!
+
+---
+
+ok its perfect, [Image #2] in that screenshot observe that in the mobile version see that its having that weird extra spacing remove that and keep it properly!
+
+---
+
+ok its perfect,[Image #2] in that screenshot observe that in the mobile version see that its having that weird extra spacing remove that and keep it properly!
+
+---
+
+[Image #3] ok now decrese some more space between that crumbs and that product images! and also keep that new space consistent!
+
+---
+
+[Image #4] also decrese some spacing of the header surrounding as well!
+
+---
+
+ok now adjust its bottom space as well!
+
+---
+
+ok now for the both mobile and desktop versions implement a feature that product images should be able to swipable to switch back and forth and also those should be swithing randomly smooth aswell like a automatic show no needed in order it can swith between randomly as well!
+
+---
+
+ok in the bottom that we have those indicating the number of that image [Image #5] insted of that bottom solid lines i need those to be replaced with the glsl shader lines aniamtion exactly as when user hover in the header on those home, shop links/tags right i need exactly those to replace with do that carefully!
+
+---
+
+ok good but it looks soo thin make it look bolder to properly notice it!
+
+---
+
+hey but it looks different from that one in the header once check and match it exactly!
+
+---
+
+hey apply that blur to make that visible as a smooth smoke exactly to match that, am i right?
+
+---
+
+[Image #6] ok now for the mobile version update it as to keep that add to cart section exactly like in that screenshot that at bottom always been floating like that!
+
+---
+
+ok move that up a bit, and for its bg give that exact frosted blur as the heder, i mean that exact blurr! apply carefully!
+
+---
+
+hey not that normal blur have a lookinto the header how its bg has the shader blurr i need exactly that do update that!
+
+---
+
+hey not that effect i asked i mean that bg blur we have right on that, its a basically blur generated with combination of shader blur and normal blur i think so, am i right i only need that to apply to that section container bg!!
+
+---
+
+hey once observe the header bg how dose it has the blur? just have a lookinto and confirm me i will let u know what to do!
+
+---
+
+add that exact blurr effect to that add to cart container bg that's it!
+
+---
+
+hey but why i cant see it? check carefully once again!!
+
+---
+
+hey still observe that header and that botton add to cart container!! there isnt at all shader frosted blur exactly like that i need like that!!
+
+---
+
+[Image #7] see it still looking normal transparant still!!
+
+---
+
+ok for the add to cart container as well i need that exact blur as it do in the header bg so have a look into carefully and apply that to it!
