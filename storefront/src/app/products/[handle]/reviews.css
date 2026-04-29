@@ -8,7 +8,9 @@
    self-contained. If your app already defines these on :root,
    you can delete this block.
 */
-.reviews-section {
+.reviews-section,
+.rv-drawer,
+.rv-drawer-backdrop {
   --shila-ink:        #1c1917;
   /* B&G theme: warm paper surface flattened to a soft neutral gray so the
      active-detail panel and chip backgrounds tonally match the rest of the PDP. */
@@ -492,21 +494,22 @@
   animation: rv-fade 0.25s ease;
 }
 .rv-drawer {
-  position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
   z-index: 501;
   width: min(92vw, 640px);
   background: #fff;
+  color: var(--shila-ink);
   border: 1px solid rgba(20,20,20,0.1);
   border-radius: 22px;
   box-shadow: 0 24px 60px rgba(0,0,0,0.25);
   display: flex; flex-direction: column;
-  max-height: calc(100vh - 3rem);
+  max-height: calc(100dvh - 3rem);
   animation: rv-slide-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes rv-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rv-slide-up {
-  from { opacity: 0; transform: translate(-50%, 30px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 24px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
 }
 .rv-drawer-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
 import ErrorBoundary from '../../../components/ErrorBoundary';
@@ -275,19 +276,62 @@ const Lightbox = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose, onPrev, onNext]);
 
+  // Lock background scroll while the lightbox is open. Without this, mobile
+  // touch and Lenis-driven wheel scroll bleed through to the page underneath.
+  // Also toggle body.overlay-blur — globals.css uses it to apply a real
+  // CSS filter:blur to the page tree (backdrop-filter was being silently
+  // suppressed by the PDP's mix-blend-mode + stacking context). Lenis keeps
+  // its own rAF scroll loop independent of overflow:hidden, so we stop it
+  // explicitly via the global instance and resume on close.
+  useEffect(() => {
+    if (!open) return;
+    const { body, documentElement: html } = document;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlOverflow = html.style.overflow;
+    body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+    body.classList.add('overlay-blur');
+    window.__lenis?.stop();
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      html.style.overflow = prevHtmlOverflow;
+      body.classList.remove('overlay-blur');
+      window.__lenis?.start();
+    };
+  }, [open]);
+
   // Skip rendering entirely when closed — the previous version kept the
   // dialog DOM mounted with display:none, which still cost layout/parse work.
   if (!open) return null;
-  return (
-    <div className={`${styles.lightbox} ${styles.lightboxOpen}`} role="dialog" aria-modal="true">
+  // Portal to document.body so position:fixed is anchored to the viewport
+  // regardless of any ancestor that establishes a containing block
+  // (transform, filter, backdrop-filter, contain, will-change). Without the
+  // portal the dialog rendered at the bottom of the page on some routes.
+  if (typeof document === 'undefined') return null;
+  // Backdrop click closes — only when the click landed on the backdrop
+  // itself, not on a child (image, buttons, counter).
+  const onBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+  return createPortal(
+    <div
+      className={`${styles.lightbox} ${styles.lightboxOpen}`}
+      role="dialog"
+      aria-modal="true"
+      data-overlay=""
+      onClick={onBackdropClick}
+    >
       <button className={`${styles.lbBtn} ${styles.lbClose}`} onClick={onClose} aria-label="Close"><CloseI /></button>
-      <button className={`${styles.lbBtn} ${styles.lbPrev}`} onClick={onPrev} aria-label="Previous"><ArrowL /></button>
-      <button className={`${styles.lbBtn} ${styles.lbNext}`} onClick={onNext} aria-label="Next"><ArrowR /></button>
-      {images[idx] && <img src={images[idx]} alt="" />}
+      <div className={styles.lbStage} onClick={onBackdropClick}>
+        <button className={`${styles.lbBtn} ${styles.lbPrev}`} onClick={onPrev} aria-label="Previous"><ArrowL /></button>
+        {images[idx] && <img src={images[idx]} alt="" />}
+        <button className={`${styles.lbBtn} ${styles.lbNext}`} onClick={onNext} aria-label="Next"><ArrowR /></button>
+      </div>
       <div className={styles.lbCounter}>
         {String(idx + 1).padStart(2, '0')} / {String(images.length).padStart(2, '0')}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
