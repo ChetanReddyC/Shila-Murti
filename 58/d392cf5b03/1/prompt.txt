@@ -1,0 +1,149 @@
+hey once have a look into that productsdetailpage and analyze that page and let me know in that pages ui how can we optimize that to make that page performance smooth natually by keeping all the things elements exactly same as like now, just tell me now! then we can discuss!
+
+---
+
+give me some more breif about that #1 short and crysp
+
+---
+
+ok perform that optimization!
+
+---
+
+ok why have u removed that exact shader frosted bulr as like the header's for these both div's? [Image #1]
+
+---
+
+hey u talking the optimzation of that product shader cards right? why have u touched that other div's at all?, am i correct just tell me!
+
+---
+
+ok u mean exactly these 2 blocks/div's? [Image #2] [Image #3]
+
+---
+
+ok now whats the optimization for those and do that once for them lets see whether it has any change in visually or not!!
+
+---
+
+ok that looks identically same and fine but whats this optimization impact tell me short and crisp!
+
+---
+
+ok what about that #2 breif about that
+
+---
+
+go
+
+---
+
+hey still i can feel the significant lag actually!
+
+---
+
+still has that lag but i felt somewhat it improved!! and make sure for strongly that prev implementation did properly done!
+
+---
+
+still there is a significant lag so lets move further
+
+---
+
+so what are the possibility's that to get that exact output in any other was? outline them? best for the optimisation and smoothness and, another idea is that to use the lenis scroll library if that would make this proper and smooth irrespective of these constraints?
+
+---
+
+hey once lets try that option 3
+
+---
+
+hey visually i havent seen any change on them but the lag also still same! lets do thing make these components bg to normal bg color and clean that old code properly lets see how smoothness would be improved once! [Image #4]
+
+---
+
+hey now lets do onething that decreytge size of that elephant bg art to check whether this happening cause of the size! just do only this
+
+---
+
+once lets see, restore its size again!!
+
+---
+
+ok well i found the issue that those commentedout bg arts were [Image #5] svg's not the pngs so thats the weight for the whole page and i commented them out and now th epage is smooth so now dont remove them just replace them with these [Image #6] templefront-white.png and violene.png
+
+---
+
+ok now lets restore these containers bg's as like prev only cuase that isnt causing the lagg's! [Image #7]
+
+---
+
+ok now lets implement the lenis to make the scroll even more smooth and better so , goahed!
+
+---
+
+[Image #7] ive tried to install its giving this error!
+
+---
+
+[Image #8] dont know why but on this final art that effect isnt working on this final 4th art and also move that to even more to left side and increse its size slightly!
+
+---
+
+hey still i cant see anything on that!
+
+---
+
+wait i have changed that art to this , shilamurtis-faceart-white.png
+
+---
+
+hey but see still it isnt working may be the issue with the sweepAngle or something should investiage in that angle as well!
+
+---
+
+hey still no!
+
+---
+
+hey that effect is working on that so the issue might be with that art only right?
+
+---
+
+hey now build a review's section as well in this page, it should looks fresh and beautiful and blends into continuty!
+
+---
+
+hey once have a lookinto the folder "reviews-handoff" on the desktop actually its a reviews section bult by claude design so take that in that its available all required so have a lookinto and take them carefully and replace that in the current page with that!
+
+---
+
+continue
+
+---
+
+ok its came correctly but we need to update that coloring of that section use black and gray to match the continuty of that section!
+
+---
+
+[Image #9] and also we dont need this div to show full review separately, completely remove this and make it as when user hover on that preview of that comment it should smoothly expand and show that full there itself, update this like this!
+
+---
+
+ok now lets tweek that expansion and all, that currently isnt fitting with that smooth rounded border desings from the page!
+
+---
+
+[Image #10] see the screenshot that this dose looks like something incomplate/perfect revamp this looks!
+
+---
+
+ok now design that to show still no reviews, be first to post a review!
+
+---
+
+hey i need that container to be exactly like this that add to cart container [Image #11] update!
+
+---
+
+[Image #12] ok update these both boxes as well!
