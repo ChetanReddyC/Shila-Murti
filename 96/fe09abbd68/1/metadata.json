@@ -1,0 +1,38 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "96fe09abbd68",
+  "session_id": "a007951c-2502-4dd5-9920-6e0fe3448cc7",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T08:50:11.3555247Z",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 14,
+  "files_touched": [
+    "storefront/src/app/products/[handle]/ProductDetailPage.module.css",
+    "storefront/src/app/products/[handle]/ProductDetailPage.tsx",
+    "storefront/src/components/DynamicSvgEffect/DynamicSvgEffect.module.css",
+    "storefront/src/components/DynamicSvgEffect/DynamicSvgEffect.tsx",
+    "storefront/src/components/DynamicSvgEffect/windowSweepRegistry.ts"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-7[1m]",
+  "turn_id": "247f2fba2720",
+  "token_usage": {
+    "input_tokens": 148,
+    "cache_creation_tokens": 245973,
+    "cache_read_tokens": 6748871,
+    "output_tokens": 65085,
+    "api_call_count": 73
+  },
+  "session_metrics": {
+    "turn_count": 14
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T08:50:10.8760695Z",
+    "agent_lines": 42,
+    "human_added": 0,
+    "human_modified": 480,
+    "human_removed": 1,
+    "total_committed": 518,
+    "agent_percentage": 8.108108108108109
+  }
+}

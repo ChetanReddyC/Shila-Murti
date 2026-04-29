@@ -1,0 +1,57 @@
+hey in the productdetails page once have a look into those bg arts once and analyze that elements and its surrounds have an idea and get back me, be short and crisp!
+
+---
+
+ok now we need to make an update on that lightsweep animations, insted of that with the same connecting to the scroll effect on those bg-arts i need an effect of revealing as like light fall on that, i mean i need that reavling with key spot light like effect, this is the effect in my mind and dont go directly to implementeation explain me back what u have understood and also if needed u can ask me questions!
+
+---
+
+1.it need's to follow a curevature tragectory that would looks like a cinematic level effect, im imagining in that way
+2.it should go back to the dim base state
+3.art should barely visible, i mean it should look even more barely visible than now!
+4.it should be like wide and strong from center to smoothly less intensity as to its end
+5.completely remove that red ink tone and all, all i need if that as it fall it should properly brightly visible than the base barely visible
+
+---
+
+i mean that spot light trajectory should look like, "how a shiling edge will follow on objects side edges right like that"
+
+---
+
+single side!
+
+---
+
+hey that effect is exactly accurate visually but the only issue is with the movement on that, it isnt actually moving like a half circular arch by revealing only that part edge of its art that is travelling! i need it like that understood?
+
+---
+
+hey now it that radius became very smaller fix that! restore as its prev size!
+
+---
+
+hey it just barely has the curvature trajectory, if see randomly that it seems it just passing from top to bottom straight!, i mean that should start from even more top right side in right once and viseversa for left one's!
+
+---
+
+make its start from even slight higher top of it, than now, and slight more to right side for right side arts and viseversa!
+
+---
+
+hey the motive is to not trying to show as much as art, it is to show some segment cinematically thats my tought lets try in this way once!
+
+---
+
+hey move that lighting to even more to right side!!!
+
+---
+
+[Image #2] i mean keep that size of that exactly same and that starting position of that spotlight should be from even more higher may be like 40% higher than its now!
+
+---
+
+ok now  its perfect!, but that 4th art lakshmi isnt visible at all check that, what's the issue and fix!!
+
+---
+
+all set everything is fine its completed, thanks claude!!
