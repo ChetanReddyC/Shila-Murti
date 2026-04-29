@@ -1,0 +1,146 @@
+Fetch this design file, read its readme, and implement the relevant aspects of the design. https://api.anthropic.com/v1/design/h/aIoHStrplUCuma328l2hHw?open_file=Product+Details+Page.html
+Implement: Product Details Page.html , first build this as a separate page isolated indiviudal page and once this comes in perfection we can swap the original page with that!!
+
+---
+
+ok go!
+
+---
+
+ok now remove that solid bg of that SimilarProductsSection cause its blocking actually that bg arts visibility, and also for on the description remove that rev more option and view less option as well and also make sure u properly cleaned the code and no resedual remaning!
+
+---
+
+hey i think that ealier i was created an a component that which is basically makes that background png art shine with the shaders animation when its hoverd on it! and im sure that it should be somewhere in the dir only once look for that please and lets see and find that first and i will let u know what to do furthur with that!!
+
+---
+
+hey i know that those will also work with the png's as well now wire that with the current using bg arts in the page and increase thier opacity to 90%
+
+---
+
+ok that effect is applied and visible when hovering but the only issue is when i hover on cetain edges only it is visible, those were blocking mouse hover on them by some elements!
+
+---
+
+yeah its working perfectly but im sure that this is not the very efficient way to do this exactly so make it optimized way even more!!
+
+---
+
+ok, now should we try some other fresh similar kind of shader effect on those? cuase the current one is barely visible and earlier i havent worked to full potential get an actuall impact on effect so now lets try insted of directly bruteforce implementation first discuss with me by listing the plausible effects based on the context of the store and we can finalize some things and try!!
+
+---
+
+ok first lets try #1
+
+---
+
+[Image #1] see i have hoverd and its looking like this!
+
+---
+
+hey this is the exact effect that we are trying to achive and tell me about the possibilites based on our current situation and lets see, Technical Task: Implement a 2.5D Dynamic Lighting Pass (Light Sweep)Objective: Replicate the "Light Pass" effect seen in the Salaar (Vinaraa) concept art. The goal is to simulate a light source sweeping across a 2D subject to reveal its 3D volume, specifically for digital art featuring high-contrast textures (like stone or metallic surfaces).1. Component Architecture:Base Layer ($T_{base}$): A static texture of the subject in low-key/shadow lighting.Emission/Rim Layer ($T_{light}$): A matching texture containing only the high-intensity highlights and rim lights (Alpha-masked).Mask ($M$): A dynamic, feathered linear gradient.2. Visual Logic (Pseudo-Shader):The effect is achieved by manipulating the UV space to animate a mask over the Emission Layer and blending it additively over the Base Layer.Mask Formula:$$M = \text{smoothstep}(\text{edge}1, \text{edge}2, \sin(uv.x \cdot \cos(\theta) + uv.y \cdot \sin(\theta) - \text{time} \cdot \text{speed}))$$Blending Logic:$$\text{Final Color} = T_{base} + (T_{light} \cdot M \cdot \text{Intensity})$$3. Implementation Requirements:Diagonal Orientation: The mask should be tilted (typically between $30^\circ$ and $45^\circ$) to better define the subject's contours.Additive Blending: Ensure the $T_{light}$ layer uses a Linear Dodge (Add) or Screen blend mode to allow the light to "glow" naturally.Feathering: The smoothstep must have a wide enough range to avoid harsh lines, creating a soft "pass" rather than a hard wipe.Atmospherics: Integrate a secondary layer of "Floaties" (low-opacity particle noise) that reacts slightly to the light intensity of the mask.4. Refinement Goals:Implement a Bloom/Glow post-process pass that triggers when the mask value $M$ is at its peak.(Optional) If using a 2.5D setup, add a subtle Parallax Offset to the $T_{light}$ layer relative to the $T_{base}$ to enhance depth during the sweep.
+
+---
+
+i mean we need to get a silimar effect on that bg line arts and tell me about the possibilities?
+
+---
+
+ok now that effect is looking like we are going in the correct direction but in that effect has hardcuts visibly so make sure that those shoudnt be there at all!!
+
+---
+
+ok now that looks fine so now lets connect shat effect to work coordinatedly with the user scroll connected and now update that effect dose not actually leave that image now like as it do for a sec now, and from now no need of any hovereffect of that on it!, and lets see!
+
+---
+
+hey that effect is looking good but we need to make it even more noticably visible than this with the subtle changes, and also that it isnt at all smooth right now make it even more smoother like having an transition-duration animation sort of effect on it and lets use the framer-motion or any other even more suitable libraries for this smooth animation happen on that!!
+
+---
+
+hey it is actually good but we need to make some changes so that effect would looks even more clearly than it is right now!!
+
+---
+
+hey currently this looks good, and now that could we also do some like sort of ripple effects as well into that with the same shader blur that header and other compoenets that currently using?
+
+---
+
+and why dose that having that readish sort of color dont need that!!
+
+---
+
+now that currently looking like a widerspread now exactly like a before shader shine i need that area of radius like that!!
+
+---
+
+hey we still need to keep this as like this only and elevate that even a bit?
+
+---
+
+[Image #2] hey move that art to the left side that shown in the ss, and make sure that every art should be straight in normal orientation and make sure that any art should not have an hard cut edges [Image #3] [Image #4] like as shown!
+
+---
+
+hey still that saraswathi art is on right side only fix that properly with all the responsivenes elements in place!
+
+---
+
+ok in the dekstop version that it has the hard cuts make them properly and smooth seamlessly mask them first!
+
+---
+
+hey this feels like those arts are cut in half way after this so on the desktops lets widen the content area to the full screen width size, so that arts would naturally stick to the edges of screen!
+
+---
+
+hey also apply that both, 'The stone' card and also that 'authenticated', 'insurred', '7-days return' these card bg as well apply with that shader glass bg effect for these both containers bg as well!
+
+---
+
+[Image #5] see still it dosent have that effect!!
+
+---
+
+hey still not, i need that exact shader glass effect from the header to those div i mean! do that
+
+---
+
+[Image #6] hey have a lookinto this buy button container i think this also has that exact shader blur to this bg right? just tell me by checking!
+
+---
+
+ok no issue leave that! i just asked!
+
+---
+
+ok this looks fine now and so lets swap this page with the original one!, and makesure that everything is in place and intact in areas of the page when doing carefully!
+
+---
+
+[Image #7] hey see this files we have removed the hovering requriment function on those arts right so i think we no longer need this files check if anywhere that those are bing actually used?
+
+---
+
+ok clean up that!
+
+---
+
+ok clean up that!, and also we dont need that any hover-driven modes as well, we just need that lightsweep connected with the user scroll!
+
+---
+
+ok clean up that!
+
+---
+
+[Image #8] hey see when i try to add the file in the git its giving me this error!
+
+---
+
+[Image #9] again see when i try to commit what it saying and also tell me that why dose that generated that many branches? [Image #10] cause running the tests?
+
+---
+
+ok but i also wanted that branches to be cleaned , we already got the data we want soo that entire branches should be cleaned and remaining branches needed!

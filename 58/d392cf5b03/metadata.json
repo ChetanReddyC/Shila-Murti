@@ -1,0 +1,25 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "58d392cf5b03",
+  "strategy": "manual-commit",
+  "branch": "fixingmajorissues",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "storefront/src/components/DynamicSvgEffect/DynamicSvgEffect.tsx"
+  ],
+  "sessions": [
+    {
+      "metadata": "/58/d392cf5b03/0/metadata.json",
+      "transcript": "/58/d392cf5b03/0/full.jsonl",
+      "content_hash": "/58/d392cf5b03/0/content_hash.txt",
+      "prompt": "/58/d392cf5b03/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 17012,
+    "cache_creation_tokens": 1806195,
+    "cache_read_tokens": 75816093,
+    "output_tokens": 338021,
+    "api_call_count": 256
+  }
+}
