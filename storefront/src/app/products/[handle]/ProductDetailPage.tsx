@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
 import ErrorBoundary from '../../../components/ErrorBoundary';
 import { productsService, ProductsServiceError } from '../../../services/productsService';
@@ -11,10 +12,16 @@ import { isValidHandle, generateProductHandle } from '../../../utils/productHand
 import { useCart } from '../../../contexts/CartContext';
 import { useWishlist } from '../../../contexts/WishlistContext';
 import { medusaApiClient } from '../../../utils/medusaApiClient';
-import SimilarProductsSection from './SimilarProductsSection';
 import LoadingSpinner from '../../../components/LoadingSpinner/LoadingSpinner';
 import DynamicSvgEffect from '../../../components/DynamicSvgEffect';
+import Reviews from './Reviews';
 import styles from './ProductDetailPage.module.css';
+
+// Defer the similar-products grid — it lives below the fold, behind a
+// `content-visibility: auto` wrapper, so the user can't see it until they
+// scroll near it. Skipping it on the initial render path lets the above-fold
+// content paint sooner.
+const SimilarProductsSection = dynamic(() => import('./SimilarProductsSection'), { ssr: false });
 
 interface ProductDetailPageProps {
   params: Promise<{ handle: string }>;
@@ -86,7 +93,10 @@ const Gallery = ({
         {images.map((src, i) => {
           const offset = i - activeIdx;
           const isActive = i === activeIdx;
-          const visible = Math.abs(offset) <= 2;
+          // Skip cards fully outside the visible stack window — they paint
+          // at opacity 0 anyway, and rendering them keeps GPU layers alive
+          // for nothing.
+          if (Math.abs(offset) > 2) return null;
           return (
             <div
               key={`${src}-${i}`}
@@ -95,12 +105,11 @@ const Gallery = ({
               style={{
                 transform: `translate(${offset * 22}px, ${Math.abs(offset) * 18}px) scale(${1 - Math.abs(offset) * 0.06}) rotate(${offset * 1.5}deg)`,
                 zIndex: 10 - Math.abs(offset),
-                opacity: visible ? (isActive ? 1 : 0.6) : 0,
+                opacity: isActive ? 1 : 0.6,
                 cursor: isActive ? 'zoom-in' : 'pointer',
-                pointerEvents: visible ? 'auto' : 'none',
               }}
             >
-              <img src={src} alt={isActive ? productTitle : ''} />
+              <img src={src} alt={isActive ? productTitle : ''} loading={isActive ? 'eager' : 'lazy'} decoding="async" />
               {isActive && (
                 <>
                   <div className={styles.frameCounter}>
@@ -131,40 +140,9 @@ const Gallery = ({
   );
 };
 
-// ─── shared glass layers (ports the storefront Header recipe) ─────────
-// The Header (mounted globally in layout.tsx) defines <filter id="glass-distortion">
-// in the DOM — we just reference it here. Two stacked layers + an outer
-// backdrop-filter on the card itself replicates the Header pill exactly.
-const GlassLayers = () => (
-  <>
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden',
-        borderRadius: 'inherit',
-        backdropFilter: 'blur(2px)',
-        WebkitBackdropFilter: 'blur(2px)',
-        filter: 'url(#glass-distortion)',
-        isolation: 'isolate',
-      }}
-    />
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute', inset: 0, zIndex: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-        backdropFilter: 'blur(2px)',
-        WebkitBackdropFilter: 'blur(2px)',
-        borderRadius: 'inherit',
-      }}
-    />
-  </>
-);
-
 // ─── material story ───────────────────────────────────────────────────
 const MaterialStory = () => (
   <section className={styles.materialStory}>
-    <GlassLayers />
     <div className={styles.msInner}>
       <img className={styles.msPeacock} src="/theme_images/peacock-art-white.png" alt="" aria-hidden="true" />
       <div className={styles.msEyebrow}><span className={styles.eyebrowGlyph} /> The Stone</div>
@@ -194,7 +172,6 @@ const CraftStrip = () => {
   ];
   return (
     <div className={styles.craftStrip}>
-      <GlassLayers />
       <div className={styles.csInner}>
         {items.map((it, i) => (
           <div key={i} className={styles.csItem}>
@@ -232,12 +209,15 @@ const Lightbox = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose, onPrev, onNext]);
 
+  // Skip rendering entirely when closed — the previous version kept the
+  // dialog DOM mounted with display:none, which still cost layout/parse work.
+  if (!open) return null;
   return (
-    <div className={`${styles.lightbox} ${open ? styles.lightboxOpen : ''}`} role="dialog" aria-modal="true">
+    <div className={`${styles.lightbox} ${styles.lightboxOpen}`} role="dialog" aria-modal="true">
       <button className={`${styles.lbBtn} ${styles.lbClose}`} onClick={onClose} aria-label="Close"><CloseI /></button>
       <button className={`${styles.lbBtn} ${styles.lbPrev}`} onClick={onPrev} aria-label="Previous"><ArrowL /></button>
       <button className={`${styles.lbBtn} ${styles.lbNext}`} onClick={onNext} aria-label="Next"><ArrowR /></button>
-      {open && images[idx] && <img src={images[idx]} alt="" />}
+      {images[idx] && <img src={images[idx]} alt="" />}
       <div className={styles.lbCounter}>
         {String(idx + 1).padStart(2, '0')} / {String(images.length).padStart(2, '0')}
       </div>
@@ -471,13 +451,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           <img className={styles.bgImg} src="/theme_images/peacock-art-white.png" alt="" />
         </DynamicSvgEffect>
         <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgMandala}`} effect="lightsweep" sweepAngle={120} inkColor="#B22222">
-          <img className={styles.bgImg} src="/svg-art3.svg" alt="" />
+          <img className={styles.bgImg} src="/theme_images/templefront-white.png" alt="" />
         </DynamicSvgEffect>
         <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgElephant}`} effect="lightsweep" sweepAngle={150} inkColor="#B22222">
           <img className={styles.bgImg} src="/theme_images/elephant-art-white.png" alt="" />
         </DynamicSvgEffect>
-        <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgSvgBand}`} effect="lightsweep" sweepAngle={45} inkColor="#B22222">
-          <img className={styles.bgImg} src="/svg-art1.svg" alt="" />
+        <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgSvgBand}`} effect="lightsweep" sweepAngle={120} inkColor="#B22222">
+          <img className={styles.bgImg} src="/theme_images/Godess-lakshmi white.png" alt="" />
         </DynamicSvgEffect>
       </div>
 
@@ -615,6 +595,12 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         </div>
 
         <CraftStrip />
+
+        <div className={styles.reviewsWrap}>
+          {/* Demoing the empty state by passing an explicit []. Drop the
+              prop (or pass real reviews) to switch to the populated view. */}
+          <Reviews reviews={[]} />
+        </div>
 
         <div className={styles.similarWrap}>
           <SimilarProductsSection current={product} />

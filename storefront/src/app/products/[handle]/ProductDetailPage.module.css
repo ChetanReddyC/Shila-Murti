@@ -32,7 +32,9 @@
   --ease-soft: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-/* Soft warm vignette behind the page */
+/* Soft warm vignette + shader-wash mood — merged into a single fixed
+   layer (was two ::before/::after). Same five gradients, same look,
+   one full-viewport compositor surface instead of two. */
 .pdp::before {
   content: "";
   position: fixed;
@@ -40,22 +42,12 @@
   z-index: -2;
   pointer-events: none;
   background:
+    radial-gradient(1100px 700px at 75% 10%, rgba(178, 34, 34, 0.05), transparent 65%),
+    radial-gradient(900px 700px at 8% 60%, rgba(40, 40, 60, 0.05), transparent 70%),
     radial-gradient(1100px 800px at 88% 12%, rgba(244, 236, 216, 0.55), transparent 62%),
     radial-gradient(900px 700px at 4% 38%, rgba(244, 236, 216, 0.32), transparent 60%),
     radial-gradient(1000px 700px at 50% 105%, rgba(244, 236, 216, 0.28), transparent 65%),
     #ffffff;
-}
-
-/* Shader-wash mood (default) */
-.pdp::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(1100px 700px at 75% 10%, rgba(178, 34, 34, 0.05), transparent 65%),
-    radial-gradient(900px 700px at 8% 60%, rgba(40, 40, 60, 0.05), transparent 70%);
 }
 
 /* Background art layer (scrolls with page) */
@@ -65,19 +57,13 @@
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  /* Edge-fade mask. Without this, the `overflow: hidden` clip cuts each
-     bg art that bleeds past the .pdp box (peacock/elephant on the right,
-     saraswathi on the left) with a hard vertical line at the boundary.
-     Compose two linear gradients so left/right AND top/bottom all feather
-     softly into the page. */
-  mask-image:
-    linear-gradient(to right, transparent 0%, black 7%, black 93%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
-  -webkit-mask-image:
-    linear-gradient(to right, transparent 0%, black 7%, black 93%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
-  mask-composite: intersect;
-  -webkit-mask-composite: source-in;
+  /* Single radial-gradient mask feathers all four edges in one pass.
+     The previous double-linear + mask-composite: intersect forced an
+     extra compositor flatten on every scroll frame across the wrapper
+     holding all 4 multiply-blended bg arts. Same edge-fade visual,
+     one composite pass instead of two. */
+  mask-image: radial-gradient(ellipse 96% 98% at 50% 50%, black 78%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 96% 98% at 50% 50%, black 78%, transparent 100%);
 }
 .pdp > :not(.pdpBg):not(.ornamentCorner) {
   position: relative;
@@ -125,9 +111,9 @@
 }
 .pdpBg .bgSvgBand {
   top: 2400px;
-  left: -2vw;
+  left: -10vw;
   right: auto;
-  width: min(32vw, 600px);
+  width: min(38vw, 720px);
   opacity: 0.9;
   mix-blend-mode: multiply;
 }
@@ -138,6 +124,7 @@
 .crumbs,
 .productGrid,
 .craftStrip,
+.reviewsWrap,
 .similarWrap {
   max-width: 1320px;
   margin-left: auto;
@@ -216,11 +203,13 @@
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.25), 0 12px 30px -8px rgba(0, 0, 0, 0.15);
   transition: transform 0.55s var(--ease-out), opacity 0.4s var(--ease-soft), box-shadow 0.4s ease;
   transform-origin: center center;
-  will-change: transform;
 }
 .mosCardActive {
   box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.35), 0 16px 40px -10px rgba(0, 0, 0, 0.2);
   cursor: zoom-in;
+  /* Promote only the active card to its own GPU layer — non-active cards
+     don't move per-frame, so they don't need permanent layer allocation. */
+  will-change: transform;
 }
 .mosCard img {
   width: 100%;
@@ -479,22 +468,17 @@
   text-wrap: pretty;
 }
 
-/* MATERIAL STORY */
+/* MATERIAL STORY — shell mirrors `.buyBox` for visual continuity. */
 .materialStory {
-  /* Exact port of the storefront Header glass shell — outer ring uses
-     transparent bg + 12px backdrop blur + the brand's drop shadow. The
-     inner content sits above two stacked glass layers (see GlassLayers
-     in the component file: a turbulence-distorted backdrop + a
-     translucent white tint). */
   position: relative;
-  border-radius: 18px;
-  border: 1.5px solid rgba(229, 232, 235, 0.5);
-  background: transparent;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  border: 1px solid rgba(229, 232, 235, 0.6);
+  background: linear-gradient(180deg, rgba(250, 250, 250, 0.6) 0%, rgba(255, 255, 255, 0.2) 100%);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.05);
-  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  /* Skip painting the whole card until it's near the viewport. */
+  content-visibility: auto;
+  contain-intrinsic-size: 0 450px;
 }
 .msInner {
   position: relative;
@@ -571,18 +555,17 @@
   letter-spacing: 0.02em;
 }
 
-/* CRAFT STRIP — same Header glass shell as .materialStory */
+/* CRAFT STRIP — same shell style as .materialStory / .buyBox. */
 .craftStrip {
   position: relative;
   margin-top: 2.5rem;
-  border-radius: 18px;
-  border: 1.5px solid rgba(229, 232, 235, 0.5);
-  background: transparent;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  border: 1px solid rgba(229, 232, 235, 0.6);
+  background: linear-gradient(180deg, rgba(250, 250, 250, 0.6) 0%, rgba(255, 255, 255, 0.2) 100%);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.05);
-  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  content-visibility: auto;
+  contain-intrinsic-size: 0 200px;
 }
 .csInner {
   position: relative;
@@ -826,9 +809,23 @@
   }
 }
 
+/* REVIEWS WRAPPER — keeps the handoff Reviews module at the same
+   1320px reading width as the other inner blocks, and defers paint
+   until near the viewport. All visual styling lives in reviews.css
+   (the handoff stylesheet, scoped under .reviews-section). */
+.reviewsWrap {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 600px;
+}
+
 /* SIMILAR PRODUCTS WRAPPER */
 .similarWrap {
   margin-top: 5rem;
+  /* Skip painting the entire similar-products grid until it's near the
+     viewport. contain-intrinsic-size reserves the layout slot so scroll
+     position and scrollbar height stay correct. */
+  content-visibility: auto;
+  contain-intrinsic-size: 0 800px;
 }
 
 /* LIGHTBOX */

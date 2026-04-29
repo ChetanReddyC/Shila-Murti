@@ -16,11 +16,20 @@ export interface WindowSweepHandlers {
 
 interface Entry extends WindowSweepHandlers {
   rect: DOMRect;
+  lastProgress: number;
+  firedOnce: boolean;
 }
 
 const entries = new Set<Entry>();
 let rafId: number | null = null;
 let attached = false;
+
+// Cull entries this many px outside the viewport — far enough that the user
+// can't see the art, close enough that re-entry is responsive.
+const CULL_MARGIN_PX = 200;
+// Skip onProgress when the change is below this fraction. The mask-position
+// formula (75% → 25%) means a 0.003 change ≈ 0.15% mask shift — invisible.
+const QUANTIZE_THRESHOLD = 0.003;
 
 function refreshRects() {
   entries.forEach(e => { e.rect = e.el.getBoundingClientRect(); });
@@ -31,12 +40,26 @@ function tick() {
   const vh = window.innerHeight;
   entries.forEach(e => {
     const r = e.rect;
+    const offscreen = r.bottom < -CULL_MARGIN_PX || r.top > vh + CULL_MARGIN_PX;
+
+    // Cull: skip entries fully outside the viewport once we've fired the
+    // boundary value at least once. The downstream spring will settle there
+    // and stop emitting on its own.
+    if (offscreen && e.firedOnce) return;
+
     // Total scroll distance over which the element travels through the viewport.
     const total = vh + r.height;
     if (total <= 0) return;
     // How far the element has scrolled from "just entering" to "just exited".
     const distance = vh - r.top;
     const progress = Math.max(0, Math.min(1, distance / total));
+
+    // Quantize: skip no-op-ish updates so the spring + CSS-var write chain
+    // doesn't fire for sub-perceptible deltas.
+    if (e.firedOnce && Math.abs(progress - e.lastProgress) < QUANTIZE_THRESHOLD) return;
+
+    e.lastProgress = progress;
+    e.firedOnce = true;
     e.onProgress(progress);
   });
 }
@@ -78,6 +101,8 @@ export function registerWindowSweep(handlers: WindowSweepHandlers): () => void {
   const entry: Entry = {
     ...handlers,
     rect: handlers.el.getBoundingClientRect(),
+    lastProgress: 0,
+    firedOnce: false,
   };
   entries.add(entry);
   attach();

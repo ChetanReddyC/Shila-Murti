@@ -105,21 +105,18 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
       (entries) => {
         entries.forEach((entry) => {
           const inView = entry.isIntersecting;
-          // Additional check: for large elements, ensure significant intersection
-          const significantlyVisible = entry.intersectionRatio > 0.15;
-          const shouldActivate = inView && (entry.intersectionRatio < 0.2 || significantlyVisible);
-
-          setIsInViewport(shouldActivate);
-
-          // Track if element has ever been visible (for lazy loading)
-          if (shouldActivate && !hasBeenInViewport) {
+          setIsInViewport(inView);
+          if (inView && !hasBeenInViewport) {
             setHasBeenInViewport(true);
           }
         });
       },
       {
         rootMargin: viewportMargin,
-        threshold: [0, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0], // Multiple thresholds for better detection
+        // Single threshold — the previous 7-threshold setup fired callbacks
+        // (and React state updates) on every threshold crossing during scroll
+        // even though the resolved condition collapsed to `isIntersecting`.
+        threshold: 0,
       }
     );
 
@@ -214,13 +211,19 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
   // React.cloneElement is used to achieve this without modifying the original child.
   const child = React.Children.only(children) as React.ReactElement<any>;
 
-  // Only create filtered version if element has been in viewport at least once
+  // Only create filtered version if element has been in viewport at least once.
+  // For 'lightsweep', skip the SVG filter entirely — the host (PDP bg arts)
+  // uses mix-blend-mode: multiply, under which the specular filter's
+  // brightening of an already-white-on-transparent PNG saturates to identity
+  // (multiply of white = passthrough), so the SVG chain produces no visible
+  // contribution. Dropping it eliminates feGaussianBlur + feSpecularLighting +
+  // feComposite work per frame on every on-screen art.
   const childWithFilter = hasBeenInViewport ? React.cloneElement(
     child,
     {
       style: {
         ...(child.props.style || {}),
-        filter: `url(#${filterId})`, // Apply the SVG filter
+        filter: effect === 'lightsweep' ? 'none' : `url(#${filterId})`,
       },
     }
   ) : null;
@@ -313,8 +316,9 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
         </div>
       )}
 
-      {/* A hidden SVG element to define our complex filter effect. Only render if needed. */}
-      {hasBeenInViewport && (
+      {/* A hidden SVG element to define our complex filter effect. Only render if needed.
+          Skipped for 'lightsweep' since the cloned child uses no SVG filter there. */}
+      {hasBeenInViewport && effect !== 'lightsweep' && (
         <svg
           aria-hidden="true"
           className={styles.filterDefinition}

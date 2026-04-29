@@ -1,0 +1,632 @@
+/* =============================================================
+   reviews.css — styles for the Reviews module
+   All classes namespaced with `.rv-` (+ .reviews-section root).
+   ============================================================= */
+
+/* -------- Brand tokens used by this module --------
+   These are scoped to .reviews-section so the module is fully
+   self-contained. If your app already defines these on :root,
+   you can delete this block.
+*/
+.reviews-section {
+  --shila-ink:        #1c1917;
+  /* B&G theme: warm paper surface flattened to a soft neutral gray so the
+     active-detail panel and chip backgrounds tonally match the rest of the PDP. */
+  --shila-paper:      #f5f5f5;
+  --shila-gray-2:     #444444;
+  --shila-gray-3:     #6b6b6b;
+  --shila-gray-4:     #9a9a9a;
+  /* B&G theme: collapse the colored accents (deep red + bronze) into the
+     ink/gray scale. Stars, bar fills, active borders, focus rings, eyebrow,
+     verified badge, see-all link — all driven by these two tokens — now read
+     as a tonal continuation of the rest of the PDP. */
+  --shila-red-deep:   #1c1917;
+  --shila-bronze:     #6b6b6b;
+
+  --font-display: 'Trajan Pro', 'Cinzel', 'Times New Roman', serif;
+  /* font-body falls back to inherit (page body font) */
+}
+
+/* ============================================================
+   REVIEWS — Compact 3-column
+   Summary · Quote list · Photos. No boxy cards.
+   ============================================================ */
+.reviews-section { margin-top: 5rem; position: relative; }
+
+.rv-head-row {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 1.5rem; margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  /* Soft gradient divider — matches PDP's ornament-line treatment instead
+     of a hard rule, so it sits beside the rounded cards below. */
+  background:
+    linear-gradient(to right, transparent, rgba(20, 20, 20, 0.12), transparent)
+    bottom / 100% 1px no-repeat;
+}
+.rv-eyebrow {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--shila-red-deep); font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.rv-eyebrow .glyph { display: inline-block; width: 22px; height: 1px; background: currentColor; }
+.rv-title {
+  font-family: var(--font-display, "Trajan Pro", serif);
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+  font-weight: 600; color: var(--shila-ink); margin: 0;
+  letter-spacing: -0.01em; line-height: 1.15;
+}
+.rv-write-btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: var(--shila-ink); color: #fff;
+  border: 0; border-radius: 999px;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.82rem; font-weight: 500; letter-spacing: 0.02em;
+  cursor: pointer; transition: all 0.2s ease;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.rv-write-btn:hover { background: #000; transform: translateY(-1px); }
+
+/* 3-column grid */
+.rv-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr 220px;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+/* Summary column */
+.rv-summary { display: flex; flex-direction: column; gap: 0.65rem; }
+.rv-avg {
+  display: flex; align-items: baseline; gap: 0.25rem;
+  font-family: var(--font-display, "Trajan Pro", serif);
+  color: var(--shila-ink); font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.rv-avg-num { font-size: 3.2rem; line-height: 1; }
+.rv-avg-of { font-size: 1rem; color: var(--shila-gray-3); font-weight: 500; }
+.rv-stars { display: inline-flex; gap: 2px; }
+.rv-count {
+  font-size: 0.78rem; color: var(--shila-gray-3);
+  margin-bottom: 0.5rem;
+}
+.rv-count strong { color: var(--shila-ink); font-weight: 600; }
+
+.rv-bars { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.25rem; }
+.rv-bar-row {
+  display: grid; grid-template-columns: 14px 1fr 18px;
+  align-items: center; gap: 0.5rem;
+  font-size: 0.74rem; color: var(--shila-gray-3);
+}
+.rv-bar-n { color: var(--shila-bronze); font-weight: 600; font-family: var(--font-display, serif); }
+.rv-bar-track {
+  height: 5px; background: rgba(20,20,20,0.06); border-radius: 999px; overflow: hidden;
+}
+.rv-bar-fill {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--shila-bronze), var(--shila-red-deep));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.rv-bar-count { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Quote list — each row is a rounded soft-paper card matching the
+   Material Story / Craft Strip language elsewhere on the PDP, and
+   expands inline on hover/focus. The expansion uses the grid
+   `0fr → 1fr` row trick to smoothly animate to the natural height
+   of unknown content (text + photos) without JS measurement. */
+.rv-quotes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.rv-quote-row {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1.5px solid rgba(229, 232, 235, 0.55);
+  border-radius: 18px;
+  padding: 0.95rem 1.25rem;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.015);
+  transition:
+    background 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.4s ease,
+    box-shadow 0.4s ease,
+    transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.rv-quote-row:hover,
+.rv-quote-row:focus-visible,
+.rv-quote-row:focus-within {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(20, 20, 20, 0.1);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.06),
+    0 4px 10px rgba(0, 0, 0, 0.035);
+  transform: translateY(-1px);
+}
+
+/* Head row — avatar | headlines | chevron */
+.rv-quote-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.95rem;
+}
+.rv-quote-avatar {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--shila-paper);
+  color: var(--shila-ink);
+  border: 1px solid rgba(20, 20, 20, 0.06);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+.rv-quote-headlines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.rv-quote-titleline {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.rv-quote-stars {
+  display: inline-flex;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.rv-quote-title {
+  font-style: italic;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1.08rem;
+  line-height: 1.3;
+  color: var(--shila-ink);
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+}
+.rv-quote-snippet {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--shila-gray-3);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* Hides cleanly when the row expands and the full body takes over below. */
+  transition: opacity 0.3s ease;
+}
+.rv-quote-row:hover .rv-quote-snippet,
+.rv-quote-row:focus-visible .rv-quote-snippet,
+.rv-quote-row:focus-within .rv-quote-snippet {
+  opacity: 0.45;
+}
+
+/* Inline meta strip */
+.rv-quote-meta-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  color: var(--shila-gray-3);
+  letter-spacing: 0.01em;
+  margin-top: 0.1rem;
+}
+.rv-quote-meta-inline strong {
+  color: var(--shila-ink);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.rv-meta-dot {
+  color: var(--shila-gray-4);
+  user-select: none;
+}
+.rv-meta-vbadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--shila-ink);
+}
+.rv-meta-photos {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--shila-gray-3);
+}
+.rv-meta-photos svg { flex-shrink: 0; }
+
+/* Chevron — rotates 180° on hover/focus to signal the open state */
+.rv-quote-chevron {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 6px;
+  color: var(--shila-gray-4);
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s ease;
+}
+.rv-quote-row:hover .rv-quote-chevron,
+.rv-quote-row:focus-visible .rv-quote-chevron,
+.rv-quote-row:focus-within .rv-quote-chevron {
+  transform: rotate(180deg);
+  color: var(--shila-ink);
+}
+
+/* Inline expansion area — grid row size animates from 0fr → 1fr,
+   which lets the row smoothly grow to the natural height of the
+   content without us needing to measure it in JS. */
+.rv-quote-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rv-quote-expand-inner {
+  /* min-height: 0 lets the grid clamp the row to 0 even though the
+     inner has natural height; overflow: hidden clips it during collapse. */
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding-top: 1rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid transparent;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    border-top-color 0.4s ease;
+}
+.rv-quote-row:hover .rv-quote-expand,
+.rv-quote-row:focus-visible .rv-quote-expand,
+.rv-quote-row:focus-within .rv-quote-expand {
+  grid-template-rows: 1fr;
+}
+.rv-quote-row:hover .rv-quote-expand-inner,
+.rv-quote-row:focus-visible .rv-quote-expand-inner,
+.rv-quote-row:focus-within .rv-quote-expand-inner {
+  opacity: 1;
+  transform: translateY(0);
+  border-top-color: rgba(20, 20, 20, 0.06);
+  transition-delay: 0.12s;
+}
+
+.rv-quote-body {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--shila-gray-2);
+  text-wrap: pretty;
+}
+.rv-quote-photos { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.rv-quote-photo {
+  width: 64px; height: 64px;
+  border-radius: 12px;
+  background-size: cover; background-position: center;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
+  cursor: pointer;
+}
+.rv-quote-photo:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+.rv-quote-helpful {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--shila-gray-3);
+  font-weight: 500;
+  padding-top: 0.25rem;
+}
+.rv-quote-helpful svg { color: var(--shila-gray-4); }
+
+/* Photos column */
+.rv-photos { display: flex; flex-direction: column; gap: 0.7rem; }
+.rv-photos-label {
+  font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--shila-gray-3); font-weight: 700;
+}
+.rv-photos-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem;
+}
+.rv-photo, .rv-photo-more {
+  aspect-ratio: 1; border-radius: 12px;
+  background-size: cover; background-position: center;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s ease,
+              border-color 0.25s ease;
+}
+.rv-photo:hover {
+  transform: translateY(-2px) scale(1.03);
+  border-color: rgba(20, 20, 20, 0.18);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+.rv-photo-more {
+  background: var(--shila-paper);
+  display: grid; place-items: center;
+  font-weight: 600; color: var(--shila-ink);
+  font-family: var(--font-display, serif);
+  font-size: 0.85rem;
+}
+.rv-see-all {
+  margin-top: 0.5rem;
+  font-size: 0.78rem; color: var(--shila-bronze); font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.rv-see-all:hover { color: var(--shila-red-deep); }
+
+/* ============================================================
+   EMPTY STATE — rendered when `reviews` is an empty array.
+   Matches the rounded soft-paper card language from elsewhere on
+   the PDP (Material Story / Craft Strip / quote rows).
+   ============================================================ */
+/* Mirrors the PDP `.buyBox` shell exactly so the empty-state container
+   sits in continuity with the Add-to-Cart card on the same page. */
+.rv-empty {
+  border-radius: 20px;
+  border: 1px solid rgba(229, 232, 235, 0.6);
+  background: linear-gradient(180deg, rgba(250, 250, 250, 0.6) 0%, rgba(255, 255, 255, 0.2) 100%);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  padding: 4rem 2rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+}
+
+.rv-empty-stars {
+  display: inline-flex;
+  gap: 0.5rem;
+  color: var(--shila-gray-4);
+  margin-bottom: 0.25rem;
+}
+.rv-empty-stars svg {
+  transition:
+    color 0.4s ease,
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* On hover, the row of stars cascades upward and deepens to ink —
+   subtle invitation, signals "you can change this." */
+.rv-empty:hover .rv-empty-stars { color: var(--shila-ink); }
+.rv-empty:hover .rv-empty-stars svg:nth-child(1) { transform: translateY(-4px); transition-delay: 0s; }
+.rv-empty:hover .rv-empty-stars svg:nth-child(2) { transform: translateY(-4px); transition-delay: 0.05s; }
+.rv-empty:hover .rv-empty-stars svg:nth-child(3) { transform: translateY(-4px); transition-delay: 0.1s; }
+.rv-empty:hover .rv-empty-stars svg:nth-child(4) { transform: translateY(-4px); transition-delay: 0.15s; }
+.rv-empty:hover .rv-empty-stars svg:nth-child(5) { transform: translateY(-4px); transition-delay: 0.2s; }
+
+.rv-empty-title {
+  margin: 0;
+  font-family: var(--font-display, 'Trajan Pro', serif);
+  font-weight: 600;
+  font-size: clamp(1.5rem, 2.6vw, 1.95rem);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--shila-ink);
+}
+.rv-empty-lede {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--shila-gray-3);
+  max-width: 50ch;
+  text-wrap: pretty;
+}
+.rv-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: var(--shila-ink);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.85rem 1.6rem;
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  transition:
+    background 0.3s ease,
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.4s ease;
+}
+.rv-empty-cta:hover {
+  background: #000;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.14);
+}
+.rv-empty-cta:active { transform: translateY(0); }
+
+@media (max-width: 640px) {
+  .rv-empty { padding: 3rem 1.25rem 2.5rem; }
+  .rv-empty-stars svg { width: 24px; height: 24px; }
+}
+
+/* DRAWER */
+.rv-drawer-backdrop {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(20,20,20,0.4);
+  backdrop-filter: blur(3px);
+  animation: rv-fade 0.25s ease;
+}
+.rv-drawer {
+  position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
+  z-index: 501;
+  width: min(92vw, 640px);
+  background: #fff;
+  border: 1px solid rgba(20,20,20,0.1);
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 3rem);
+  animation: rv-slide-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes rv-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rv-slide-up {
+  from { opacity: 0; transform: translate(-50%, 30px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.rv-drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+  padding: 1.5rem 1.75rem 0.5rem;
+}
+.rv-drawer-eyebrow {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--shila-red-deep); font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+.rv-drawer-eyebrow .glyph { display: inline-block; width: 18px; height: 1px; background: currentColor; }
+.rv-drawer-title {
+  font-family: var(--font-display, "Trajan Pro", serif);
+  font-size: 1.4rem; color: var(--shila-ink); margin: 0; font-weight: 600;
+}
+.rv-drawer-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--shila-paper); border: 0;
+  font-size: 1.4rem; line-height: 1; cursor: pointer;
+  color: var(--shila-ink);
+  display: grid; place-items: center; flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.rv-drawer-close:hover { background: var(--shila-ink); color: #fff; }
+
+.rv-drawer-body {
+  padding: 1rem 1.75rem 1.25rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  overflow-y: auto;
+}
+.rv-drawer-row { display: flex; flex-direction: column; gap: 0.5rem; }
+.rv-drawer-rating-row { flex-direction: row; align-items: center; justify-content: space-between; }
+.rv-drawer-label {
+  font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--shila-gray-3); font-weight: 600;
+}
+.rv-drawer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+.rv-input, .rv-textarea {
+  border: 1px solid rgba(20,20,20,0.12);
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.92rem; color: var(--shila-ink);
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.rv-input:focus, .rv-textarea:focus {
+  outline: none; border-color: var(--shila-bronze);
+  box-shadow: 0 0 0 3px rgba(20,20,20,0.08);
+}
+.rv-textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+
+.rv-star-picker { display: inline-flex; gap: 4px; }
+.rv-star-btn {
+  background: transparent; border: 0; cursor: pointer;
+  padding: 2px; transition: transform 0.15s ease;
+}
+.rv-star-btn:hover { transform: scale(1.15); }
+
+.rv-photo-upload { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.rv-upload-chip {
+  width: 64px; height: 64px; border-radius: 10px;
+  background-size: cover; background-position: center;
+  border: 1px solid rgba(20,20,20,0.1);
+  position: relative;
+}
+.rv-upload-x {
+  position: absolute; top: -5px; right: -5px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--shila-ink); color: #fff; border: 0;
+  font-size: 0.85rem; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+}
+.rv-upload-add {
+  width: 64px; height: 64px; border-radius: 10px;
+  border: 1.5px dashed rgba(20,20,20,0.2);
+  background: transparent; color: var(--shila-gray-3);
+  cursor: pointer;
+  display: grid; place-items: center;
+  transition: all 0.15s ease;
+}
+.rv-upload-add:hover { border-color: var(--shila-ink); color: var(--shila-ink); background: rgba(20,20,20,0.03); }
+
+.rv-drawer-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 1rem 1.75rem 1.5rem;
+  border-top: 1px solid rgba(20,20,20,0.06);
+}
+.rv-form-note { font-size: 0.74rem; color: var(--shila-gray-3); font-style: italic; }
+.rv-drawer-actions { display: inline-flex; gap: 0.5rem; }
+.rv-cancel {
+  background: transparent; border: 1px solid rgba(20,20,20,0.12);
+  padding: 0.65rem 1.1rem; border-radius: 999px;
+  font-size: 0.85rem; color: var(--shila-ink); cursor: pointer;
+  transition: all 0.2s ease;
+}
+.rv-cancel:hover { background: var(--shila-paper); }
+.rv-submit {
+  background: var(--shila-red-deep); color: #fff;
+  border: 0; padding: 0.65rem 1.4rem; border-radius: 999px;
+  font-size: 0.85rem; font-weight: 500; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.rv-submit:hover:not(:disabled) { background: #000; transform: translateY(-1px); }
+.rv-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (max-width: 1023px) {
+  .rv-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+  .rv-summary { display: grid; grid-template-columns: auto 1fr; gap: 1rem 1.5rem; align-items: center; }
+  .rv-summary > .rv-avg { grid-row: span 3; }
+  .rv-bars { grid-column: 2; grid-row: 4; margin-top: 0; }
+  .rv-photos-grid { grid-template-columns: repeat(6, 1fr); }
+}
+@media (max-width: 640px) {
+  .rv-summary { display: flex; }
+  .rv-photos-grid { grid-template-columns: repeat(4, 1fr); }
+  .rv-drawer-grid { grid-template-columns: 1fr; }
+  .rv-head-row { flex-direction: column; align-items: stretch; }
+  .rv-write-btn { align-self: flex-start; }
+}
