@@ -30,17 +30,12 @@
   position: absolute;
   inset: 0;
   transform: translateZ(0); /* Force hardware acceleration */
-  will-change: mask-image, -webkit-mask-image; /* Hint to browser about mask changes */
-}
-
-/* lightsweep — scroll-driven mask-position. JS sets --sweep-pos on the
-   wrapper from the element's scroll progress (rAF-throttled). The band
-   peak stays on the art at all times (range clamped to keep gradient
-   50% within the visible window). */
-.sweepLayer {
-  mask-position: var(--sweep-pos, 50%) var(--sweep-pos, 50%);
-  -webkit-mask-position: var(--sweep-pos, 50%) var(--sweep-pos, 50%);
-  will-change: mask-position, -webkit-mask-position;
+  /* For 'spotlight' the radial-gradient mask is sized to the layer once and
+     repositioned via its own `at <x> <y>` (CSS vars set per scroll frame in
+     JS). For 'specular' / 'ink' the mask string itself changes via inline
+     style. Either way, the mask image is what the browser is actually
+     re-rasterizing, so it's the right hint. */
+  will-change: mask-image, -webkit-mask-image;
 }
 
 .filterDefinition {

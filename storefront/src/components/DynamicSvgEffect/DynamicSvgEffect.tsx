@@ -26,16 +26,38 @@ interface DynamicSvgEffectProps {
    * Visual effect preset.
    * - 'specular' (default): cursor-driven white specular highlight.
    * - 'ink': cursor-driven wet-ink bloom (SourceAlpha → red flood → white over).
-   * - 'lightsweep': scroll-driven diagonal sweep using the same red-ink filter,
-   *   but masked by a linear gradient whose position is bound to the element's
-   *   scroll progress through the viewport. The band stays on the art at all
-   *   times (no off-canvas excursion). No hover or pointer interaction.
+   * - 'spotlight': scroll-driven curved-rim spotlight reveal. A wide soft
+   *   radial pool of "key light" travels along ONE side of the element,
+   *   following a sin-bowed bezier-style path from top to bottom (with a
+   *   slight off-frame overshoot at both ends). Its center is bound to the
+   *   element's scroll progress through the viewport; the spring smoothes
+   *   chunky scroll deltas. No SVG filter, no hover, no pointer interaction.
    */
-  effect?: 'specular' | 'ink' | 'lightsweep';
-  /** Brand red used by the ink and lightsweep effects. Default '#7a1414'. */
+  effect?: 'specular' | 'ink' | 'spotlight';
+  /** Brand red used by the ink effect. Default '#7a1414'. */
   inkColor?: string;
-  /** Sweep angle (deg) for `lightsweep`. Default 135. */
-  sweepAngle?: number;
+  /** Which rim of the element the spotlight hugs. Default 'right'. */
+  rimSide?: 'left' | 'right';
+  /**
+   * Inward bulge of the arc at its apex (% of element width). The trajectory
+   * is a true semicircle parameterized as x = anchor ± R·sin(πp), y = 50 −
+   * R·cos(πp); `archDepth` is the horizontal R, `archHeight` the vertical R.
+   * Default 55 — apex pushes well past the element's centre, so the arch
+   * shape is unmistakable even under a wide spot pool.
+   */
+  archDepth?: number;
+  /**
+   * Vertical extent of the arc (% of element height). 50 = arc spans the full
+   * height (top to bottom). <50 keeps the spot away from the very edges.
+   * Default 50.
+   */
+  archHeight?: number;
+  /** Horizontal radius of the spotlight pool (% of element width). Default 55. */
+  spotRadiusX?: number;
+  /** Vertical radius of the spotlight pool (% of element height). Default 38. */
+  spotRadiusY?: number;
+  /** CSS filter applied to the revealed (spotlit) copy of the art. */
+  spotlightFilter?: string;
 }
 
 // Throttling function to limit the rate of function calls
@@ -68,7 +90,12 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
   viewportMargin = '100px',
   effect = 'specular',
   inkColor = '#7a1414',
-  sweepAngle = 135,
+  rimSide = 'right',
+  archDepth = 55,
+  archHeight = 100,
+  spotRadiusX = 55,
+  spotRadiusY = 38,
+  spotlightFilter,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isInViewport, setIsInViewport] = useState(!enableViewportCulling); // If culling disabled, always in viewport
@@ -171,26 +198,25 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
     }
   }, [isInViewport, isHovering]);
 
-  // For lightsweep, "hovering" really means "in viewport" — the sweep mask
-  // is positioned by JS based on scroll progress; we just need the
+  // For spotlight, "hovering" really means "in viewport" — the radial mask
+  // center is positioned by JS based on scroll progress; we just need the
   // effectLayer to be visible (opacity 1) while the art is on-screen.
   useEffect(() => {
-    if (effect !== 'lightsweep') return;
+    if (effect !== 'spotlight') return;
     if (isInViewport && !hasBeenInViewport) setHasBeenInViewport(true);
     setIsHovering(isInViewport);
   }, [effect, isInViewport, hasBeenInViewport]);
 
-  // Scroll-driven sweep:
-  //   raw progress (from scroll registry) → useSpring (smoothing) → --sweep-pos
+  // Scroll-driven spotlight position:
+  //   raw progress (from scroll registry) → useSpring (smoothing) → --spot-x/--spot-y
   // The spring decouples visual motion from scroll cadence — chunky wheel
-  // ticks become a continuous, eased glide. Range [75%, 25%] keeps the
-  // band's peak well within the visible window so the band is always
-  // substantially on the art.
+  // ticks become a continuous, eased glide. Path is computed from progress
+  // in the listener below.
   const rawSweep = useMotionValue(0.5);
   const smoothSweep = useSpring(rawSweep, { stiffness: 80, damping: 22, mass: 0.7 });
 
   useEffect(() => {
-    if (effect !== 'lightsweep') return;
+    if (effect !== 'spotlight') return;
     const el = containerRef.current;
     if (!el) return;
     return registerWindowSweep({
@@ -199,12 +225,34 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
     });
   }, [effect, rawSweep]);
 
-  useMotionValueEvent(smoothSweep, 'change', (v) => {
-    if (effect !== 'lightsweep') return;
+  useMotionValueEvent(smoothSweep, 'change', (p) => {
+    if (effect !== 'spotlight') return;
     const el = containerRef.current;
     if (!el) return;
-    const pos = 75 - v * 50; // 75% → 25%
-    el.style.setProperty('--sweep-pos', `${pos}%`);
+    // True semicircular-arch trajectory (parameterized by θ = π·p):
+    //   x = anchorX ± archDepth · sin(θ)
+    //   y = 50 − archHeight · cos(θ)
+    // At p=0: spot at top of the rim (anchorX, 50−archHeight) — i.e., the
+    //         top-right corner of the bbox for rimSide='right', top-left
+    //         for 'left'.
+    // At p=0.5: spot at the arc's apex (anchorX + sign·archDepth, 50) — the
+    //          point pushed furthest inward, away from the rim.
+    // At p=1: spot at bottom of the rim (anchorX, 50+archHeight) — i.e.,
+    //         the corresponding bottom corner.
+    // anchorX is pushed past the rim, with the whole curve nudged rightward
+    // for both rim sides. archHeight (100) means y at p=0 lands at -50%
+    // (well above the bbox) and at p=1 at 150% (well below) — spot enters
+    // from far off-frame above the rim, arcs deeply through the interior,
+    // exits far off-frame below. The entry/exit beats are pronounced: the
+    // art is genuinely dim for a stretch of scroll before the spot crosses
+    // its top edge, and again after it leaves the bottom edge.
+    const anchorX = rimSide === 'right' ? 112 : 8;
+    const sign = rimSide === 'right' ? -1 : 1;
+    const theta = Math.PI * p;
+    const x = anchorX + sign * archDepth * Math.sin(theta);
+    const y = 50 - archHeight * Math.cos(theta);
+    el.style.setProperty('--spot-x', `${x}%`);
+    el.style.setProperty('--spot-y', `${y}%`);
   });
 
   // We need to add our SVG filter to the child component.
@@ -212,34 +260,40 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
   const child = React.Children.only(children) as React.ReactElement<any>;
 
   // Only create filtered version if element has been in viewport at least once.
-  // For 'lightsweep', skip the SVG filter entirely — the host (PDP bg arts)
-  // uses mix-blend-mode: multiply, under which the specular filter's
+  // For 'spotlight', skip the SVG filter entirely — the host (PDP bg arts)
+  // uses mix-blend-mode: multiply, under which an SVG specular-style filter's
   // brightening of an already-white-on-transparent PNG saturates to identity
   // (multiply of white = passthrough), so the SVG chain produces no visible
-  // contribution. Dropping it eliminates feGaussianBlur + feSpecularLighting +
-  // feComposite work per frame on every on-screen art.
+  // contribution. Instead, the consumer passes `spotlightFilter` (a plain CSS
+  // filter string) which is applied inline to the cloned img — that's how the
+  // spotlit copy gets its vivid, fully-revealed look while the dim base copy
+  // keeps the consumer's barely-there CSS filter via cascade.
   const childWithFilter = hasBeenInViewport ? React.cloneElement(
     child,
     {
       style: {
         ...(child.props.style || {}),
-        filter: effect === 'lightsweep' ? 'none' : `url(#${filterId})`,
+        filter: effect === 'spotlight'
+          ? (spotlightFilter ?? 'none')
+          : `url(#${filterId})`,
+        // For spotlight the consumer's CSS may dim the base img via opacity
+        // (so the un-spotlit area reads as a ghost). The revealed copy must
+        // ignore that dimming — pin it to full opacity so the pool of light
+        // produces a clear reveal regardless of the base styling.
+        ...(effect === 'spotlight' ? { opacity: 1 } : {}),
       },
     }
   ) : null;
 
   // Mask drives where the filtered child shows through:
   //  - 'specular' / 'ink': cursor-driven radial gradient, position from CSS vars.
-  //  - 'lightsweep': fixed-stop linear gradient at sweepAngle°, sized larger
-  //    than the layer so an animated mask-position can sweep it diagonally
-  //    across the art (CSS keyframe in the .sweepLayer class).
+  //  - 'spotlight': scroll-driven elliptical pool whose center is driven by
+  //    --spot-x/--spot-y (set per frame from scroll progress along a curved
+  //    rim path). Wide, strong core with a long, soft falloff to transparent
+  //    so the reveal reads as a key light rather than a hard-edged disc.
   const maskGradient = (() => {
-    if (effect === 'lightsweep') {
-      // Tighter, sharper band with deeper shoulders. Stops at 38/45/50/55/62
-      // give a ~24% gradient-axis band — narrower than the prior 30% — and
-      // 0.65 alpha shoulders make the lead-in/out more saturated, so the
-      // sweep reads as a deliberate ink stamp rather than a soft wash.
-      return `linear-gradient(${sweepAngle}deg, transparent 0%, transparent 38%, rgba(0,0,0,0.65) 45%, black 50%, rgba(0,0,0,0.65) 55%, transparent 62%, transparent 100%)`;
+    if (effect === 'spotlight') {
+      return `radial-gradient(ellipse ${spotRadiusX}% ${spotRadiusY}% at var(--spot-x, 50%) var(--spot-y, 50%), black 0%, rgba(0,0,0,0.92) 22%, rgba(0,0,0,0.6) 46%, rgba(0,0,0,0.22) 70%, transparent 92%)`;
     }
     if (effect === 'ink') {
       return `radial-gradient(circle ${spotlightSize}px at var(--mouse-x) var(--mouse-y), black 0%, transparent 100%)`;
@@ -247,14 +301,11 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
     return `radial-gradient(circle ${spotlightSize}px at var(--mouse-x) var(--mouse-y), black 40%, transparent 100%)`;
   })();
   const maskStyle: React.CSSProperties = hasBeenInViewport ? (
-    effect === 'lightsweep' ? {
+    effect === 'spotlight' ? {
       maskImage: maskGradient,
       WebkitMaskImage: maskGradient,
-      maskSize: '250% 250%',
-      WebkitMaskSize: '250% 250%',
-      // no-repeat: avoids the gradient tiling and re-entering from the
-      // opposite corner. Mask-position is driven by --sweep-pos via the
-      // .sweepLayer class, set per-frame from scroll progress.
+      // No tiling: the gradient is sized to the element and positioned by
+      // the radial-gradient's own `at <x> <y>` — we don't drive mask-position.
       maskRepeat: 'no-repeat',
       WebkitMaskRepeat: 'no-repeat',
     } : {
@@ -277,38 +328,39 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
         ...containerStyle,
       } as React.CSSProperties}
     >
-      {/* Base state: The original art. Always visible for 'lightsweep' (the
-          sweep layers on top through a mask). For 'specular' / 'ink' it
-          fades out while hovered so the filtered effectLayer takes over. */}
+      {/* Base state: The original art. Always visible for 'spotlight' (the
+          spotlit copy layers on top through the radial mask). For 'specular'
+          / 'ink' it fades out while hovered so the filtered effectLayer takes
+          over. */}
       <div
         className={styles.baseLayer}
-        style={{ opacity: effect === 'lightsweep' ? 1 : (isHovering ? 0 : 1) }}
-        aria-hidden={effect !== 'lightsweep' && isHovering}
+        style={{ opacity: effect === 'spotlight' ? 1 : (isHovering ? 0 : 1) }}
+        aria-hidden={effect !== 'spotlight' && isHovering}
       >
         {children}
       </div>
 
       {/* Effect layer: filter + mask. Visible while hovering (specular/ink) or
-          while in viewport (lightsweep — sweep is time-driven). */}
+          while in viewport (spotlight — center is scroll-driven). */}
       {hasBeenInViewport && (
         <div
           className={styles.effectLayer}
           style={{
             opacity: isHovering && isInViewport ? 1 : 0,
-            pointerEvents: isHovering && isInViewport && effect !== 'lightsweep' ? 'auto' : 'none'
+            pointerEvents: isHovering && isInViewport && effect !== 'spotlight' ? 'auto' : 'none'
           }}
           aria-hidden={!isHovering || !isInViewport}
         >
-          {/* Ambient layer: faint full art under the mask. Skipped for lightsweep
-              so the base layer below shows through fully outside the sweep band. */}
-          {effect !== 'lightsweep' && (
+          {/* Ambient layer: faint full art under the mask. Skipped for spotlight
+              so the dim base layer below shows through fully outside the pool. */}
+          {effect !== 'spotlight' && (
             <div className={styles.ambientLayer}>
               {children}
             </div>
           )}
-          {/* Masked filter layer. .sweepLayer adds the keyframe animation for lightsweep. */}
+          {/* Masked filter layer. */}
           <div
-            className={`${styles.spotlightLayer} ${effect === 'lightsweep' ? styles.sweepLayer : ''}`}
+            className={styles.spotlightLayer}
             style={maskStyle}
           >
             {childWithFilter}
@@ -317,8 +369,8 @@ const DynamicSvgEffect: React.FC<DynamicSvgEffectProps> = ({
       )}
 
       {/* A hidden SVG element to define our complex filter effect. Only render if needed.
-          Skipped for 'lightsweep' since the cloned child uses no SVG filter there. */}
-      {hasBeenInViewport && effect !== 'lightsweep' && (
+          Skipped for 'spotlight' since the cloned child uses a plain CSS filter. */}
+      {hasBeenInViewport && effect !== 'spotlight' && (
         <svg
           aria-hidden="true"
           className={styles.filterDefinition}

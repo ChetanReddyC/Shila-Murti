@@ -1,5 +1,5 @@
 /**
- * Shared window-level scroll registry for DynamicSvgEffect (`effect: 'lightsweep'`).
+ * Shared window-level scroll registry for DynamicSvgEffect (`effect: 'spotlight'`).
  *
  * One scroll + resize listener total, regardless of how many entries opt in.
  * Per element, computes a scroll progress 0..1 (0 = element's top edge just
@@ -27,8 +27,9 @@ let attached = false;
 // Cull entries this many px outside the viewport — far enough that the user
 // can't see the art, close enough that re-entry is responsive.
 const CULL_MARGIN_PX = 200;
-// Skip onProgress when the change is below this fraction. The mask-position
-// formula (75% → 25%) means a 0.003 change ≈ 0.15% mask shift — invisible.
+// Skip onProgress when the change is below this fraction. Downstream the
+// progress feeds a parametric path (x ≈ anchor + amp·sinπp, y ≈ p·100); a
+// 0.003 delta translates to ≪1% center movement — sub-perceptible.
 const QUANTIZE_THRESHOLD = 0.003;
 
 function refreshRects() {

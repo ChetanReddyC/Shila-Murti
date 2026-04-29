@@ -80,13 +80,21 @@
   display: block;
   pointer-events: none;
   user-select: none;
-  filter: grayscale(100%) contrast(1.05) brightness(0.65);
-  /* Soft elliptical vignette so the natural edges of each PNG/SVG fade
-     into the page instead of clipping abruptly. Applies to both the base
-     img and the cloned filter img inside the sweep layer. */
+  /* DIM BASE — barely visible. Under mix-blend-mode: multiply on the wrapper,
+     a pixel of brightness ~0.92 reads as a faint whisper on the cream paper.
+     The spotlit COPY of the same img (cloned by DynamicSvgEffect) overrides
+     this via inline style to a low-brightness/high-contrast filter, so the
+     pool of light reveals the art crisply — and once the spotlight passes,
+     the area drops back to this ghost state. */
+  filter: grayscale(100%) brightness(0.94);
+  opacity: 0.55;
+  /* Soft elliptical vignette so the natural edges of each PNG fade into the
+     page instead of clipping abruptly. Applies to both the base img and the
+     cloned spotlit img inside the radial mask layer. */
   mask-image: radial-gradient(ellipse 92% 92% at 50% 50%, black 45%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 92% 92% at 50% 50%, black 45%, transparent 100%);
 }
+
 .pdpBg .bgPeacock {
   top: 120px;
   right: -2vw;

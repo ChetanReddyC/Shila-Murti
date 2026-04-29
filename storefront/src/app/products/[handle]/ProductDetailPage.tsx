@@ -447,17 +447,43 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   return (
     <div className={styles.pdp}>
       <div className={styles.pdpBg} aria-hidden="true">
-        <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgPeacock}`} effect="lightsweep" sweepAngle={135} inkColor="#B22222">
+        {/* Each art's spotlight rims its INNER (page-facing) edge:
+              right-of-page arts (peacock, elephant) → light runs down their LEFT side
+              left-of-page arts  (mandala, lakshmi)  → light runs down their RIGHT side
+            so the highlight always travels toward the reader's gaze, not off the screen.
+            spotlightFilter is the vivid filter for the revealed copy; the dim base
+            stays at the toned-down filter set on .bgImg in the module CSS. */}
+        <DynamicSvgEffect
+          className={`${styles.bgArt} ${styles.bgPeacock}`}
+          effect="spotlight"
+          rimSide="left"
+          spotlightFilter="grayscale(100%) contrast(1.18) brightness(0.45)"
+        >
           <img className={styles.bgImg} src="/theme_images/peacock-art-white.png" alt="" />
         </DynamicSvgEffect>
-        <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgMandala}`} effect="lightsweep" sweepAngle={120} inkColor="#B22222">
+        <DynamicSvgEffect
+          className={`${styles.bgArt} ${styles.bgMandala}`}
+          effect="spotlight"
+          rimSide="right"
+          spotlightFilter="grayscale(100%) contrast(1.18) brightness(0.45)"
+        >
           <img className={styles.bgImg} src="/theme_images/templefront-white.png" alt="" />
         </DynamicSvgEffect>
-        <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgElephant}`} effect="lightsweep" sweepAngle={150} inkColor="#B22222">
+        <DynamicSvgEffect
+          className={`${styles.bgArt} ${styles.bgElephant}`}
+          effect="spotlight"
+          rimSide="left"
+          spotlightFilter="grayscale(100%) contrast(1.18) brightness(0.45)"
+        >
           <img className={styles.bgImg} src="/theme_images/elephant-art-white.png" alt="" />
         </DynamicSvgEffect>
-        <DynamicSvgEffect className={`${styles.bgArt} ${styles.bgSvgBand}`} effect="lightsweep" sweepAngle={120} inkColor="#B22222">
-          <img className={styles.bgImg} src="/theme_images/Godess-lakshmi white.png" alt="" />
+        <DynamicSvgEffect
+          className={`${styles.bgArt} ${styles.bgSvgBand}`}
+          effect="spotlight"
+          rimSide="right"
+          spotlightFilter="grayscale(100%) contrast(1.18) brightness(0.45)"
+        >
+          <img className={styles.bgImg} src="/theme_images/Godess-lakshmi-white.png" alt="" />
         </DynamicSvgEffect>
       </div>
 
